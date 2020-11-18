@@ -1,0 +1,36 @@
+CDP1802 NOTES
+=============
+
+- AMSAT AO-40 IHU-1 (also on OSCAR 10, 13)
+   AO-13 w/ 32K of memory, but never used more than 16K
+   CDP-1802 w/ 16KB of memory, running at 100K instr/s
+   NB. 100K = 10us / 2 MCLK, 1 MCLK = 5us, 1 CLK = 625ns => 1.6MHz
+
+   TLM spec says 64K memory
+
+   256byte  128 channel ADC
+   128byte  IPS SYSPAGE
+   telemetry transmit @ 400bps using PSK
+
+   P3 block structure
+   sync            4   #39 #15 #ED #30
+   block         512
+   CRCC            2
+   inter-block  ~130  #50
+
+   400bit/s = 50byte/s, 50Hz is the std rate for IPS sysclk and interrupts.
+
+- disable interrupts on bootstrap
+   0000  71       DIS         ; X = P = 0, so inits again (X,P) w/ zero
+   0001  00                   ; and disables INT
+   ...                        ; setup INT handling
+         70       RET         ; enable INT
+         xp
+
+- interrupt routine
+   SAVE     ; save T into stack pointed by X
+   ...
+   RET      ; return and IE
+   or
+   DIS      ; return and disable IE
+

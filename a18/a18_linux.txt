@@ -1,0 +1,22 @@
+Mark Abene's suggested command-line script for Linux compilation is:
+ln -s A18.H a18.h
+gcc -I. -o a18 a18.c a18util.c a18eval.c
+
+-------------
+
+A18 Assembler Info, Nov 2015: Kevin Dezuzio 
+
+For my COSMAC assembly, I am using the William Coley A18 cross-assembler with modifications by Herb Johnson.  I was able to compile this program in Slackware Linux simply by doing this: 
+
+gcc -o a18 a18.c a18eval.c a18util.c -Wall 2>wallerrors.txt
+
+You will find a few warnings in wallerrors.txt, but nothing that appears to be serious. When assembling a source file, I use the following in a script: 
+ 
+#!/bin/bash 
+./a18 $1.asm -l $1.lst -o $1.hex
+
+simply provide the name of the assembly file minus the .asm and you will get a hex output and a formatted list file.
+
+I'm not sure of all the differences between A18 and the commercial Avocet that Lee Hart uses, but defining the registers R0-RF/r0-rf with equates may be necessary for some old code.  A file 1802reg.asm included in Herb's version will take care of this.
+
+Note - you don't need anything high-tech to run this; I use an old Dell Celeron/500 laptop with 256MB of ram.  It is more than gutsy enough.  Unfortunately I have w98 dos and xp partitions to run other stuff like the Parallel Port QBasic program (great for loading up romless m/c's), my eprom burner and the Rhinestone LCC compiler, but I do try to do as much as I can in Linux.

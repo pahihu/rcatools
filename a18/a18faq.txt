@@ -1,0 +1,35 @@
+"Frequently" asked questions - actually just asked once.
+
+> Can you change the assembler to do X? to run under Windows [something]?
+
+*You* can make the change if you wish. If someone adapts the source to run under Windows - the suggested, free C compiler can also produce Windows programs - I'd like to see that, maybe add their source to my distribution. Same applies to most changes. But under the terms of release from the original author, ANYONE can change and redistribute the source and their changes, and MUST charge nothing or only small amounts above distribution costs, and MUST include all sources and changes. (This is pre-Internet software, when it cost dollars for diskettes and pennies to mail them.) See my A18 Web page for a note from the author, today, about all this.
+
+http://www.retrotechnology.com/memship/a18.html
+
+But as so many 8-bit software tools were written for use under MS-DOS, I see no need for Windows versions myself. I'll make any changes that seem reasonable, if not I'll likely add a note "here's a change you can make". - Herb Johnson
+
+------------------------------------
+
+> Can the assembler listing produce OCTAL codes and data?
+
+Yes, there is now a note about how to change the source to do that. The Intel hex file output is unchanged.
+
+> The .asm file must be completely specified and does not assume the .asm extension. 
+> (Some assemblers assume the extensions and allows it to specified if different.)
+
+> If you don't (fully) specify the two output files you don't get them at all. 
+>(Some assembers assume you want to produce the files unless you specify otherwise.)
+
+Right on both points. See the doc file. These are features.
+
+> In using [some MS-DOS assembler in Windows XP] I can double click the .exe file and have the window open in the directory I'm in. 
+>I was not successful in getting the A18.exe to stay open without first opening and navigating the DOS window to the folder.  
+
+In XP I use an already open MS-DOS window, and execute the assembler from the command line. I suppose there's a way to set up the .EXE to run-on-click, but since the assembler requires command-line filenames and parameters, I see no point in this, one needs to use the keyboard anyway. If anyone has this "fix", I'll add a document to that effect.
+
+Note that in the MS-DOS window, the keyboard "up arrow" key will provide earlier command-line content. In other words, to assemble again, just use the up-arrow key to get to the previous command line and hit "return" to execute it. Use insert/delete/left arrow/right arrow to edit the command line as needed, to change the various input file names. But reassembly is generally just "uparrow return", two "keyboard clicks". I use other MS-DOS windows or other desktop windows, to do work like editing, compiling, and so on. 
+
+But one could work entirely under MS-DOS as well.
+
+- herb Johnson, April 15 2010
+

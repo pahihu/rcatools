@@ -1,0 +1,13 @@
+Disassemble all:
+1806 disassembler for the nokia ATF-2 carphone
+
+disasm < nokia.hex > nokia.asm
+
+Disassemble from 00e0h - 0fffh:
+disasm -b00e0 -e0fff < nokia.hex > nokia.asm
+
+Note that disassembling the whole rom at once will fail because the emty space in the eprom is filled with ff, and ff is a 2 bytes instruction. You will need to split up the dataspace in some parts.
+
+This program is (c) 1998 Herman Robers, PA3FYW. <pa3fyw@amsat.org>
+This is a pre-pre-pre-release so don't expect anything useful from it.
+Do not distribute

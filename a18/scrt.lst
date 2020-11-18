@@ -1,0 +1,157 @@
+                        ;exerpted and edited UT71 CALL/RETN support code, Herb Johnson Mar 2018
+                        ;http://www.retrotechnology.com/memship/UT71_rom.html - read the whole UT71 code
+                        ;http://www.retrotechnology.com/memship/rcabug_scrt.html - read about SCRT
+                        
+                        ;please don't entirely rely on this code as I've just chopped it up
+                        ;ONLY to illustrate use of CALL and RTRN, initialization and use - Herb Johnson
+                        
+                        	;; Converted from ASM8 to A18
+                        	;; 9/9/2016
+                        	;; DW Schultz
+                        ;NAME: UT71. VER 0.0
+                        
+   0000                 R0     EQU 0
+   0001                 R1     EQU 1
+                        
+   0002                 SP     EQU 002H ;STACK POINTER
+   0003                 PC     EQU 003H ;PROGRAM COUNTER
+   0004                 CALL   EQU 004H ;CALL ROUTINE REGISTER
+   0005                 RETN   EQU 005H ;RETURN ROUTINE REGISTER
+   0006                 LINK   EQU 006H ;SUBROUTINE.DATA LINK (return stack)
+   000C                 DELAY  EQU 00CH ;DELAY ROUTINE REG
+   000F                 CHAR   EQU 00FH ; STORES ASCII I/O
+                        
+   8000                 UT71   EQU 08000H
+   8CFF                 TOPSTK EQU 008CFFH
+   8C1F                 WRAM   EQU 08C1FH
+                        
+   8000                      ORG UT71            ;entry to ROM monitor P=X=R0
+                        
+   8000   71             	DIS              ;on reset P=R0=0000H
+   8001   00             	DB 0                 ;DISABLE
+   8002   F8 80          	LDI HIGH(UT71) 	 ;ESTABLISH PROGRAM COUNTER AT
+   8004   B0            	PHI R0           ;8000 HEX and "jump" there
+                         
+                        
+   8005   F8 8C         	LDI 	HIGH(WRAM) ;TOP OF SAVE AREA
+   8007   B1            	PHI	R1 
+   8008   F8 1F         	LDI	LOW(WRAM)
+   800A   A1            	PLO	R1
+   800B   E1            	SEX 	R1	
+   800C   21            LOOP  DEC 	R1         ;POINT BELOW WHERE SAVED R IS TO GO
+   800D   F8 D0         	LDI	0D0H
+   800F   73            	STXD            ;LOAD "SEP R0" INSTRUCTION FOR RETURN
+                             ;additional initialization and command setup
+   8010   C0 80 2A           LBR INIT
+                        
+                             ;bulk of UT71 monitor code not included
+                        
+                        ;stub of address so you can "assemble" this code, please dont "execute" it!
+                        
+   8013   30 13         START:  BR  START  
+   8015                 DELAY1: ;magic delay routine
+   8015                 TYPED:  ;magic print-to-console routine
+   8015   30 13                 BR  START
+                        
+                        ;*******************************************
+                        
+                        ;example of subroutine call and subroutine
+                         
+   8017   D4            EXAM: SEP	CALL		;or use CALL OSTRNG pseudoop
+   8018   80 20         	DW	OSTRNG	;called address
+   801A   0D 0A 0A 00   	DB 	0DH,0AH,0AH,00 ;option to pass along data 
+                                             ;if implemented MUST be part of subroutine
+   801E   30 17               BR  EXAM 
+                        
+                        
+   8020                 OSTRNG  ;routine to print
+   8020   46                   LDA LINK		;LINK reg points to string after CALL address & increments?
+   8021   BF            	  PHI CHAR
+   8022   32 29                BZ EXITM      ;print characters in string until null 
+   8024   D4                   SEP CALL
+   8025   80 15                DW (TYPED)	;send char in D to console (print it)  
+   8027   30 20                BR OSTRNG
+   8029   D5            EXITM  SEP RETN
+                        
+                        
+                        
+                        ;*************************************************************************
+                        ;     REGISTER INITIALIZATION ROUTINE
+                        ;     entered with R0 as program counter 
+                        
+   802A   F8 13         INIT LDI LOW(START)   ;REG 3 AS PROGRAM COUNTER
+   802C   A3            	PLO PC
+   802D   F8 80         	LDI HIGH(START)
+   802F   B3            	PHI PC 
+                        
+   8030   F8 15         ENTER2 LDI LOW(DELAY1)
+   8032   AC            	PLO DELAY       ;REG C to DELAY ROUTINE
+   8033   F8 80         	LDI HIGH(DELAY1)
+   8035   BC            	PHI DELAY
+   8036   F8 83         	LDI HIGH(CALLR) ;REG 4 TO CALL
+   8038   B4            	PHI CALL
+   8039   B5            	PHI RETN
+   803A   F8 64         	LDI LOW(CALLR)
+   803C   A4            	PLO CALL
+   803D   F8 74         	LDI LOW(RETR)   ;REG 5 TO RETURN
+   803F   A5            	PLO RETN
+   8040   F8 FF         	LDI LOW(TOPSTK) ;REG 2 AS A STACK POINTER TO LOCATION 3CFF HEX
+   8042   A2            	PLO SP
+   8043   F8 8C         	LDI HIGH(TOPSTK)
+   8045   B2            	PHI SP
+   8046   E2            	SEX SP
+   8047   D3            	SEP PC
+                        
+                        
+                        ;*************************************************************************
+                        ;DESC: STANDARD SEP CALL and RETN 
+                        ;REG USED: SP,PC,SEP CALL;,A(,RETURN,LINK & STACK
+                        ;*************************************************************************
+                        
+   8363                 	ORG UT71+0363H
+                        
+                        ; STANDARD CALL
+                        
+   8363   D3            EXITC SEP PC             ;GO TO CALLED ROUTINE
+                        
+   8364   E2            CALLR SEX SP 		    ;SET R(X)
+   8365   96            	GHI LINK
+   8366   73            	STXD                ;SAVE THE CURRENT LINK ON
+   8367   86            	GLO LINK
+   8368   73            	STXD                ;THE STACK
+   8369   93            	GHI PC
+   836A   B6            	PHI LINK
+   836B   83            	GLO PC
+   836C   A6            	PLO LINK
+   836D   46            	LDA LINK
+   836E   B3            	PHI PC              ;PICK UP THE SUBROUTINE
+   836F   46            	LDA LINK
+   8370   A3            	PLO PC              ;ADDRESS
+   8371   30 63         	BR EXITC
+                        
+                        ;  STANDARD RETURN
+                        
+   8373   D3            EXITR  SEP PC            ;RETURN TO MAIN PGM
+                        
+   8374   96            RETR GHI LINK            ;recover calling program return addr
+   8375   B3            	PHI PC
+   8376   86            	GLO LINK
+   8377   A3            	PLO PC
+   8378   E2            	SEX SP
+   8379   12            	INC SP              ;SET THE STACK POINTER
+   837A   72            	LDXA
+   837B   A6            	PLO LINK            ;RESTORE THE CONTENTS OF
+   837C   F0            	LDX
+   837D   B6            	PHI LINK            ;LINK
+   837E   30 73         	BR EXITR
+                        
+                        
+   8380                 	END
+0004  CALL          8364  CALLR         000f  CHAR          000c  DELAY     
+8015  DELAY1        8030  ENTER2        8017  EXAM          8363  EXITC     
+8029  EXITM         8373  EXITR         802a  INIT          0006  LINK      
+800c  LOOP          8020  OSTRNG        0003  PC            0000  R0        
+0001  R1            0005  RETN          8374  RETR          0002  SP        
+8013  START         8cff  TOPSTK        8015  TYPED         8000  UT71      
+8c1f  WRAM          
+

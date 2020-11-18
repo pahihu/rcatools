@@ -1,0 +1,39 @@
+INtel Hex record format - Herb Johnson
+
+Intel hex format is a standard among many 8-bit assemblers and EPROM
+programmers. Each line or record has ASCII hexadecimal byte values in memory
+order. Each record includes a leading ":", a type byte, load address, a data
+byte count, data, and ends with a "checksum" byte. All bytes (except the ":" and
+checksum) are summed up in hex; the "checksum" is a value that, when added to
+the sum, produces a ZERO value in the least significant byte. So a sum of 1234
+HEX (not decimal!) would need a checksum BYTE of CC HEX to produce a 1300 HEX
+value - last byte is 00. You can call it a "modulo 256 value of zero" if you
+wish.
+
+The fun part is figuring out what part of the record, represents what feature
+I've described above. Or, a Web search will likely find defining documents for
+"Intel hex record" format. There are also hexadecimal calculators on various Web
+sites if you want to do calculate checksums by hand. Imagine the fun of 
+doing math in hex, in your head. I did that all the time in the 1970's.
+In the 21st century, even decimal math "in your head" is probably considered
+idiot-savant talent! So, hone your hexidecimal skills and impress your friends.
+
+GIve up? Here's the Intel Hex format scheme:
+values are expressed in two ASCII hex digits per byte. 
+
+start - ASCII colon ':'
+byte count - two hex digits, often defaults to 10 or 20 (hex)
+address - four hex digits, high address/low address
+type - two hex digits, 00 to 05
+data - in hex digits, for the count of bytes
+checksum - hex digits
+..and a line terminator like CR or CR/LF
+
+What is a checksum?
+Add up in hex all the bytes, not the colon, not the checksum. 
+What byte value when added to the sum, will make the last two hex digits "00"? That's the checksum.
+
+Record types 
+"00" for data, 
+"01" for an "end of file", otherwise it's a data record with no data. Often it has a "start" address for the file.
+..and other types not used for 8-bit systems.

@@ -1,0 +1,19 @@
+Changes to A18
+==============
+
+!		statement separator, no labels on subsequent statements
+-m		UT4/IDIOT monitor output format
+CONST, DC	define constant, automatic width adjustment (1 or 2bytes)
+
+BR => LBR	automatic conversion
+@nnnn		octal number
+-f num		filler byte
+-i		ignore case in labels
+
+EXPORT label1,...,labelN
+		label export
+-x file.exp	export labels
+A.1		synonym for HIGH
+A.0		synonym for LOW
+*		synonym for location counter
+DS		synonym for BLK

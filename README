@@ -1,0 +1,8 @@
+CDP1802 tools
+=============
+
+a18/            assembler, tweaked to compile RCA ASM sources
+disasm/         disassembler, tweaked to read binary data
+sim18/          simulator, microFORTH nucleus reconstruction, work in-progress
+
+Good luck!

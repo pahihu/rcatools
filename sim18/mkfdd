@@ -1,0 +1,15 @@
+#!/bin/sh
+#
+# Make FDD disk image
+# 512 bytes/sector, 9 sectors/track, 70 tracks/disk
+#
+
+if [ $# -ne 1 ];
+then
+   echo "usage: mkfdd <filename>"
+   exit 1
+fi
+
+dd if=/dev/zero of=$1 bs=512 count=630
+
+# vim:ts=3 sw=3 et:

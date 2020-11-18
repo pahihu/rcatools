@@ -1,0 +1,29 @@
+GLL ROM
+=======
+
+RCA1802 CPU @ 1.6MHz ~ 2 cycle instructions (2x8 machine cycles) 10us
+GLL  MF
+DMA     R0
+INT     R1
+R       R2      return stack ptr
+P       R3      program stack
+...
+W       R9      current word exec
+A       RA      temp reg
+B       RB      temp reg
+U       RC      user area
+I       RD      instr. ptr
+S       RE      data stack ptr
+F       RF      NEXT
+
+microFORTH
+P       R3      prog counter
+U       R4      user area
+...
+T       R9      temp reg
+A       RA      aux reg
+W       RB      curr. word being executed
+I       RC      next word to be executed
+S       RD      data stack ptr
+R       RE      return stack ptr
+F       RF      NEXT
