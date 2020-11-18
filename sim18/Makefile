@@ -1,12 +1,13 @@
 CC = cc
 CFLAGS = -O2
+LDFLAGS = #-g
 SRCS = 1802.c
 OBJS = $(SRCS:.c=.o)
 
 all: sim18
 
 sim18: $(OBJS)
-	$(CC) -o $@ $(OBJS)
+	$(CC) $(LDFLAGS) -o $@ $(OBJS)
 	ls -l $@
 
 rom.xxd: rom.txt

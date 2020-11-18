@@ -15,6 +15,8 @@
  *          Mike Riley's port extended + mapper
  *          ?D disassemble
  *          !A 1-line assembler
+ *          INP0 stops xecute loop
+ *          'Q' stops tracing
  *
  */
 
@@ -122,7 +124,7 @@ void dasminit(void)
    for (i = 0; i < 16; i++)
       ma[i] = aa[i] = 0;
 
-   m = "0   INC DEC 3   LDA STR 6   7   GLO GHI PLO PLI 12  SEP SEX 15  ";
+   m = "0   INC DEC 3   LDA STR 6   7   GLO GHI PLO PHI 12  SEP SEX 15  ";
    a = "R";
    ma[ 0] = "IDL LDN LDN LDN LDN LDN LDN LDN LDN LDN LDN LDN LDN LDN LDN LDN ";
    aa[ 0] = "-RRRRRRRRRRRRRRR";
@@ -205,7 +207,7 @@ char *prinb(int n, int m)
    return buf;
 }
 
-void prinregs()
+int prinregs()
 {
    int i;
 
@@ -217,7 +219,7 @@ void prinregs()
       if (7 == i) printf("\n");
    }
    printf("\n");
-   getchar();
+   return getchar();
 }
 
 void cycle(void)
@@ -264,14 +266,15 @@ void out(Byte port, Byte data)
 void xecute(Word p)
 {  
    Word W;
-   int i;
+   int i, done;
 
-   r[P] = p;
-   while (1) {
+   r[P] = p; done = 0;
+   while (!done) {
       if (trace) {
          dasm(r[P]);
          printf("\n");
-         prinregs();
+         if ('Q' == prinregs())
+            break;
       }
       W = memrd(r[P]); r[P]++; cycle();
       I = Hi(W); N = Lo(W);
@@ -340,12 +343,16 @@ void xecute(Word p)
          } else {
             if (8 & N) {
                // INP, input N
-               NLINES = N;
-               D = inp(NLINES);
-               memwr(r[X], D);
+               if (8 == N)
+                  done = 1;
+               else {
+                  NLINES = 7 & N;
+                  D = inp(NLINES);
+                  memwr(r[X], D);
+               }
             } else {
                // OUT, output N
-               NLINES = N;
+               NLINES = 7 & N;
                out(NLINES, memrd(r[X])); r[X]++;
             }
          }
@@ -588,6 +595,11 @@ static int digit(int c)
    return 10 + c - 'A';
 }
 
+static int issep(int c)
+{
+   return c == ' ' || c == ',' || c == ';' || c == '\n';
+}
+
 static int utc;
 
 int utget(FILE *inp)
@@ -615,7 +627,7 @@ char *utnam(FILE *inp)
       utc = utget(inp);
 
    i = 0;
-   while (' ' != utc && i < 31) {
+   while (!issep(utc) && i < 31) {
       buf[i++] = utc;
       utc = utget(inp);
    }
@@ -641,16 +653,18 @@ Word utadr(FILE *inp)
 int utasm(FILE *inp, Word dst)
 {
    char *mnemo, *args, *p;
-   int  i, arg;
+   int  i, arg, sel;
    Byte c0de;
    Word adr;
 
    mnemo = utnam(inp);
    if (strlen(mnemo) > 4)
       goto LError;
+   args = 0;
    p = strstr(m, mnemo);
    if (p) {
-      c0de = HiLo((p - m) / 4, 0);
+      sel  = (p - m) / 4;
+      c0de = HiLo(sel, 0);
       args = a;
    }
    else {
@@ -659,12 +673,15 @@ int utasm(FILE *inp, Word dst)
          p = strstr(ma[i], mnemo);
          if (!p)
             continue;
-         c0de = HiLo(i, (p - ma[i])/4);
+         sel  = (p - ma[i]) / 4;
+         c0de = HiLo(i, sel);
          args = aa[i];
          break;
       }
    }
-   arg = !args[1]? args[0] : args[Lo(c0de)];
+   if (!args)
+      goto LError;
+   arg = !args[1]? args[0] : args[sel];
    if (arg == 'R') {
       adr = utadr(inp);
       c0de += (adr & 0xF);
@@ -768,6 +785,8 @@ int ut40mon(FILE *inp)
             while (utc == ' ' || utc == '\n')
                utc = utget(inp);
             adr = utadr(inp);
+            while (utc == ' ' || utc == '\n')
+               utc = utget(inp);
             while (utc != EOF && utc != '\n') {
                while (utc == ' ')
                   utc = utget(inp);
@@ -803,7 +822,6 @@ int ut40mon(FILE *inp)
             while (utc == ' ' || utc == '\n')
                utc = utget(inp);
             adr = utadr(inp);
-            H("start adr: %04X\n", adr);
             while (utc != EOF && utc != '\n') {
                while (utc == ' ')
                   utc = utget(inp);
@@ -968,7 +986,7 @@ void storage(void)
 
 void usage(void)
 {
-   fprintf(stderr,"usage: sim18 [-2gimutx] [-bxxxx] [-d -exxxx] [-f<fdd.img>] -s<kbytes> <file>...\n");
+   fprintf(stderr,"usage: sim18 [-2gmutx] [-bxxxx] [-d -exxxx] [-f<fdd.img>] -s<kbytes> <file>...\n");
    fprintf(stderr,"options:\n");
    fprintf(stderr,"   -2         enable TLIO\n");
    fprintf(stderr,"   -bxxxx     disasm/load/start 'begin' address\n");
@@ -1046,7 +1064,7 @@ int main(int argc, char *argv[])
                fprintf(stderr,"max. 4 FDDs\n");
             break;
          case 'g': regs = gllregs; break;
-         case 'i': readdat = readidi; break;
+         case 'm': readdat = readidi; break;
          case 'u': ut40 = 1; break;
          case 's': MAX_MEM = atoi(argv[i] + 2);
                    if (MAX_MEM > 1024) MAX_MEM = 1024;
