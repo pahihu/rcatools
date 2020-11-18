@@ -19,7 +19,7 @@ rom.dis: rom.bin
 	d18 -b0000 -e0200 -rrom.bin -2 > rom.dis
 
 nucleus.bin: nucleus.asm
-	a18 nucleus.sasmr -L nucleus.lst -b $@
+	a18 nucleus.asm -L nucleus.lst -b $@
 	ls -l $@
 
 clean:
