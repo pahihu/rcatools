@@ -7,7 +7,7 @@
  * 201114AP initial version
  * 201115AP disassembler, GLL-MAG register names
  * 201116AP initial FDD support
- * 201117AP built-in UT40 monitor
+ * 201117AP built-in UT40 monitor (BUT40)
  *          configurable memory size
  *          two-level I/O
  * 201118AP DMA_IN/DMA_OUT/INT processing
@@ -979,11 +979,11 @@ void usage(void)
    fprintf(stderr,"   -m         set M-rec fmt\n");
    fprintf(stderr,"   -s<kbytes> memory size (default 64KB)\n");
    fprintf(stderr,"   -t         trace\n");
-   fprintf(stderr,"   -u         start UT40 (?DMR,!AM,$LPQUXY)\n");
+   fprintf(stderr,"   -u         start BUT40 (?DMR,!AM,$LPQUXY)\n");
    fprintf(stderr,"   -x         Mark Riley's port extender+mapper\n");
    fprintf(stderr,"   file       load bin/M-rec fmt at 'begin' adr\n");
    fprintf(stderr,"\n");
-   fprintf(stderr,"UT40 commands:\n");
+   fprintf(stderr,"BUT40 commands:\n");
    fprintf(stderr,"   ?Dadr len                 disassemble\n");
    fprintf(stderr,"   ?Madr len                 memory dump\n");
    fprintf(stderr,"   ?R                        register dump\n");
