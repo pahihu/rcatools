@@ -13,6 +13,8 @@
  * 201118AP DMA_IN/DMA_OUT/INT processing
  *          counting MCLK
  *          Mike Riley's port extended + mapper
+ *          ?D disassemble
+ *          !A 1-line assembler
  *
  */
 
@@ -68,7 +70,7 @@ Byte SEL;
 int RC;    // Mark Riley, port extender
 int MAPPER[16];
 
-char *m[16], *a[16];
+char *m, *ma[16], *a, *aa[16];
 
 static char *gllregs[16] = {
    "DMA", "INT", "  R", "  P",
@@ -115,20 +117,25 @@ Byte memwr(int addr, Byte data)
 
 void dasminit(void)
 {
-   m[ 0] = "1   INC DEC 3   LDA STR 6   7   GLO GHI PLO PLI 12  SEP SEX 15  ";
-   a[ 0] = "R";
-   m[ 1] = "IDL LDN LDN LDN LDN LDN LDN LDN LDN LDN LDN LDN LDN LDN LDN LDN ";
-   a[ 1] = "-RRRRRRRRRRRRRRR";
-   m[ 3] = "BR  BQ  BZ  BDF B1  B2  B3  B4  NBR BNQ BNZ BNF BN1 BN2 BN3 BN4 ";
-   a[ 3] = "1";
-   m[ 6] = "IRX OUT1OUT2OUT3OUT4OUT5OUT6OUT7INP0INP1INP2INP3INP4INP5INP6INP7";
-   a[ 6] = "-";
-   m[ 7] = "RET DIS LDXASTXDADC SDB SHRCSMB SAV MARKREQ SEQ ADCISDBISHLCSMBI";
-   a[ 7] = "------------##-#";
-   m[12] = "LBR LBQ LBZ LBDFNOP LSNQLSNZLSNFLSKPLBNQLBNZLBNFLSIELSQ LSZ LSDF";
-   a[12] = "2222-----222----";
-   m[15] = "LDX OR  AND XOR ADD SD  SHR SM  LDI ORI ANI XRI ADI SDI SHL SMI ";
-   a[15] = "--------######-#";
+   int i;
+
+   for (i = 0; i < 16; i++)
+      ma[i] = aa[i] = 0;
+
+   m = "0   INC DEC 3   LDA STR 6   7   GLO GHI PLO PLI 12  SEP SEX 15  ";
+   a = "R";
+   ma[ 0] = "IDL LDN LDN LDN LDN LDN LDN LDN LDN LDN LDN LDN LDN LDN LDN LDN ";
+   aa[ 0] = "-RRRRRRRRRRRRRRR";
+   ma[ 3] = "BR  BQ  BZ  BDF B1  B2  B3  B4  NBR BNQ BNZ BNF BN1 BN2 BN3 BN4 ";
+   aa[ 3] = "1";
+   ma[ 6] = "IRX OUT1OUT2OUT3OUT4OUT5OUT6OUT7INP0INP1INP2INP3INP4INP5INP6INP7";
+   aa[ 6] = "-";
+   ma[ 7] = "RET DIS LDXASTXDADC SDB SHRCSMB SAV MARKREQ SEQ ADCISDBISHLCSMBI";
+   aa[ 7] = "------------##-#";
+   ma[12] = "LBR LBQ LBZ LBDFNOP LSNQLSNZLSNFLSKPLBNQLBNZLBNFLSIELSQ LSZ LSDF";
+   aa[12] = "2222-----222----";
+   ma[15] = "LDX OR  AND XOR ADD SD  SHR SM  LDI ORI ANI XRI ADI SDI SHL SMI ";
+   aa[15] = "--------######-#";
 }
 
 int dasm(Word p)
@@ -138,14 +145,15 @@ int dasm(Word p)
    char mnemo[5];
    char *args, arg, tmp[16];
    int i, nargs;
+
    c0de = memrd(p);
-   args = a[0];
-   strncpy(mnemo, m[0] + 4*Hi(c0de), 4);
+   args = a;
+   strncpy(mnemo, m + 4*Hi(c0de), 4);
    mnemo[4] = '\0';
    if (isdigit(mnemo[0])) {
       i = atol(mnemo);
-      args = a[i];
-      strncpy(mnemo, m[i] + 4*Lo(c0de), 4);
+      args = aa[i];
+      strncpy(mnemo, ma[i] + 4*Lo(c0de), 4);
       mnemo[4] = '\0';
    }
    arg = !args[1]? args[0] : args[Lo(c0de)];
@@ -171,11 +179,11 @@ int dasm(Word p)
       sprintf(tmp," %04XH", adr);
       break;
    }
-   printf("%04X", p);
+   printf("%04X ", p);
    for (i = 0; i < 1 + nargs; i++)
-      printf(" %02X", memrd(p+i));
+      printf("%02X", memrd(p+i));
    for (; i < 4; i++)
-      printf("   ");
+      printf("  ");
    printf("%s", mnemo);
    if (tmp[0])
       printf("%s", tmp);
@@ -630,6 +638,49 @@ Word utadr(FILE *inp)
    return adr;
 }
 
+int utasm(FILE *inp, Word dst)
+{
+   char *mnemo, *args, *p;
+   int  i, arg;
+   Byte c0de;
+   Word adr;
+
+   mnemo = utnam(inp);
+   if (strlen(mnemo) > 4)
+      goto LError;
+   p = strstr(m, mnemo);
+   if (p) {
+      c0de = HiLo((p - m) / 4, 0);
+      args = a;
+   }
+   else {
+      for (i = 0; i < 16; i++) {
+         if (!ma[i]) continue;
+         p = strstr(ma[i], mnemo);
+         if (!p)
+            continue;
+         c0de = HiLo(i, (p - ma[i])/4);
+         args = aa[i];
+         break;
+      }
+   }
+   arg = !args[1]? args[0] : args[Lo(c0de)];
+   if (arg == 'R') {
+      adr = utadr(inp);
+      c0de += (adr & 0xF);
+   }
+   memwr(dst++, c0de);
+   if (arg != '-' && arg != 'R') {
+      adr = utadr(inp);
+      if (arg == '2')
+         memwr(dst++, HI(adr));
+      memwr(dst++, LO(adr));
+   }
+   return dst;
+LError:
+   return -1;
+}
+
 int utbyt(FILE *inp)
 {
    int byt = 0;
@@ -689,6 +740,16 @@ int ut40mon(FILE *inp)
             }
             H("\n");
          }
+         else if (utc == 'D') {
+            utc = utget(inp);
+            adr = utadr(inp);
+            len = utadr(inp);
+            if (!len) len = 1;
+            len += adr;
+            for (;adr < len;)
+               adr += dasm(adr);
+            H("\n");
+         }
          else if (utc == 'R') {
             utc = utget(inp);
             for (i = 0; i < 16; i++) {
@@ -737,6 +798,32 @@ int ut40mon(FILE *inp)
                memwr(adr++, byt); bytes++;
             }
          }
+         else if (utc == 'A') {
+            utc = utget(inp);
+            while (utc == ' ' || utc == '\n')
+               utc = utget(inp);
+            adr = utadr(inp);
+            H("start adr: %04X\n", adr);
+            while (utc != EOF && utc != '\n') {
+               while (utc == ' ')
+                  utc = utget(inp);
+
+               if (utc == ',') {
+                  uteat(inp);
+                  if (utc == EOF)
+                     break;
+                  if (utc != '\n')
+                     goto LError;
+                  utc = utget(inp);
+                  continue;
+               }
+
+               byt = utasm(inp, adr);
+               if (byt < 0)
+                  goto LError;
+               adr = byt;
+            }
+         }
          else
             goto LError;
          break;
@@ -768,11 +855,11 @@ int ut40mon(FILE *inp)
             err = 1;
             if (adr) {
                unit = HI(adr); track = LO(adr);
-               err = unit>4 || unit<1 || track>70 || track<1 || !fdd[unit - 1];
+               err = unit>3 || track>70 || track<1 || !fdd[unit];
                if (!err) {
                   H("loading (%X,%2X)...\n", unit, track);
-                  fseek(fdd[unit - 1], (track - 1) * 9 * 512, SEEK_SET);
-                  ut40mon(fdd[unit-1]);
+                  fseek(fdd[unit], (track - 1) * 9 * 512, SEEK_SET);
+                  ut40mon(fdd[unit]);
                }
             }
             if (err) {
@@ -860,7 +947,8 @@ void fini(void)
 {
    int i;
 
-   printf("MCLK = %d\n", MCLK);
+   if (MCLK)
+      printf("MCLK = %d\n", MCLK);
    for (i = 0; i < 4; i++)
       if (fdd[i])
          fclose(fdd[i]);
@@ -891,9 +979,22 @@ void usage(void)
    fprintf(stderr,"   -m         set M-rec fmt\n");
    fprintf(stderr,"   -s<kbytes> memory size (default 64KB)\n");
    fprintf(stderr,"   -t         trace\n");
-   fprintf(stderr,"   -u         start UT40 (?M,!M,$LPQRUXY)\n");
+   fprintf(stderr,"   -u         start UT40 (?DMR,!AM,$LPQUXY)\n");
    fprintf(stderr,"   -x         Mark Riley's port extender+mapper\n");
    fprintf(stderr,"   file       load bin/M-rec fmt at 'begin' adr\n");
+   fprintf(stderr,"\n");
+   fprintf(stderr,"UT40 commands:\n");
+   fprintf(stderr,"   ?Dadr len                 disassemble\n");
+   fprintf(stderr,"   ?Madr len                 memory dump\n");
+   fprintf(stderr,"   ?R                        register dump\n");
+   fprintf(stderr,"   !Aadr instr[, instr..]    1-line asm\n");
+   fprintf(stderr,"   !Madr bytes[,; bytes..]   memory entry\n");
+   fprintf(stderr,"   $L                        load (unit,track)\n");
+   fprintf(stderr,"   $Padr                     xecute\n");
+   fprintf(stderr,"   $Q                        quit\n");
+   fprintf(stderr,"   $Uadr                     xecute, TLIO enabled\n");
+   fprintf(stderr,"   $X file adr len           xmit comma sep\n");
+   fprintf(stderr,"   $Y file adr len           xmit semicolon sep\n");
    exit(1);
 }
 
