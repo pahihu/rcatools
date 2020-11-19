@@ -20,6 +20,8 @@
  * 201119AP fixed INP/OUT asm/disasm
  *          IDL in UT40 stops xecute loop
  *          HH, HHHH, assembles constant
+ *          fixed SD/SDB asm
+ *          fixed borrow gen, 8bit results in D
  *
  */
 
@@ -51,7 +53,7 @@ typedef unsigned short Word;
 #define HILO(x,y)       ((LO(x) << 8) + LO(y))
 #define FLAG(x)         ((x) ? 1 : 0)
 #define CY(x)           FLAG(0x10000 & (x))
-#define MASK16          0xFFFF
+#define MASK8           0x00FF
 
 #define LBR             r[P] = HILO(memrd(r[P]),memrd(r[P]+1))
 #define NLBR            r[P] = r[P] + 2
@@ -291,10 +293,12 @@ void xecute(Word p)
             // IDL, idle
             // wait for DMA or INT;
             if (ut40)
-               break;
-            BUS = memrd(r[0]);
-            while (!DMA_IN && !DMA_OUT && !INT)
-               cycle();
+               done = 1;
+            else {
+               BUS = memrd(r[0]);
+               while (!DMA_IN && !DMA_OUT && !INT)
+                  cycle();
+            }
          } else {
             // LDN, load via N
             D = memrd(r[N]);
@@ -309,7 +313,7 @@ void xecute(Word p)
       case 3: // short branch
          W = 0;
          switch (7 & N) {
-         case 0: // BR, br (NBR)
+         case 0: // BR, br (NBR,SKP)
             W = 1;
             break;
          case 1: // BQ, br if Q=1 (BNQ)
@@ -386,11 +390,11 @@ void xecute(Word p)
             break;
          case 4: // ADC, add w/ carry
             D = memrd(r[X]) + D + DF;
-            DF = CY(D); D &= MASK16;
+            DF = CY(D); D &= MASK8;
             break;
          case 5: // SDB, sub D w/ borrow
             D =  memrd(r[X]) - D - (1 - DF);
-            DF = FLAG(D < 0); D &= MASK16;
+            DF = FLAG(D < 0); D &= MASK8;
             break;
          case 6: // SHRC, shift right w/ carry
             W = D & 1;
@@ -400,7 +404,7 @@ void xecute(Word p)
             break;
          case 7: // SMB, sub mem w/ borrow
             D = D - memrd(r[X]) - (1 - DF);
-            DF = FLAG(D < 0); D &= MASK16;
+            DF = FLAG(D < 0); D &= MASK8;
             break;
          case 8: // SAV, save
             memwr(r[X], T);
@@ -418,11 +422,11 @@ void xecute(Word p)
             break;
          case 0xC: // ADCI, add w/ cy imm
             D = memrd(r[P]) + D + DF; r[P]++;
-            DF = CY(D); D &= MASK16;
+            DF = CY(D); D &= MASK8;
             break;
          case 0xD: // SDBI, sub D w/ borrow imm
             D =  memrd(r[P]) - D - (1 - DF); r[P]++;
-            DF = FLAG(D < 0); D &= MASK16;
+            DF = FLAG(D < 0); D &= MASK8;
             break;
          case 0xE: // SHLC, shift left w/ carry
             W = FLAG(D & 0x80);
@@ -431,7 +435,7 @@ void xecute(Word p)
             break;
          case 0xF: // SMBI, sub mem w/ borrow imm
             D = D - memrd(r[P]) - (1 - DF); r[P]++;
-            DF = FLAG(D < 0); D &= MASK16;
+            DF = FLAG(D < 0); D &= MASK8;
             break;
          }
          break;
@@ -512,62 +516,42 @@ void xecute(Word p)
          X = N;
          break;
       case 0xF:
-         switch (N) {
-         case 0: // LDX, load via X
-            D = memrd(r[X]);
+         W = 8 & N? P : X;
+         switch (7 & N) {
+         case 0: // LDX, load via X (LDI)
+            D = memrd(r[W]);
             break;
-         case 1: // OR, or
-            D = D | memrd(r[X]);
+         case 1: // OR, or (ORI)
+            D = D | memrd(r[W]);
             break;
-         case 2: // AND, and
-            D = D & memrd(r[X]);
+         case 2: // AND, and (ANI)
+            D = D & memrd(r[W]);
             break;
-         case 3: // XOR, exclusive or
-            D = D ^ memrd(r[X]);
+         case 3: // XOR, exclusive or (XRI)
+            D = D ^ memrd(r[W]);
             break;
-         case 4: // ADD, add
-            D = memrd(r[X]) + D;
-            DF = CY(D); D &= MASK16;
+         case 4: // ADD, add (ADI)
+            D = memrd(r[W]) + D;
+            DF = CY(D); D &= MASK8;
             break;
-         case 5: // SD, sub D
-            D = memrd(r[X]) - D;
-            DF = FLAG(D < 0); D &= MASK16;
+         case 5: // SD, sub D (SDI)
+            D = memrd(r[W]) - D;
+            DF = 1 - FLAG(D < 0); D &= MASK8;
             break;
-         case 6: // SHR, shift right
-            DF = D & 1; D = D >> 1;
+         case 6: // SHR, shift right (SHL)
+            if (8 & N) {
+               DF = FLAG(D & 0x80); D = D << 1;
+            }
+            else {
+               DF = D & 1; D = D >> 1;
+            }
             break;
-         case 7: // SM, sub memory
-            D = D - memrd(r[X]);
-            DF = FLAG(D < 0); D &= MASK16;
-            break;
-         case 8: // LDI, load imm
-            D = memrd(r[P]); r[P]++;
-            break;
-         case 9: // ORI, or imm
-            D = D | memrd(r[P]); r[P]++;
-            break;
-         case 0xA: // ANI, and imm
-            D = D & memrd(r[P]); r[P]++;
-            break;
-         case 0xB: // XRI, exclusive or imm
-            D = D ^ memrd(r[P]); r[P]++;
-            break;
-         case 0xC: // ADI, add imm
-            D = memrd(r[P]) + D; r[P]++;
-            DF = CY(D); D &= MASK16;
-            break;
-         case 0xD: // SDI, sub D imm
-            D = memrd(r[P]) - D; r[P]++;
-            DF = FLAG(D < 0); D &= MASK16;
-            break;
-         case 0xE: // SHL, shift left
-            DF = FLAG(D & 0x80); D = D << 1;
-            break;
-         case 0xF: // SMI, sub mem imm
-            D = D - memrd(r[P]); r[P]++;
-            DF = FLAG(D < 0); D &= MASK16;
+         case 7: // SM, sub memory (SMI)
+            D = D - memrd(r[W]);
+            DF = 1 - FLAG(D < 0); D &= MASK8;
             break;
          }
+         if (8 & N) r[P]++;
          break;
       } // switch I
       cycle();
@@ -690,6 +674,9 @@ int utasm(FILE *inp, Word dst)
    len = strlen(mnemo);
    if (len > 4)
       goto LError;
+   for (i = len; i < 4; i++)
+      mnemo[i] = ' ';
+   mnemo[i] = '\0';
    args = 0;
    p = strstr(m, mnemo);
    if (p) {
@@ -715,8 +702,6 @@ int utasm(FILE *inp, Word dst)
       adr = 0;
       while (ishex(*mnemo))
          adr = 16 * adr + digit(*mnemo++);
-      if (*mnemo)
-         goto LError;
       if (len > 2)
          memwr(dst++, HI(adr));
       memwr(dst++, LO(adr));
