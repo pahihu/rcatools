@@ -17,6 +17,9 @@
  *          !A 1-line assembler
  *          INP0 stops xecute loop
  *          'Q' stops tracing
+ * 201119AP fixed INP/OUT asm/disasm
+ *          IDL in UT40 stops xecute loop
+ *          HH, HHHH, assembles constant
  *
  */
 
@@ -75,20 +78,21 @@ int MAPPER[16];
 char *m, *ma[16], *a, *aa[16];
 
 static char *gllregs[16] = {
-   "DMA", "INT", "  R", "  P",
-   " R4", " R5", " R6", " R7",
-   " R8", "  W", "  A", "  B",
-   "  U", "  I", "  S", "  F"
+   "DMA", "INT", "R  ", "P  ",
+   "R4 ", "R5 ", "R6 ", "R7 ",
+   "R8 ", "W  ", "A  ", "B  ",
+   "U  ", "I  ", "S  ", "F  "
 };
 
 static char *cdpregs[16] = {
-   " R0", " R1", " R2", " R3",
-   " R4", " R5", " R6", " R7",
-   " R8", " R9", " RA", " RB",
-   " RC", " RD", " RE", " RF"
+   "R0 ", "R1 ", "R2 ", "R3 ",
+   "R4 ", "R5 ", "R6 ", "R7 ",
+   "R8 ", "R9 ", "RA ", "RB ",
+   "RC ", "RD ", "RE ", "RF "
 };
 
 int trace = 0;
+int ut40 = 0;
 char **regs = cdpregs;
 
 FILE *fdd[4];
@@ -130,8 +134,8 @@ void dasminit(void)
    aa[ 0] = "-RRRRRRRRRRRRRRR";
    ma[ 3] = "BR  BQ  BZ  BDF B1  B2  B3  B4  SKP BNQ BNZ BNF BN1 BN2 BN3 BN4 ";
    aa[ 3] = "11111111-1111111";
-   ma[ 6] = "IRX OUT1OUT2OUT3OUT4OUT5OUT6OUT7INP0INP1INP2INP3INP4INP5INP6INP7";
-   aa[ 6] = "-";
+   ma[ 6] = "IRX OUT OUT OUT OUT OUT OUT OUT INP INP INP INP INP INP INP INP ";
+   aa[ 6] = "-NNNNNNNNNNNNNNN";
    ma[ 7] = "RET DIS LDXASTXDADC SDB SHRCSMB SAV MARKREQ SEQ ADCISDBISHLCSMBI";
    aa[ 7] = "------------##-#";
    ma[12] = "LBR LBQ LBZ LBDFNOP LSNQLSNZLSNFLSKPLBNQLBNZLBNFLSIELSQ LSZ LSDF";
@@ -169,6 +173,9 @@ int dasm(Word p)
       break;
    case 'R':
       sprintf(tmp," %s", regs[Lo(c0de)]);
+      break;
+   case 'N':
+      sprintf(tmp," %d", 7 & Lo(c0de));
       break;
    case '1':
       nargs = 1;
@@ -283,6 +290,8 @@ void xecute(Word p)
          if (0==N) {
             // IDL, idle
             // wait for DMA or INT;
+            if (ut40)
+               break;
             BUS = memrd(r[0]);
             while (!DMA_IN && !DMA_OUT && !INT)
                cycle();
@@ -650,54 +659,6 @@ Word utadr(FILE *inp)
    return adr;
 }
 
-int utasm(FILE *inp, Word dst)
-{
-   char *mnemo, *args, *p;
-   int  i, arg, sel;
-   Byte c0de;
-   Word adr;
-
-   mnemo = utnam(inp);
-   if (strlen(mnemo) > 4)
-      goto LError;
-   args = 0;
-   p = strstr(m, mnemo);
-   if (p) {
-      sel  = (p - m) / 4;
-      c0de = HiLo(sel, 0);
-      args = a;
-   }
-   else {
-      for (i = 0; i < 16; i++) {
-         if (!ma[i]) continue;
-         p = strstr(ma[i], mnemo);
-         if (!p)
-            continue;
-         sel  = (p - ma[i]) / 4;
-         c0de = HiLo(i, sel);
-         args = aa[i];
-         break;
-      }
-   }
-   if (!args)
-      goto LError;
-   arg = !args[1]? args[0] : args[sel];
-   if (arg == 'R') {
-      adr = utadr(inp);
-      c0de += (adr & 0xF);
-   }
-   memwr(dst++, c0de);
-   if (arg != '-' && arg != 'R') {
-      adr = utadr(inp);
-      if (arg == '2')
-         memwr(dst++, HI(adr));
-      memwr(dst++, LO(adr));
-   }
-   return dst;
-LError:
-   return -1;
-}
-
 int utbyt(FILE *inp)
 {
    int byt = 0;
@@ -717,6 +678,67 @@ int utbyt(FILE *inp)
 
 #define H   printf
 #define O   fprintf
+
+int utasm(FILE *inp, Word dst)
+{
+   char *mnemo, *args, *p;
+   int  i, arg, sel, len;
+   Byte c0de;
+   Word adr;
+
+   mnemo = utnam(inp);
+   len = strlen(mnemo);
+   if (len > 4)
+      goto LError;
+   args = 0;
+   p = strstr(m, mnemo);
+   if (p) {
+      sel  = (p - m) / 4;
+      c0de = HiLo(sel, 0);
+      args = a;
+   }
+   else {
+      for (i = 0; i < 16; i++) {
+         if (!ma[i]) continue;
+         p = strstr(ma[i], mnemo);
+         if (!p)
+            continue;
+         sel  = (p - ma[i]) / 4;
+         c0de = HiLo(i, sel);
+         args = aa[i];
+         if (c0de == 0x01 || c0de == 0x61)
+            c0de--;
+         break;
+      }
+   }
+   if (!args) {
+      adr = 0;
+      while (ishex(*mnemo))
+         adr = 16 * adr + digit(*mnemo++);
+      if (*mnemo)
+         goto LError;
+      if (len > 2)
+         memwr(dst++, HI(adr));
+      memwr(dst++, LO(adr));
+      return dst;
+   }
+   arg = !args[1]? args[0] : args[sel];
+   if (arg == 'R' || arg == 'N') {
+      adr = 0x0F & utadr(inp);
+      if (arg == 'N') adr &= 0x07;
+      c0de += adr;
+   }
+   memwr(dst++, c0de);
+   if (arg != '-' && arg != 'R' && arg != 'N') {
+      adr = utadr(inp);
+      if (arg == '2')
+         memwr(dst++, HI(adr));
+      memwr(dst++, LO(adr));
+   }
+   return dst;
+LError:
+   return -1;
+}
 
 int ut40mon(FILE *inp)
 {
@@ -1020,7 +1042,7 @@ int main(int argc, char *argv[])
 {
    FILE *fin;
    int i, bytes;
-   int onlydasm, begin, end, ut40;
+   int onlydasm, begin, end;
    char *endptr;
    int (*readdat)(char*,int);
 
