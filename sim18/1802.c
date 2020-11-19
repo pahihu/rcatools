@@ -25,6 +25,7 @@
  *          fixed not-taken branches
  *          simplified LBR/LSKP
  *          TLIO 1854 char I/O
+ *          fixed NOP
  *
  */
 
@@ -490,7 +491,7 @@ void xecute(Word p)
             cond = (1==DF);
             break;
          case 4: // NOP, nop (LSIE)
-            cond = 8&N? (0==IE) : 1;
+            cond = 8&N? (0==IE) : 0;
             break;
          case 5: // LSNQ, skip if Q=0 (LSQ)
             cond = (0==Q);
