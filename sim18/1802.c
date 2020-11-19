@@ -22,6 +22,7 @@
  *          HH, HHHH, assembles constant
  *          fixed SD/SDB asm
  *          fixed borrow gen, 8bit results in D
+ *          fixed not-taken branches
  *
  */
 
@@ -342,6 +343,8 @@ void xecute(Word p)
             W = !W;
          if (W)
             r[P] = HILO(HI(r[P]),memrd(r[P]));
+         else
+            r[P]++;
          break;
       case 4: // LDA, load advance
          D = memrd(r[N]); r[N]++;
