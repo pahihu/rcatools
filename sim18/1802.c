@@ -23,6 +23,8 @@
  *          fixed SD/SDB asm
  *          fixed borrow gen, 8bit results in D
  *          fixed not-taken branches
+ *          simplified LBR/LSKP
+ *          TLIO 1854 char I/O
  *
  */
 
@@ -237,6 +239,16 @@ void cycle(void)
    MCLK++;
 }
 
+Byte eflag(int x)
+{
+   if (TLIO) {
+      switch (x) {
+      case EF4: EF |= EF4; break; // 1854 serial data in
+      }
+   }
+   return EF & x;
+}
+
 Byte xinp(Byte port)
 {
    if (port < 16)
@@ -246,12 +258,17 @@ Byte xinp(Byte port)
 
 Byte inp(Byte port)
 {
-   if (TLIO && 1 == port)
-      return SEL;
-   if (RC && 5 == port)
-      return SEL;
-   if (RC && 6 == port)
-      return xinp(SEL);
+   if (TLIO)
+      switch (port) {
+      case 1: return SEL;
+      case 2: return getchar(); // 1854 char in
+      case 3: return 0x81; // 1854 status
+      }
+   else if (RC)
+      switch (port) {
+      case 5: return SEL;
+      case 6: xinp(SEL);
+      }
    return BUS;
 }
 
@@ -264,19 +281,24 @@ void xout(Byte port, Byte data)
 
 void out(Byte port, Byte data)
 {
-   if (TLIO && 1 == port)
-      SEL = data;
-   else if (RC && 5 == port)
-      SEL = data;
-   else if (RC && 6 == port)
-      xout(SEL, data);
+   if (TLIO)
+      switch (port) {
+      case 1: SEL = data; break;
+      case 2: putchar(0x7F & data); break; // 1854 char out
+      case 3: break; // 1854 ctrl
+      }
+   else if (RC)
+      switch (port) {
+      case 5: SEL = data;
+      case 6: xout(SEL, data);
+      }
    BUS = data;
 }
 
 void xecute(Word p)
 {  
    Word W;
-   int i, done;
+   int i, cond, done;
 
    r[P] = p; done = 0;
    while (!done) {
@@ -312,39 +334,38 @@ void xecute(Word p)
          r[N]--;
          break;
       case 3: // short branch
-         W = 0;
+         cond = 0;
+         W = memrd(r[P]); r[P]++;
          switch (7 & N) {
          case 0: // BR, br (NBR,SKP)
-            W = 1;
+            cond = 1;
             break;
          case 1: // BQ, br if Q=1 (BNQ)
-            W = (1 == Q);
+            cond = (1 == Q);
             break;
          case 2: // BZ, br if D=0 (BNZ)
-            W = (0 == D);
+            cond = (0 == D);
             break;
          case 3: // BDF, br if DF=1 (BNF)
-            W = (1 == DF);
+            cond = (1 == DF);
             break;
          case 4: // B1, br if EF1=1 (BN1)
-            W = (0 != (EF1 & EF));
+            cond = (0 != eflag(EF1));
             break;
          case 5: // B2, br if EF1=1 (BN2)
-            W = (0 != (EF2 & EF));
+            cond = (0 != eflag(EF2));
             break;
          case 6: // B3, br if EF2=1 (BN3)
-            W = (0 != (EF3 & EF));
+            cond = (0 != eflag(EF3));
             break;
          case 7: // B4, br if EF4=1 (BN4)
-            W = (0 != (EF4 & EF));
+            cond = (0 != eflag(EF4));
             break;
          }
          if (8 & N)
-            W = !W;
-         if (W)
-            r[P] = HILO(HI(r[P]),memrd(r[P]));
-         else
-            r[P]++;
+            cond = !cond;
+         if (cond)
+            r[P] = HILO(HI(r[P]),W);
          break;
       case 4: // LDA, load advance
          D = memrd(r[N]); r[N]++;
@@ -455,61 +476,41 @@ void xecute(Word p)
          r[N] = HILO(D, LO(r[N]));
          break;
       case 0xC:
-         switch (N) {
-         case 0: // LBR
-            LBR;
+         switch (7 & N) {
+         case 0: // LBR (NLBR, LSKP)
+            cond = 1;
             break;
-         case 1: // LBQ, if Q=1
-            if (1==Q) LBR;
-            else NLBR;
+         case 1: // LBQ, if Q=1 (LBNQ)
+            cond = (1==Q);
             break;
-         case 2: // LBZ, if D=0
-            if (0==D) LBR;
-            else NLBR;
+         case 2: // LBZ, if D=0 (LBNZ)
+            cond = (0==D);
             break;
-         case 3: // LBDF, if DF=1
-            if (1==DF) LBR;
-            else NLBR;
+         case 3: // LBDF, if DF=1 (LBNF)
+            cond = (1==DF);
             break;
-         case 4: // NOP, nop
+         case 4: // NOP, nop (LSIE)
+            cond = 8&N? (0==IE) : 1;
             break;
-         case 5: // LSNQ, skip if Q=0
-            if (0==Q) NLBR;
+         case 5: // LSNQ, skip if Q=0 (LSQ)
+            cond = (0==Q);
             break;
-         case 6: // LSNZ, skip if D=0
-            if (0==D) NLBR;
+         case 6: // LSNZ, skip if D=0 (LSZ)
+            cond = (0!=D);
             break;
-         case 7: // LSNF, skip if DF=0
-            if (0==DF) NLBR;
-            break;
-         case 8: // NLBR, LSKP
-            NLBR;
-            break;
-         case 9: // LBNQ
-            if (0==Q) LBR;
-            else NLBR;
-            break;
-         case 0xA: // LBNZ
-            if (0==D) LBR;
-            else NLBR;
-            break;
-         case 0xB: // LBNF
-            if (0==DF) LBR;
-            else NLBR;
-            break;
-         case 0xC: // LSIE, skip if IE=1
-            if (1==IE) NLBR;
-            break;
-         case 0xD: // LSQ
-            if (1==Q) NLBR;
-            break;
-         case 0xE: // LSZ
-            if (0==D) NLBR;
-            break;
-         case 0xF: // LSDF
-            if (1==DF) NLBR;
+         case 7: // LSNF, skip if DF=0 (LSDF)
+            cond = (0==DF);
             break;
          }
+         if (8 & N)
+            cond = !cond;
+
+         if (4 & N) {
+            if (cond) NLBR;
+         }
+         else if (cond) LBR;
+         else NLBR;
+
          cycle();
          break;
       case 0xD: // SEP, set P
