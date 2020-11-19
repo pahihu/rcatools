@@ -26,6 +26,8 @@
  *          simplified LBR/LSKP
  *          TLIO 1854 char I/O
  *          fixed NOP
+ *          fig-FORTH register names
+ *          fixed SHL
  *
  */
 
@@ -48,6 +50,9 @@
 
 typedef unsigned char Byte;
 typedef unsigned short Word;
+
+#define H   printf
+#define O   fprintf
 
 #define Lo(x)           ((x) & 15)
 #define Hi(x)           Lo((x) >> 4)
@@ -95,6 +100,13 @@ static char *cdpregs[16] = {
    "R4 ", "R5 ", "R6 ", "R7 ",
    "R8 ", "R9 ", "RA ", "RB ",
    "RC ", "RD ", "RE ", "RF "
+};
+
+static char *figregs[16] = {
+   "R0 ", "R1 ", "RP ", "PPC",
+   "R4 ", "R5 ", "R6 ", "TMP",
+   "AUX", "SP ", "IP ", "WP ",
+   "IPC", "UP ", "RE ", "DSK"
 };
 
 int trace = 0;
@@ -220,7 +232,7 @@ char *prinb(int n, int m)
    return buf;
 }
 
-int prinregs()
+void prinregs()
 {
    int i;
 
@@ -232,7 +244,6 @@ int prinregs()
       if (7 == i) printf("\n");
    }
    printf("\n");
-   return getchar();
 }
 
 void cycle(void)
@@ -259,10 +270,14 @@ Byte xinp(Byte port)
 
 Byte inp(Byte port)
 {
+   int c;
+
    if (TLIO)
       switch (port) {
       case 1: return SEL;
-      case 2: return getchar(); // 1854 char in
+      case 2: fflush(stdout);
+              c = getchar(); // 1854 char in
+              return c;
       case 3: return 0x81; // 1854 status
       }
    else if (RC)
@@ -304,10 +319,10 @@ void xecute(Word p)
    r[P] = p; done = 0;
    while (!done) {
       if (trace) {
-         dasm(r[P]);
-         printf("\n");
-         if ('Q' == prinregs())
-            break;
+         H("\n"); dasm(r[P]);
+         H("\n"); prinregs();
+         // if ('Q' == getchar())
+         //     break;
       }
       W = memrd(r[P]); r[P]++; cycle();
       I = Hi(W); N = Lo(W);
@@ -319,6 +334,7 @@ void xecute(Word p)
             if (ut40)
                done = 1;
             else {
+               fflush(stdout);
                BUS = memrd(r[0]);
                while (!DMA_IN && !DMA_OUT && !INT)
                   cycle();
@@ -456,7 +472,7 @@ void xecute(Word p)
          case 0xE: // SHLC, shift left w/ carry
             W = FLAG(D & 0x80);
             D = (D << 1) + DF;
-            DF = W;
+            DF = W; D &= MASK8;
             break;
          case 0xF: // SMBI, sub mem w/ borrow imm
             D = D - memrd(r[P]) - (1 - DF); r[P]++;
@@ -545,7 +561,8 @@ void xecute(Word p)
             break;
          case 6: // SHR, shift right (SHL)
             if (8 & N) {
-               DF = FLAG(D & 0x80); D = D << 1;
+               DF = FLAG(D & 0x80); D = D << 1; D &= MASK8;
+               N = 7 & N;
             }
             else {
                DF = D & 1; D = D >> 1;
@@ -664,9 +681,6 @@ int utbyt(FILE *inp)
 
    return byt;
 }
-
-#define H   printf
-#define O   fprintf
 
 int utasm(FILE *inp, Word dst)
 {
@@ -998,9 +1012,10 @@ void storage(void)
 
 void usage(void)
 {
-   fprintf(stderr,"usage: sim18 [-2gmutx] [-bxxxx] [-d -exxxx] [-f<fdd.img>] -s<kbytes> <file>...\n");
+   fprintf(stderr,"usage: sim18 [-24gmutx] [-bxxxx] [-d -exxxx] [-f<fdd.img>] -s<kbytes> <file>...\n");
    fprintf(stderr,"options:\n");
    fprintf(stderr,"   -2         enable TLIO\n");
+   fprintf(stderr,"   -4         fig-FORTH register names\n");
    fprintf(stderr,"   -bxxxx     disasm/load/start 'begin' address\n");
    fprintf(stderr,"   -d         disassemble only\n");
    fprintf(stderr,"   -exxxx     end address\n");
@@ -1061,6 +1076,7 @@ int main(int argc, char *argv[])
       if (*argv[i] == '-') {
          switch (argv[i][1]) {
          case '2': TLIO = 1; break;
+         case '4': regs = figregs; break;
          case 'd': onlydasm = 1; break;
          case 'b': begin = strtol(argv[i] + 2, &endptr, 16); break;
          case 'e': end   = strtol(argv[i] + 2, &endptr, 16); break;
