@@ -7,7 +7,7 @@
  * 201114AP initial version
  * 201115AP disassembler, GLL-MAG register names
  * 201116AP initial FDD support
- * 201117AP built-in UT40 monitor (BUT40)
+ * 201117AP built-in UT20 monitor (BUT20)
  *          configurable memory size
  *          two-level I/O
  * 201118AP DMA_IN/DMA_OUT/INT processing
@@ -18,7 +18,7 @@
  *          INP0 stops xecute loop
  *          'Q' stops tracing
  * 201119AP fixed INP/OUT asm/disasm
- *          IDL in UT40 stops xecute loop
+ *          IDL in UT20 stops xecute loop
  *          HH, HHHH, assembles constant
  *          fixed SD/SDB asm
  *          fixed borrow gen, 8bit results in D
@@ -29,6 +29,7 @@
  *          fig-FORTH register names
  *          fixed SHL
  * 201120AP fixed carry/borrow gen
+ *          updated disk geometry: 128 b/sec * 26 sec/tr * 76 tr
  *
  */
 
@@ -111,7 +112,7 @@ static char *figregs[16] = {
 };
 
 int trace = 0;
-int ut40 = 0;
+int ut20 = 0;
 char **regs = cdpregs;
 
 FILE *fdd[4];
@@ -336,7 +337,7 @@ void xecute(Word p)
          if (0==N) {
             // IDL, idle
             // wait for DMA or INT;
-            if (ut40) {
+            if (ut20) {
                fflush(stdout);
                done = 1;
             }
@@ -751,7 +752,7 @@ LError:
    return -1;
 }
 
-int ut40mon(FILE *inp)
+int ut20mon(FILE *inp)
 {
    Word adr, len;
    int i, byt, cont;
@@ -906,11 +907,11 @@ int ut40mon(FILE *inp)
             err = 1;
             if (adr) {
                unit = HI(adr); track = LO(adr);
-               err = unit>3 || track>70 || track<1 || !fdd[unit];
+               err = unit>3 || track>76 || track<1 || !fdd[unit];
                if (!err) {
                   H("loading (%X,%2X)...\n", unit, track);
-                  fseek(fdd[unit], (track - 1) * 9 * 512, SEEK_SET);
-                  ut40mon(fdd[unit]);
+                  fseek(fdd[unit], (track - 1) * 26 * 128, SEEK_SET);
+                  ut20mon(fdd[unit]);
                }
             }
             if (err) {
@@ -988,7 +989,7 @@ int readidi(char *fn, int offs)
    int bytes;
 
    fin = fopen(fn, "rt");
-   bytes = ut40mon(fin);
+   bytes = ut20mon(fin);
    fclose(fin);
 
    return bytes;
@@ -1031,11 +1032,11 @@ void usage(void)
    fprintf(stderr,"   -m         set M-rec fmt\n");
    fprintf(stderr,"   -s<kbytes> memory size (default 64KB)\n");
    fprintf(stderr,"   -t         trace\n");
-   fprintf(stderr,"   -u         start BUT40 (?DMR,!AM,$LPQUXY)\n");
+   fprintf(stderr,"   -u         start BUT20 (?DMR,!AM,$LPQUXY)\n");
    fprintf(stderr,"   -x         Mark Riley's port extender+mapper\n");
    fprintf(stderr,"   file       load bin/M-rec fmt at 'begin' adr\n");
    fprintf(stderr,"\n");
-   fprintf(stderr,"BUT40 commands:\n");
+   fprintf(stderr,"BUT20 commands:\n");
    fprintf(stderr,"   ?Dadr len                 disassemble\n");
    fprintf(stderr,"   ?Madr len                 memory dump\n");
    fprintf(stderr,"   ?R                        register dump\n");
@@ -1063,7 +1064,7 @@ int main(int argc, char *argv[])
 
    regs = cdpregs;
    onlydasm = begin = end = 0;
-   ut40 = 0;
+   ut20 = 0;
    trace = 0;
    readdat = readbin;
    MAX_MEM = 64 * 1024;
@@ -1100,7 +1101,7 @@ int main(int argc, char *argv[])
             break;
          case 'g': regs = gllregs; break;
          case 'm': readdat = readidi; break;
-         case 'u': ut40 = 1; break;
+         case 'u': ut20 = 1; break;
          case 's': MAX_MEM = atoi(argv[i] + 2);
                    if (MAX_MEM > 1024) MAX_MEM = 1024;
                    MAX_MEM *= 1024;
@@ -1133,9 +1134,9 @@ int main(int argc, char *argv[])
       for (i = begin; i <= end; )
          i += dasm(i);
    }
-   else if (ut40) {
+   else if (ut20) {
       SEL = 0x01;
-      ut40mon(stdin);
+      ut20mon(stdin);
    }
    else
       xecute(begin);
