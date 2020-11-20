@@ -309,7 +309,7 @@
 
              The command line for the cross-assembler looks like this:
 
-           A18 source_file {-i} {-f number} {-h} {-l|-m list_file} {-o obj_file} {-b bin_file} {-x exp_file}
+           A18 source_file {-i} {-r} {-f number} {-h} {-l|-m list_file} {-o obj_file} {-b bin_file} {-x exp_file}
 
         where the { } indicates that the specified item is optional.
 
@@ -325,7 +325,7 @@
 
              Note: -L produces a listing file with uppercase address and 
              data; -l produces lowercase. -m produces a listing file with
-             UT4/IDIOT loader format.
+             UT4/IDIOT loader format. -r declares register names R1..RF.
 
              a18 test18.asm -o test18.hex            source:   test18.asm
                                                      listing:  none
@@ -384,11 +384,11 @@
 
         Finally, an optional comment can 
         be added to the end of the line.  This comment must begin with a 
-        semicolon which signals the assembler to pass the rest of the 
-        line to the listing and otherwise ignore it.  Thus, the source 
+        semicolon or '..'  which signals the assembler to pass the rest of
+        the line to the listing and otherwise ignore it.  Thus, the source 
         line looks like this:
 
-             {label}{ opcode{ arguments}[!opc[ args]]}{;commentary}
+             {label}{ opcode{ arguments}[!opc[ args]]}{;|..commentary}
 
         where the { } indicates that the specified item is optional, and
         [ ] suggests repetition.
@@ -398,7 +398,7 @@
           column 1
              |
              GRONK   RLDI  R1, POINTER     ; This line has everything.
-                     PUSH  H!PUSH H        ; 2 opcodes, listed on 2 lines
+                     PUSH  H!PUSH H        .. 2 opcodes, listed on 2 lines
                      SEX   R1              ; This line has no label.
              BEEP                          ; This line has no opcode.
              ; This line has no label and no opcode.

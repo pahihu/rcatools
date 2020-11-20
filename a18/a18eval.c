@@ -376,9 +376,10 @@ opr2:		    token.attr = BINARY + RELAT + OPR;
 	case ',':   token.attr = SEP;
 		    break;
 
-	case '!':   token.attr = MULTI;
+        case '!':   token.attr = MULTI;
 		    DIAG(printf(" separator"));
-		    break;
+                    break;
+
         case '\n':  token.attr = EOL;
 		    DIAG(printf(" eol"));
 		    break;
@@ -506,23 +507,48 @@ void trash()
 /*  Semicolon is mapped to \n.  In addition, a copy of all input is set	*/
 /*  up in a line buffer for the benefit of the listing.			*/
 
-static int oldc, eol;
+static int oldc, eol, xoldc;
 static char *lptr;
+
+static int xgetc(FILE *source)
+{
+    SCRATCH int c;
+
+    if (xoldc) { c = xoldc; xoldc = '\0'; return c; }
+    c = getc(source);
+    if (c != EOF)
+        c &= 0377;
+    return c;
+}
 
 int popc(void)
 {
-    SCRATCH int c;
+    SCRATCH int c, doskip;
 
     if (oldc) { c = oldc;  oldc = '\0';  return c; }
     if (eol) return '\n';
     for (;;) {
-	if ((c = getc(source)) != EOF && (c &= 0377) == ';' && !quote) {
-	    do *lptr++ = c;
-	    while ((c = getc(source)) != EOF && (c &= 0377) != '\n');
+        c = xgetc(source);
+        if (c != EOF && !quote && (c == ';' || c == '.')) {
+            doskip = 1;
+            if (c == '.') {
+               c = xgetc(source);
+               if (c == '.')
+                  *lptr++ = '.';
+               else {
+                  xoldc = c;
+                  c = '.';
+                  doskip = 0;
+               }
+            }
+            if (doskip) {
+	        do *lptr++ = c;
+	        while ((c = xgetc(source)) != EOF && c != '\n');
+            }
 	}
 	if (c == EOF) c = '\n';
 	if ((*lptr++ = c) >= ' ' && c <= '~') return c;
-	if (c == '\n') { eol = TRUE;  *lptr = '\0';  return '\n'; }
+	if (c == '\n') { eol = TRUE;  *lptr = '\0';  xoldc = '\0'; return '\n'; }
 	if (c == '\t') return quote ? '\t' : ' ';
     }
 }
@@ -532,7 +558,7 @@ int popc(void)
 
 void pushc(char c)
 {
-    oldc = c;
+    oldc  = c;
     return;
 }
 
@@ -541,7 +567,7 @@ void pushc(char c)
 
 void multiline()
 {
-  oldc = '\0'; oldt = eol = FALSE;
+  oldc = xoldc = '\0'; oldt = eol = FALSE;
 }
 
 int newline()

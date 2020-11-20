@@ -119,6 +119,23 @@ int (*symcmp)(const char*,const char*);
 FILE *filestk[FILES], *source;
 TOKEN token;
 
+SYMBOL *find_symbol(char *), *new_symbol(char *);
+
+static
+void rcaregs(void)
+{
+    SCRATCH int i;
+    SCRATCH char buf[8];
+    SCRATCH SYMBOL *l;
+
+    for (i = 0; i < 16; i++) {
+        sprintf(buf, "R%X", i);
+        l = new_symbol(buf);
+	l -> attr = FORWD + VAL;
+	l -> valu = i;
+    }
+}
+
 /*  Mainline routine.  This routine parses the command line, sets up	*/
 /*  the assembler at the beginning of each pass, feeds the source text	*/
 /*  to the line assembler, feeds the result to the listing and hex file	*/
@@ -129,10 +146,11 @@ static int done, extend, ifsp, off;
 static
 void usage(void)
 {
-  fprintf(stderr,"usage: a18 <file.asm> [-f number] [-i] [-l|-L|-m file.lst] [-o file.hex] [-b file.bin] [-x file.exp]\n");
+  fprintf(stderr,"usage: a18 <file.asm> [-f number] [-i] [-r] [-l|-L|-m file.lst] [-o file.hex] [-b file.bin] [-x file.exp]\n");
   fprintf(stderr,"       -f <number>    use low byte of number as filler\n");
   fprintf(stderr,"       -h             usage\n");
   fprintf(stderr,"       -i             ignore case in labels\n");
+  fprintf(stderr,"       -r             define register names R1..RF\n");
   fprintf(stderr,"       -m file.idi    listing file in IDIOT/UT4 format\n");
   fprintf(stderr,"       -l file.lst    listing file in lowercase hex\n");
   fprintf(stderr,"       -L file.lst    listing file in uppercase hex\n");
@@ -199,6 +217,9 @@ char **argv;
 		case 'i':
 		case 'I':   symcmp = strcasecmp;
 			    break;
+                case 'r':
+                case 'R':   rcaregs();
+                            break;
 		case 'l':   caphex = 0;  // hex address, data lowercase
 		case 'L':   
 dolst:			    if (!*++*argv) {
@@ -375,8 +396,7 @@ static void do_label(void)
 	    if ((l = find_symbol(label))) {
 		l -> attr &= ~FORWD;
 		if (l -> valu != pc) {
-		    // DIAG(printf("\nlabel=[%s] pc=%04X val=%04X",label,pc,l->valu));
-		    printf("\nlabel=[%s] pc=%04X val=%04X",label,pc,l->valu);
+		    DIAG(printf("\nlabel=[%s] pc=%04X val=%04X",label,pc,l->valu));
 		    error('M');
 		}
 	    }
@@ -433,7 +453,7 @@ LSIXTN:
 						    c0de = opcod -> valu;
 						    cvt = ((0x30 <= c0de && c0de < 0x34)) ||
 						    	  ((0x38 <= c0de && c0de < 0x3C));
-						    if (cvt) {
+						    if (0/*cvt*/) {
 							if (pass == 1)
 							    printf("converted to long branch at %04X\n",pc);
 						        bytes++;
