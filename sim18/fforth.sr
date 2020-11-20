@@ -1,0 +1,3788 @@
+.. -*- Mode:Asm; comment-start: ".." -*-
+.. FFFF  I   GGG        FFFF   OO   RRRR   TTTTT  H   H
+.. F     I  G           F     O  O  R  R     T    H   H
+.. FFF   I  G GGG   XX  FFF   O  O  RRR      T    HHHHH
+.. F     I  G   G       F     O  O  R  R     T    H   H
+.. F     I   GGG        F      OO   R   R    T    H   H
+..
+..               1   8888    00   2222
+..               1   8  8   0  0     2
+..               1   8888   0  0   22
+..               1   8  8   0  0  2
+..               1   8888    00   2222
+..
+..
+..       ALL PUBLICATIONS OF THE FORTH INTREST GROUP
+..       ARE PUBLIC DOMAIN.  THEY MAY BE FURTHER
+..       DISTRIBUTED BY INCLUSION OF THIS CREDIT
+..       NOTICE:
+..
+..       THIS PUBLICATION HAS BEEN MADE AVAILABLE BY THE
+..                       FORTH INTREST GROUP
+..                       P. O. BOX 1105
+..                       SAN CARLOS, CA 94070
+..
+..       IMPLEMENTAION BY:
+..               GARY R. BRADSHAW
+..               RFD 1 BOX 80
+..               GIDLEY ROAD
+..               ESPERANCE, NY  12066
+..
+..       MODIFIED BY:
+..               GORDEN FLEMMING
+..               13490 SIMSHAW ST.
+..               SYLMAR, CA  91342
+..
+..               JIM MCDANIEL
+..               1109 POINCIANA DR.
+..               SUNNYVALE, CA 94086
+....
+.... Apr 2016 mods Herb Johnson for A18 cross-assembler
+.... change .EQU to EQU, things like that
+....
+.... Oct 2016 modified for ASM8 and MicroDOS by DW Schultz	
+.... Includes disk I/O using UT71 calls supporting three disks
+.... 
+..
+..   ADDRESS COMMENTS & CORRECTIONS TO  JIM MCDANIEL.
+..
+..       ACKNOWLEDGEMENTS:
+..
+..               KEN MANTEI
+..
+..               FIG INSTALLATION MANUAL
+..
+..               FIG 8080 ASSEMBLY SOURCE LISTING....
+..
+..
+..               THIS LISTING TYPED     PRINTED 3/18/81
+..
+..
+..       THE I/O VECTORS FOR DISC  ARE POINTING TO
+..       ROUTINES FOR THE RCA CDP18S007, CDP18S008
+..       OR THE CDP 18SOO5..
+..       FOR OTHER SYSTEMS YOU WILL NEED TO
+..       CHANGE THE POINTERS AND WRITE YOUR
+..       OWN ROUTINES...
+..
+.. THE USER VARIABLE  DV IS 3 BYTES LONG
+.. (USER AREA OFFSET 32H 33H 34H) AND IS USED
+.. TO PASS VARIABLES TO THE RCA ROM UTILITY
+.. WHEN CALLING FOR DISK I/O.  THE RESIDENT ROM
+.. UTILITIES PRODUCE THEIR OWN ERROR MESSAGES.
+..
+.. THIS VERSION ASSEMBLES WITH START UP CONSTANTS THAT
+.. ASSUME 28K OF RAM. DISC BUFFERS ARE
+.. SET FOR 1K (THIS CAN BE EASILY CHANGED
+.. BY CHANGING FIRST, LIMIT, B/BUF AND B/SCR).
+.. BLOCK 0 BEGINS AT TRACK 0 SECTOR 1.
+..
+..
+.. DR1 (SET DRIVE TO 1) IS IMPLEMENTED AS:
+..  : DR1 B/SCR 250 * OFFSET ! ..
+.. THERFORE B/SCR AND B/BUF CAN BE CHANGED WITHOUT
+.. HAVING TO REWRITE
+.. DR1.
+.. THE TERMINAL I/O ASSUMES THE USE OF AN
+.. RCA CDP1854 UART CONFIGURED IN ONE OF THE
+.. ABOVE MENTIONED SYSTEMS.  THE UART IS DRIVEN
+.. DIRECTLY WITHOUT CALLING RCA ROM UTILITY
+.. ROUTINES.
+..
+..
+.. THE FORTH WORD   MON   EXITS FORTH AND RETURNS
+.. TO THE RESIDENT ROM UTILITY.
+..
+.. THE FORTH WORD  BYE  IS DEFINED AS:
+.. : BYE  FLUSH  MON ....
+..
+..
+..       REGISTER ALLOCATIONS FOR THIS VERSION
+..
+..               R2   RETURNS STACK POINTER  R0
+..                    GROWS DOWN LEFT POINTING TO
+..                    FREE LOCATION
+..
+..               R3   PC FOR I/O AND PRIMITIVES
+..
+..               R7, R8  TEMPORARY ACCUMULATORS
+..
+..               R9   COMPUTATION STACK POINTER   S0
+..                    GROWS UPWARD
+..                    LEFT POINTING AT HIGH BYTE
+..
+..               RA   FORTH "I" REGISTER   IP
+..
+..               RB   FORTH "W" REGISTER   WP
+..
+..               RC   PC FOR INNER INTERPRETER
+..
+..               RD   USER POINTER         UP
+..
+..               RF   DISC I/O
+..
+..               OTHER REGISTERS ARE LEFT AVAILABLE
+..               EXCEPT THAT RF.0 IS ZERO AFTER COLD
+..               OR WARM STARTS
+..
+..
+..             MEMORY MAP
+..
+..       ---------------------- LIMIT
+..
+..            RAM BUFFERS
+..
+..       ---------------------- FIRST
+..
+..             USER AREA
+..
+..       ---------------------- UP
+..
+..            RETURN STACK      R0
+..
+..       ---------------------- 
+..
+..          TERMINAL BUFFER
+..
+..       ---------------------- TIB
+..
+..         COMPUTATION STACK
+..
+..       ---------------------- S0
+..
+..             FREE SPACE
+..
+..       ----------------------
+..
+..            TEXT BUFFER
+..
+..       ---------------------- PAD
+..
+..             WORD BUFFER
+..
+..       ---------------------- DP
+..
+..             DICTIONARY
+..
+..       ----------------------
+..
+..         BOOT UP PARAMETERS
+..
+..       ---------------------- ORGIN 005E
+..
+..          ANY REQUIRED I/O
+..           INITIALIZATION
+..
+..       ---------------------- 0000
+..
+..
+FIRSTB  EQU 0D000H .. ADDRESS OF FIRST DISK BUFFER
+LIMITB  EQU 0FC2CH .. END OF DISK BUFFER AREA
+CSTACK  EQU 9
+RSTACK  EQU 2
+        ..
+        ORG 0000
+        ..
+        .. SET-UP ROUTINES
+        ..
+        DIS!DC 0
+        OUT 1!DC 1               .. SET LEVEL 1 I/O
+        OUT 3!DC 1DH			.. SET UP UART
+        LDI 6FH
+        PHI 2
+        LDI 0FFH
+        PLO 2
+        LDI 00
+        PHI 3
+        LDI 5EH
+        PLO 3
+        SEP 3
+        ..
+        ..
+        ..
+        ORG 005EH
+        ..
+START  NOP
+        LBR COLD            .. COLD START
+        NOP
+        LBR WARM            .. WARM START
+        DC 070AH          .. CPU NUMBER
+        DC 0001H          .. REVISION NUMBER
+        DC TASK - 7        .. TOPMOST PRGM IN FORTH VOCABULARY
+        DC 007FH          .. BACKSPACE
+        DC 7000H          .. INITIAL USER AREA         UP
+        DC 6F00H          .. INITAL STACK              S0
+        DC 6FFFH          .. INITAL RETURN STACK       R0
+        DC 6F80H          .. TERMINAL BUFFER           TIB
+        DC 001FH          .. NAME FIELD WIDTH          WIDTH
+                            ..   (31 DECIMAL)
+        DC 0000H          .. WARNING                   WARNING
+        DC LEND            .. FENCE                     FENCE
+        DC LEND            .. INIT DICTIONARY POINTER   DP
+        DC FRTH + 16       .. INIT VOCAB                VOC-LINK
+        ..
+        ..
+        DC 83H,'LI',0D4H .. LIT
+        DC 0000H
+LIT    DC $ + 2
+        INC R9!INC R9
+        LDA RA!STR R9!INC R9
+        LDA RA!STR R9!DEC R9
+        SEP RC
+        ..
+        ..
+        .. NEXT INNER INTERPRETER
+       SEP R3              .. LEAVE RC AT NEXT
+NEXT   LDA RA!PHI RB
+       LDA RA!PLO RB
+WBR    LDA RB!PHI R3
+       LDA RB!PLO R3
+       BR NEXT - 1
+        ..
+        ..	
+        ..        EXECUTE
+        DC 87H,'EXECUT',0C5H .. EXECUTE
+        DC LIT - 6
+EXE    DC $ + 2
+        LDA R9!PHI RB
+        LDN R9!PLO RB              .. LOAD W FROM STACK              
+        DEC R9!DEC R9!DEC R9
+        INC RC!INC RC
+        INC RC!INC RC             .. POINT TO WBR
+        SEP RC
+        ..
+        ..
+        DC 86H,'BRANC',0C8H .. BRANCH
+        DC EXE - 10
+BRCH    DC $ + 2
+BRANCH  LDA RA
+        STR R2
+        LDA RA
+        PLO RA
+        LDN R2
+        PHI RA
+        SEP RC
+        ..
+        ..
+        DC 87H,'0BRANC',0C8H .. 0BRANCH
+        DC BRCH - 9
+ZBRCH   DC $ + 2
+        LDA R9
+        BNZ NO
+        LDN R9
+        BNZ NO
+        DEC R9
+        DEC R9
+        DEC R9
+        BR BRANCH
+NO      INC RA
+        INC RA
+        DEC R9
+        DEC R9
+        DEC R9
+        SEP RC
+        ..
+        DC 86H,'(LOOP',0A9H .. (LOOP)
+        DC ZBRCH - 10
+LUPE    DC $ + 2
+        INC R2
+        GHI R2
+        PHI R8
+        PHI R7
+        GLO R2
+        PLO R8
+        PLO R7
+        DEC R2
+        LDN R8
+        ADI 01
+        STR R8
+        INC R8
+        LDN R8
+        ADCI 00
+        NOP                 .. TO NEW PAGE
+        NOP
+COMP    STR R8
+        INC R8
+        SEX R7
+        LDA R8
+        SD
+        INC R7
+        LDN R8
+        SDB
+        ANI 80H
+        BZ CEND
+        LDA RA
+        STR R2
+        LDN RA
+        PLO RA
+        LDN R2
+        PHI RA
+        SEP RC
+CEND    INC RA
+        INC RA
+        INC R2
+        INC R2
+        INC R2
+        INC R2
+        SEP RC
+        ..
+        DC 87H,'(+LOOP',0A9H .. (+LOOP)
+          DC LUPE - 9
+PLUPE   DC $ + 2
+        INC R2
+        GHI R2
+        PHI R8
+        PHI R7
+        GLO R2
+        PLO R8
+        PLO R7
+        DEC R2
+        SEX R9
+        INC R9
+        LDN R8
+        ADD
+        STR R8
+        INC R8
+        DEC R9
+        LDN R8
+        ADC
+        STR R8
+        LDN R9
+        SHL
+        DEC R9
+        DEC R9
+        BDF LUPE1
+        BR COMP +1
+LUPE1   INC R8
+        SEX R7
+        LDA R8
+        SM
+        INC R7
+        LDN R8
+        SMB
+        BR COMP + 8
+        ..
+        ..
+        DC 84H,'(DO',0A9H .. (DO)
+        DC PLUPE - 10
+PDO     DC $ + 2
+        DEC R9
+        DEC R9
+        SEX R2
+        LDA R9
+        STXD
+        LDA R9
+        STXD
+        LDA R9
+        STXD
+        LDN R9
+        STXD
+        DEC R9
+        DEC R9
+        DEC R9
+        DEC R9
+        DEC R9
+        SEP RC
+        ..
+        ..
+        DC 85H,'DIGI',0D4H .. DIGIT
+        DC PDO - 7
+DGT     DC $ + 2
+        SEX R9
+        DEC R9
+        LDN R9
+        SMI 30H
+        BNF BAD
+        SMI 11H
+        BDF DOK
+        SMI 0F9H
+        BDF BAD
+DOK     ADI 0AH
+        STR R9
+        INC R9
+        INC R9
+        SM
+        BDF BAD2
+        DEC R9
+        SEP RC
+BAD2    DEC R9
+        DEC R9
+BAD     LDI 00
+        STXD
+        STR R9
+        SEP RC
+        ..
+        DC 86H,'(FIND',0A9H .. (FIND)
+        DC DGT - 8
+FIND    DC $ + 2
+        DEC R9
+        DEC R9
+        LDA R9
+        PHI R8
+        LDA R9
+        PLO R8
+        LDA R9
+        PHI R7
+        LDN R9
+        PLO R7
+        DEC R9
+        DEC R9
+LOOP1   SEX R7              .. SAVE LENGTH BYTE
+        LDN R7
+        STR R2
+        LDA R8              .. COMPARE LENGTH BYTES
+        XOR
+        ANI 3FH
+        BNZ BADLEN
+NEXCHR  INC R7
+        LDA R8              .. COMPARE NEXT CHARACTER
+        XOR
+        SHL
+        BNZ BADCHR          .. NO MATCH ON 7 BITS
+        SHLC
+        BZ NEXCHR           .. IF NOT LAST CHARACTER
+LOOP2   LDA R7              ..   ELSE END OF STRING
+        ANI 80H
+        BZ LOOP2
+        SEX R9              .. END OF DICT NAME
+        GLO R7
+        ADI 04
+        STXD
+        GHI R7
+        ADCI 00
+        STR R9              .. LEAVE PFA
+        INC R9
+        INC R9
+        LDI 00
+        STR R9
+        INC R9
+        LDN R2              .. GET LENGTH BYTE
+        STR R9
+        INC R9
+        LDI 0FFH
+        STR R9
+        INC R9
+        STXD                .. AND TRUE FLAG
+        SEP RC
+BADLEN  INC R7
+BADCHR  LDA R7
+        ANI 80H
+        BZ BADCHR
+        LDN R7
+        BNZ BOK
+        INC R7
+        LDN R7
+        DEC R7
+        BNZ BOK
+        LDI 00            .. LINK=0 RETURN FALSE
+        STR R9
+        DEC R9
+        STR R9
+        SEP RC
+BOK     LDA R7
+        STR R2
+        LDN R7
+        PLO R7
+        LDN R2
+        PHI R7
+        LDN R9
+        PLO R8
+        DEC R9
+        LDA R9
+        PHI R8
+        BR LOOP1
+        ..
+        ..
+        DC 87H,'ENCLOS',0C5H .. ENCLOSURE
+        DC FIND -9
+ENCL    DC $ + 2
+        DEC R9
+        DEC R9
+        LDA R9
+        PHI R8
+        LDA R9
+        PLO R8
+        INC R9
+        LDI 00            .. R7.0 IS OFFSET
+        PLO R7
+        LDN R9              .. SAVE DELIM
+        STR R2
+        SEX R2
+LOP1    LDN R8
+        SM
+        BNZ FRST            .. FIND FIRST NON-
+        INC R8              ..   DELIM CHAR
+        INC R7
+        BR LOP1
+FRST    GLO R7              .. SAVE OFFSET TO
+        STR R9
+        PHI R7
+        INC R9              ..   FIRST CHARACTER
+        LDI 00
+        STR R9
+        INC R9
+        INC R9
+        STR R9
+        INC R9
+LOP2    LDN R8
+        BZ NULL             .. EQUAL NULL ?
+        SM                  .. SUBTRACT DELIMIN
+        BZ DELIM
+        INC R8
+        INC R7
+        BR LOP2
+NULL    GLO R7              .. LEAVE OFFSET
+        SEX R9
+        STR R9
+        GHI R7              .. TO NEXT CHARACTER
+        SM
+        BNZ SKIP
+        INC R7
+SKIP    GLO R7              .. LAST CHARACTER IN
+        DEC R9
+        DEC R9
+        STR R9              .. WORD
+        INC R9
+        SEP RC
+DELIM   INC R7
+        GLO R7
+        STR R9
+        DEC R7
+        BR SKIP
+        ..
+        DC 85H,'CMOV',0C5H .. CMOVE
+        DC ENCL - 10
+CMOVE   DC $ + 2
+        LDA R9
+        ADI 01
+        PHI R7
+        LDN R9
+        PLO R7
+        DEC R7
+        DEC R9
+        DEC R9
+        DEC R9
+        GHI RA              .. PUSH RA
+        STR R2
+        DEC R2
+        GLO RA
+        STR R2
+        LDA R9              .. RA IS 'TO'
+        PHI RA
+        LDN R9
+        PLO RA
+        DEC R9
+        DEC R9
+        DEC R9
+        LDA R9              .. R8 IS 'FROM'
+        PHI R8
+        LDN R9
+        PLO R8
+        DEC R9
+        DEC R9
+        DEC R9
+LUUP    GHI R7
+        BZ END2
+        LDA R8
+        STR RA
+        INC RA
+        DEC R7
+        BR LUUP
+END2    LDA R2              .. POP RA
+        PLO RA
+        LDN R2
+        PHI RA
+        SEP RC
+        ..
+        DC 82H,55H,0AAH  .. U*
+                            .. UNSIGNED 16 X 16 BIT MULTIPLY
+        DC CMOVE - 8
+USTAR   DC $ + 2
+        SEX R9
+        LDI 00
+        PLO R7              .. R7 IS LOW 2 BYTES
+        PHI R7
+        LDI 10H            .. OF PRODUCT
+LP7B    STR R2              .. MEM(2) IS LOOP COUNT
+        GLO R7
+        SHL
+        PLO R7
+        GHI R7
+        SHLC
+        PHI R7
+        INC R9              .. DOUBLE THE PRODUCT AND
+        LDN R9              ..   TEST HIGH BIT
+        SHLC
+        STXD
+        LDN R9              ..   OF OP2
+        SHLC
+        STR R9
+        BNF SKP9A
+        DEC R9
+        GLO R7
+        ADD
+        PLO R7
+        DEC R9              ..   ADD OP1
+        GHI R7
+        ADC
+        PHI R7
+        INC R9              .. TO 24 BIT PRODUCT
+        INC R9
+        INC R9
+        LDI 00
+        ADC
+        STXD
+SKP9A   LDN R2
+        SMI 01
+        BNZ LP7B
+UOUT    DEC R9              .. MOVE REST OF
+        GLO R7
+        STXD
+        GHI R7              .. PRODUCT TO STACK
+        STR R9
+        INC R9
+        INC R9
+        SEP RC
+        ..
+        DC 82H,55H,0AFH  .. U/ UNSIGNED DIVIDE
+        DC USTAR - 5
+USLSH   DC $ + 2
+        SEX R9
+        DEC R9
+        DEC R9
+        LDA R9
+        PHI R7
+        LDN R9
+        PLO R7
+        DEC R9
+        DEC R9
+        LDA R9
+        SHL
+        INC R9
+        STXD
+        DEC R9
+        DEC R9
+        LDA R9
+        SHLC
+        INC R9
+        STR R9
+        INC R9
+        LDI 10H
+        PLO R8
+LPC5    GLO R7
+        SHLC
+        PLO R7
+        GHI R7
+        SHLC
+        PHI R7
+        INC R9
+        INC R9
+        GLO R7
+        SM
+        PHI R8
+        DEC R9
+        GHI R7
+        SMB
+        BNF SKPD8
+        PHI R7
+        GHI R8
+        PLO R7
+SKPD8   DEC R9
+        LDN R9
+        SHLC
+        STXD
+        LDN R9
+        SHLC
+        STR R9
+        INC R9
+        DEC R8
+        GLO R8
+        BNZ LPC5
+        DEC R9
+        BR UOUT
+        ..
+        DC 83H,'AN',0C4H  .. AND
+        DC USLSH - 5
+FAND    DC $ + 2
+        GLO R9
+        PLO R8
+        GHI R9
+        PHI R8
+        DEC R8
+        SEX R8
+        INC R9
+        LDN R9
+        AND
+        STXD
+        DEC R9
+        LDN R9
+        AND
+        STR R8
+        DEC R9
+        DEC R9
+        SEP RC
+        ..
+        DC 82H,4FH,0D2H  .. OR
+        DC FAND - 6
+FFOR    DC $ + 2
+        GLO R9
+        PLO R8
+        GHI R9
+        PHI R8
+        DEC R8
+        SEX R8
+        INC R9
+        LDN R9
+        OR
+        STXD
+        DEC R9
+        LDN R9
+        OR
+        STR R8
+        DEC R9
+        DEC R9
+        SEP RC
+        ..
+        DC 83H,'XO',0D2H   .. XOR
+        DC FFOR - 5
+FXOR    DC $ + 2
+        GLO R9
+        PLO R8
+        GHI R9
+        PHI R8
+        DEC R8
+        SEX R8
+        INC R9
+        LDN R9
+        XOR
+        STXD
+        DEC R9
+        LDN R9
+        XOR
+        STR R8
+        DEC R9
+        DEC R9
+        SEP RC
+        ..
+        DC 83H,'SP',0C0H  .. SP@
+        DC FXOR - 6
+FSPAT   DC $ + 2
+        GHI R9
+        STR R2
+        GLO R9
+        INC R9
+        INC R9
+        INC R9
+        STR R9
+        DEC R9
+        LDN R2
+        STR R9
+        SEP RC
+        ..
+        DC 83H,'SP',0A1H  .. SP!
+                            ..   stack pointer store
+        DC FSPAT - 6
+SP1     DC $ + 2
+        GLO RD
+        ADI 06
+        PLO R8
+        GHI RD
+        ADCI 00
+        PHI R8
+        LDA R8
+        PHI R9
+        LDN R8
+        PLO R9
+        SEP RC
+        ..
+        DC 83H,'RP',0A1H  .. RP!
+                            .. RETURN STACK POINTER STORE
+        DC SP1 - 6
+RP1     DC $ + 2
+        GLO RD
+        ADI 08
+        PLO R8
+        GHI RD
+        ADCI 00
+        PHI R8
+        LDA R8
+        PHI R2
+        LDN R8
+        PLO R2
+        SEP RC
+        ..
+        DC 82H,3BH,0D3H  .. ;S (UNEST)
+        DC RP1 - 6
+SEMIS   DC $ + 2
+        INC R2
+        LDA R2
+        PLO RA
+        LDN R2
+        PHI RA
+        SEP RC
+
+        DC 85H,'LEAV',0C5H .. LEAVE
+        DC SEMIS - 5
+LVE     DC $ + 2
+        GHI R2
+        PHI R8
+        GLO R2
+        PLO R8
+        INC R8
+        LDA R8
+        INC R8
+        STR R8
+        DEC R8
+        LDA R8
+        INC R8
+        STR R8
+        SEP RC
+        ..
+        DC 82H,3EH,0D2H  .. >R   TO R
+        DC LVE - 8
+GR      DC $ + 2
+        SEX R2
+        LDA R9
+        STXD
+        LDN R9
+        STXD
+        DEC R9
+        DEC R9
+        DEC R9
+        SEP RC
+        ..
+        DC 82H,52H,0BEH  .. R>   FROM R
+        DC GR - 5
+RG      DC $ + 2
+        INC R9
+        INC R9
+        INC R9
+        INC R2
+        LDA R2
+        STR R9
+        DEC R9
+        LDN R2
+        STR R9
+        SEP RC
+        ..
+        DC 81D2H          .. R   COPY TOP OF RETN
+        DC RG - 5          .. STACK TO TOP OF
+R       DC $ + 2           .. COMPUTATION STACK
+        GLO R2
+        PLO R8
+        GHI R2
+        PHI R8
+        INC R8
+        INC R9
+        INC R9
+        INC R9
+        LDA R8
+        STR R9
+        DEC R9
+        LDN R8
+        STR R9
+        SEP RC
+        ..
+        DC 82H,30H,0BDH  .. 0=
+        DC R - 4
+ZEQAL   DC $ + 2
+        LDA R9
+        BNZ NONE
+        LDN R9
+        BNZ NONE
+ZONE    LDI 01
+        BR STOR
+NONE    LDI 00
+STOR    STR R9
+        DEC R9
+        LDI 00
+        STR R9
+        SEP RC
+        ..
+        DC 82H,30H,0BCH  .. 0<
+        DC ZEQAL - 5
+ZLESS   DC $ + 2
+        LDA R9
+        SHL
+        BDF ZONE
+        BR NONE
+        ..
+        DC 81ABH          .. +
+        DC ZLESS - 5
+PLUS    DC $ + 2
+        GLO R9
+        PLO R8
+        GHI R9
+        PHI R8
+        DEC R8
+        SEX R8
+        INC R9
+        LDN R9
+        ADD
+        STXD
+        DEC R9
+        LDN R9
+        ADC
+        STR R8
+        DEC R9
+        DEC R9
+        SEP RC
+        ..
+        DC 85H,'MINU',0D3H .. MINUS
+        DC PLUS - 4
+MINUS   DC $ + 2
+        SMI 00            .. SET CARRY
+MINOS   INC R9
+        LDN R9
+        XRI 0FFH
+        ADCI 00
+        STR R9
+        DEC R9
+        LDN R9
+        XRI 0FFH
+        ADCI 00
+        STR R9
+        SEP RC
+        ..
+        DC 82H,44H,0ABH  .. D+ DCL PRCN INTEGERS
+        DC MINUS - 8       .. ARE STORED HIGH 16 BITS TOP
+DPLUS   DC $ + 2           .. LOW 16 BITS BENEATH
+        GLO R9
+        SMI 05
+        PLO R8
+        GHI R9
+        SMBI 00
+        PHI R8
+        DEC R9
+        SEX R8
+        LDN R9
+        ADD
+        STXD
+        DEC R9
+        LDN R9
+        ADC
+        STR R8
+        INC R8
+        INC R8
+        INC R8
+        INC R9
+        INC R9
+        INC R9
+        LDN R9
+        ADC
+        STXD
+        DEC R9
+        LDN R9
+        ADC
+        STR R8
+        DEC R9
+        DEC R9
+        DEC R9
+        DEC R9
+        SEP RC
+        ..
+        DC 86H,'DMINU',0D3H .. DMINUS
+        DC DPLUS - 5
+DMIN    DC $ + 2
+        SEX R9
+        DEC R9
+        LDN R9
+        XRI 0FFH
+        ADI 01
+        STXD
+        LDN R9
+        XRI 0FFH
+        ADCI 00
+        STR R9
+        INC R9
+        INC R9
+        BR MINOS
+        ..
+        DC 84H,'OVE',0D2H .. OVER
+        DC DMIN - 9
+OVER    DC $ + 2
+        DEC R9
+        DEC R9
+        LDA R9
+        INC R9
+        INC R9
+        INC R9
+        STR R9
+        DEC R9
+        DEC R9
+        DEC R9
+        LDA R9
+        INC R9
+        INC R9
+        INC R9
+        STR R9
+        DEC R9
+        SEP RC
+        ..
+        DC 84H,'DRO',0D0H .. DROP
+        DC OVER - 7
+DROP    DC $ + 2
+        DEC R9
+        DEC R9
+        SEP RC
+        ..
+        DC 84H,'SWA',0D0H .. SWAP
+        DC DROP - 7
+SWAP    DC $ + 2
+        GLO R9
+        PLO R8
+        GHI R9
+        PHI R8
+        DEC R8
+        LDN R8
+        STR R2
+        INC R9
+        LDN R9
+        STR R8
+        LDN R2
+        STR R9
+        DEC R9
+        DEC R8
+        LDN R8
+        STR R2
+        LDN R9
+        STR R8
+        LDN R2
+        STR R9
+        SEP RC
+        ..
+        DC 83H,'DU',0D0H  .. DUP
+        DC SWAP - 7
+DUP     DC $ + 2
+        LDA R9
+        INC R9
+        STR R9
+        DEC R9
+        LDA R9
+        INC R9
+        STR R9
+        DEC R9
+        SEP RC
+        ..
+        DC 82H,2BH,0A1H  .. +!
+        DC DUP - 6
+PLUSS   DC $ + 2
+        LDA R9
+        PHI R8
+        LDN R9
+        PLO R8
+        DEC R9
+        DEC R9
+        INC R8
+        SEX R8
+        LDN R9
+        ADD
+        STXD
+        DEC R9
+        LDN R9
+        ADC
+        STR R8
+POP     DEC R9
+        DEC R9
+        SEP RC
+        ..
+        DC 86H,'TOGGL',0C5H .. TOGGLE
+        DC PLUSS - 5
+TGLE    DC $ + 2
+        INC R9
+        LDN R9
+        PLO R7
+        DEC R9
+        DEC R9
+        DEC R9
+        LDA R9
+        PHI R8
+        LDN R9
+        PLO R8
+        SEX R8
+        GLO R7
+        XOR
+        STR R8
+        DEC R9
+        BR POP
+        ..        
+        DC 81C0H          .. @
+        DC TGLE - 9
+AT      DC $ + 2
+        LDA R9
+        PHI R8
+        LDN R9
+        PLO R8
+        DEC R9
+        LDA R8
+        STR R9
+        INC R9
+        LDN R8
+        STR R9
+        DEC R9
+        SEP RC
+        ..
+        DC 82H,43H,0C0H  .. C@
+        DC AT - 4
+CAT     DC $ + 2
+        LDA R9
+        PHI R8
+        LDN R9
+        PLO R8
+        LDN R8
+        STR R9
+        DEC R9
+        LDI 00
+        STR R9
+        SEP RC
+        ..
+        DC 81A1H          .. !   STORE
+        DC CAT - 5
+EX      DC $ + 2
+        LDA R9
+        PHI R8
+        LDN R9
+        PLO R8
+        DEC R9
+        DEC R9
+        DEC R9
+        LDA R9
+        STR R8
+        INC R8
+        LDN R9
+        STR R8
+        DEC R9
+        DEC R9
+        DEC R9
+        SEP RC
+        ..
+        DC 82H,43H,0A1H  .. C!   C STORE
+        DC EX - 4
+CEX     DC $ + 2
+        LDA R9
+        PHI R8
+        LDN R9
+        PLO R8
+        DEC R9
+        DEC R9
+        LDN R9
+        STR R8
+        DEC R9
+        DEC R9
+        DEC R9
+        SEP RC
+..
+..
+.. THE FOLLOWING FOUR ROUTINES ARE USER DEFINED
+.. FOR THE CONSULE INPUT AND OUTPUT       
+        ..
+        .. SEND ASCII TO TERMINAL
+        ..
+        DC 84H,'EMI',0D4H .. EMIT
+        DC CEX - 5
+EMIT    DC NEST            .. OUTPUT CHAR TO
+                            .. TERMINAL AND INCREMENT
+                            .. 'OUT'
+        DC FOUT            .. GET ADDRESS OF OUT
+        DC CSEND
+        DC SEMIS
+CSEND   DC $ + 2
+.. INCREMENT USER VARIABLE 'OUT'
+.. WHOSE ADDRESS IN ON THE COMPUTATION
+.. STACK
+        LDA R9
+        PHI R8
+        LDN R9
+        PLO R8
+        DEC R9
+        DEC R9
+        DEC R9
+        INC R8
+        LDN R8
+        ADI 01
+        STR R8
+        DEC R8
+        LDN R8
+        ADCI 00
+        STR R8
+.. WAIT UNTIL UART FREE AND
+.. SEND OUT CHARACTER WHICH IS ON
+.. THE COMP.STACK
+CSEND1  SEX R2
+        INP 3              .. GET UART STATUS
+        SHL                 .. GET THRE FLAG
+        BNF CSEND1
+        SEX R9
+        INC R9
+        OUT 2
+        DEC R9
+        DEC R9
+        DEC R9
+        DEC R9
+        SEP RC
+        ..
+        ..
+        DC 83H,'KE',0D9H  .. KEY   READ KEYBOARD
+        DC EMIT - 7
+KEY     DC $ + 2
+        SEX CSTACK
+        IRX
+        IRX
+        IRX
+KEY1    INP 3              .. GET DA BIT FROM
+        SHR                                     .. UART STATUS BYTE
+        BNF KEY1            .. WAIT 'TILL DATA AVAIL.
+        INP 2               .. GET DATA
+        ANI 7FH            .. STRIP PARITY BIT
+        STR CSTACK
+        DEC CSTACK
+        LDI 00
+        STR CSTACK
+        SEP RC
+        ..
+        .. TEST FOR BREAK
+        ..
+        DC 89H,'?TERMINA',0CCH .. ?TERMINAL
+        DC KEY - 6
+.. ASSUME THAT A FRAMING ERROR INDICATES
+.. THAT THE BREAK KEY IS OR WAS PRESSED.
+QTERM   DC $ + 2
+        SEX CSTACK
+        IRX
+        IRX
+        IRX
+        INP 3               .. GET NEW STATUS BYTE
+        ANI 08            .. GET FRAMING ERROR BIT
+        STXD
+..        INP 2               .. DO A DUMMY READ TO
+.. CLEAR THE DATA AVAILABLE SIGNAL
+        LDI 00
+        STR CSTACK
+        SEP RC
+        ..
+        .. SEND CR/LF TO TERMINAL
+        ..
+        DC 82H,43H,0D2H  .. CR
+        DC QTERM - 12
+CR      DC $ + 2
+        SEX RSTACK
+CR1     INP 3               .. GET THRE BIT
+        SHL
+        BNF CR1
+        LDI 0DH
+        STR RSTACK
+        OUT 2
+        DEC RSTACK
+CR2     INP 3
+        SHL
+        BNF CR2
+        LDI 0AH
+        STR RSTACK
+        OUT 2
+        DEC RSTACK
+        SEX R9
+        SEP RC
+        ..
+        ..
+NEST    GHI RA
+        STR R2
+        DEC R2
+        GLO RA
+        STR R2
+        DEC R2
+        GHI RB
+        PHI RA
+        GLO RB
+        PLO RA
+        SEP RC
+        ..
+VAR     INC R9
+        INC R9
+        GHI RB
+        STR R9
+        INC R9
+        GLO RB
+        STR R9
+        DEC R9
+        SEP RC
+        ..
+CONST   INC R9
+        INC R9
+        LDA RB
+        STR R9
+        INC R9
+        LDA RB
+        STR R9
+        DEC R9
+        SEP RC
+        ..
+USER    INC R9
+        INC R9
+        SEX R9
+        LDA RB
+        STR R9
+        INC R9
+        LDA RB
+        STR R9
+        GLO RD
+        ADD
+        STXD
+        GHI RD
+        ADC
+        STR R9
+        SEP RC
+..
+.. FROM HERE ON THE SOURCE IS GENERALLY
+.. DEFINED WITH FORTH WORD ADDRESSES
+..
+        DC 81B0H          .. 0
+        DC CR - 5
+ZERO    DC CONST
+        DC 0000H
+        ..
+        DC 81B1H          .. 1
+        DC ZERO - 4
+ONE     DC CONST
+        DC 0001H
+        ..
+        DC 81B2H          .. 2
+        DC ONE - 4
+TWO     DC CONST
+        DC 0002H
+        ..
+        DC 82H,42H,0CCH  .. BL
+        DC TWO - 4         .. CONSTANT ASCII BLANK
+BL      DC CONST
+        DC 0020H
+        ..
+        DC 83H,43H,2FH,0CCH .. C/L
+                                .. CHARACTERS PER LINE
+        DC BL - 5
+CL      DC CONST
+        DC 0040H          .. 64 (DECIMAL)
+        ..
+        DC 85H,'FIRS',0D4H .. FIRST
+        DC CL - 6
+FIRST   DC CONST
+        DC FIRSTB
+        ..
+        DC 85H,'LIMI',0D4H .. LIMIT
+        DC FIRST - 8
+LIMIT   DC CONST
+        DC LIMITB
+        ..
+        DC 85H,'B/BU',0C6H .. B/BUF
+                               .. BYTES PER BUFFER
+        DC LIMIT - 8
+BBUF    DC CONST
+        DC 0400H          .. 1024 BYTES/BUFFER
+        ..
+        DC 85H,'B/SC',0D2H .. B/SCR
+                               .. BUFFERS/SCREEN
+        DC BBUF - 8
+BSCR    DC CONST
+        DC 0001H
+        ..
+        DC 86H,'ORIGI',0CEH .. ORIGIN
+        DC BSCR - 8
+ORGN    DC CONST
+        DC 005EH
+        ..
+        DC 87H,'+ORIGI',0CEH .. +ORIGIN
+
+        DC ORGN - 9
+PORGN   DC NEST
+        DC ORGN
+        DC PLUS
+        DC SEMIS
+        ..
+        .. USER VARIABLES
+        ..
+        DC 82H,53H,0B0H  .. S0
+        DC PORGN - 10
+SO      DC USER
+        DC 0006H
+        ..
+        DC 82H,52H,0B0H  .. R0
+        DC SO - 5
+RO      DC USER
+        DC 0008H
+        ..
+        DC 83H,'TI',0C2H  .. TIB
+        DC RO - 5
+TIB     DC USER
+        DC 000AH
+        ..
+        DC 85H,'WIDT',0C8H .. WIDTH
+        DC TIB - 6
+WIDTH   DC USER
+        DC 000CH
+        ..
+        DC 87H,'WARNIN',0C7H .. WARNING
+        DC WIDTH - 8
+WRNG    DC USER
+        DC 000EH
+        ..
+        DC 85H,'FENC',0C5H .. FENCE   FORGET BOUNDRY
+        DC WRNG - 10
+FNCE    DC USER
+        DC 0010H
+        ..
+        DC 82H,44H,0D0H  .. DP
+        DC FNCE - 8
+DP      DC USER
+        DC 0012H
+        ..
+        DC 88H,'VOC-LIN',0CBH .. VOC-LINK
+        DC DP - 5
+VL      DC USER
+        DC 0014H
+        ..
+        DC 83H,42H,4CH,0CBH .. BLK
+        DC VL - 11
+BLK     DC USER
+        DC 0016H
+        ..
+        DC 82H,49H,0CEH  .. IN
+        DC BLK - 6
+FIN     DC USER
+        DC 0018H
+        ..
+        DC 83H,'OU',0D4H  .. OUT
+        DC FIN - 5
+FOUT    DC USER
+        DC 001AH
+        ..
+        DC 83H,'SC',0D2H  .. SCR
+        DC FOUT - 6
+FSCR    DC USER
+        DC 001CH
+        ..
+        DC 86H,'OFFSE',0D4H .. OFFSET
+        DC FSCR - 6
+OFST    DC USER
+        DC 001EH
+        ..
+        DC 87H,'CONTEX',0D4H .. CONTEXT
+        DC OFST - 9
+CNTX    DC USER
+        DC 0020H
+        ..
+        DC 87H,'CURREN',0D4H .. CURRENT
+        DC CNTX - 10
+CRNT    DC USER
+        DC 0022H
+        ..
+        DC 85H,'STAT',0C5H .. STATE
+        DC CRNT - 10
+STT     DC USER
+        DC 0024H
+        ..
+        DC 84H,'BAS',0C5H .. BASE
+        DC STT - 8
+BASE    DC USER
+        DC 0026H
+        ..
+        DC 83H,44H,50H,0CCH .. DPL
+        DC BASE - 7
+DPL     DC USER
+        DC 0028H
+        ..
+        DC 83H,46H,4CH,0C4H .. FLD
+        DC DPL - 6
+FLD     DC USER
+        DC 002AH
+        ..
+        DC 83H,43H,53H,0D0H .. CSP
+        DC FLD - 6
+CSP     DC USER
+        DC 002CH
+        ..
+        DC 82H,52H,0A3H  .. R
+        DC CSP - 6
+RNU     DC USER
+        DC 002EH
+        ..
+        DC 83H,48H,4CH,0C4H .. HLD
+        DC RNU - 5
+HLD     DC USER
+        DC 0030H
+..
+        DC 82H,44H,0D6H  .. DV
+        DC HLD - 6         .. 5 BYTE VECTOR AREA
+.. USED DURING DISK OPERATIONS
+DV      DC USER
+        DC 0032H
+        ..
+        .. END OF USER VARIABLES
+        ..
+        DC 82H,31H,0ABH  .. 1+
+        DC DV - 5
+PLUS1   DC NEST
+        DC ONE
+        DC PLUS
+        DC SEMIS
+        ..
+        DC 82H,32H,0ABH  .. 2+
+        DC PLUS1 - 5
+PLUS2   DC NEST
+        DC TWO
+        DC PLUS
+        DC SEMIS
+        ..
+        DC 84H,'HER',0C5H .. HERE
+        DC PLUS2 - 5
+HERE    DC NEST
+        DC DP
+        DC AT
+        DC SEMIS
+        ..
+        DC 85H,'ALLO',0D4H .. ALLOT
+        DC HERE - 7
+ALLOT   DC NEST
+        DC DP
+        DC PLUSS
+        DC SEMIS
+        ..
+        DC 81ACH          .. , (COMMA)
+        DC ALLOT - 8
+COMMA   DC NEST
+        DC HERE
+        DC EX
+        DC TWO
+        DC ALLOT
+        DC SEMIS
+        ..
+        DC 82H,43H,0ACH  .. C,
+        DC COMMA - 4
+CCMA    DC NEST
+        DC HERE
+        DC CEX
+        DC ONE
+        DC ALLOT
+        DC SEMIS
+        ..
+        DC 81ADH          .. - (MINUS SIGN)
+        DC CCMA - 5
+MINS    DC NEST
+        DC MINUS
+        DC PLUS
+        DC SEMIS
+        ..
+        DC 81BDH          .. = (EQUAL SIGN)
+        DC MINS - 4
+EQL     DC NEST
+        DC MINS
+        DC ZEQAL
+        DC SEMIS
+        ..
+        DC 81BCH          .. < (LESS THAN SIGN)
+        DC EQL - 4
+LESS    DC NEST
+        DC MINS
+        DC ZLESS
+        DC SEMIS
+        ..
+        DC 81BEH          .. > (GTR THAN SIGN)
+        DC LESS - 4
+GTR     DC NEST
+        DC SWAP
+        DC LESS
+        DC SEMIS
+        ..
+        DC 83H,52H,4FH,0D4H .. ROT
+        DC GTR - 4
+ROT     DC NEST
+        DC GR
+        DC SWAP
+        DC RG
+        DC SWAP
+        DC SEMIS
+        ..
+        DC 85H,'SPAC',0C5H .. SPACE
+        DC ROT - 6
+SPC     DC NEST
+        DC BL
+        DC EMIT
+        DC SEMIS
+        ..
+        DC 84H,'-DU',0D0H .. -DUP
+        DC SPC - 8
+MDUP    DC NEST
+        DC DUP
+        DC ZBRCH
+        DC $ + 4
+        DC DUP
+        DC SEMIS
+        ..
+        DC 88H,'TRAVERS',0C5H .. TRAVERSE
+        DC MDUP - 7
+TRVS    DC NEST
+        DC SWAP
+TR1     DC OVER
+        DC PLUS
+        DC LIT
+        DC 007FH
+        DC OVER
+        DC CAT
+        DC LESS
+        DC ZBRCH
+        DC TR1
+        DC SWAP
+        DC DROP
+        DC SEMIS
+        ..
+        ..
+        DC 86H,'LATES',0D4H .. LATEST
+        DC TRVS - 11
+LTST    DC NEST
+        DC CRNT
+        DC AT
+        DC AT
+        DC SEMIS
+        ..
+        ..
+        DC 83H,4CH,46H,0C1H .. LFA
+        DC LTST - 9        .. LINK FIELD ADDRESS
+LFA     DC NEST
+        DC LIT
+        DC 0004H
+        DC MINS
+        DC SEMIS
+        ..
+        DC 83H,43H,46H,0C1H .. CFA
+        DC LFA - 6         .. CODE FIELD ADDRESS
+CFA     DC NEST
+        DC TWO
+        DC MINS
+        DC SEMIS
+        ..
+        ..
+        DC 83H,4EH,46H,0C1H .. NFA
+        DC CFA - 6         .. NAME FIELD ADDRESS
+NFA     DC NEST
+        DC LIT
+        DC 0005H
+        DC MINS
+        DC LIT
+        DC 0FFFFH
+        DC TRVS
+        DC SEMIS
+        ..
+        ..
+        DC 83H,50H,46H,0C1H .. PFA
+        DC NFA - 6         .. PARAMETER FIELD ADDRESS
+PFA     DC NEST
+        DC ONE
+        DC TRVS
+        DC LIT
+        DC 0005H
+        DC PLUS
+        DC SEMIS
+        ..
+        ..
+        DC 84H,21H,43H,53H,0D0H .. !CSP
+        DC PFA - 6
+DCSP    DC NEST
+        DC FSPAT
+        DC CSP
+        DC EX
+        DC SEMIS
+        ..
+        ..
+        DC 86H,'?ERRO',0D2H .. ?ERROR
+        DC DCSP - 7
+QERR    DC NEST
+        DC SWAP
+        DC ZBRCH
+        DC $ + 8
+        DC ERROR
+        DC BRCH
+        DC $ + 4
+        DC DROP
+        DC SEMIS
+        ..
+        ..
+        DC 85H,'?COM',0D0H .. ?COMP
+        DC QERR - 9
+QCMP    DC NEST
+        DC STT
+        DC AT
+        DC ZEQAL
+        DC LIT
+        DC 0011H
+        DC QERR
+        DC SEMIS
+        ..
+        ..
+        DC 85H,'?EXE',0C3H .. ?EXEC
+        DC QCMP - 8
+EXC     DC NEST
+        DC STT
+        DC AT
+        DC LIT
+        DC 0012H
+        DC QERR
+        DC SEMIS
+        ..
+        ..
+        DC 86H,'?PAIR',0D3H .. ?PAIRS
+        DC EXC - 8
+QPR     DC NEST
+        DC MINS
+        DC LIT
+        DC 0013H
+        DC QERR
+        DC SEMIS
+        ..
+        ..
+        DC 84H,3FH,43H,53H,0D0H .. ?CSP
+        DC QPR - 9
+QCSP    DC NEST
+        DC FSPAT
+        DC CSP
+        DC AT
+        DC MINS
+        DC LIT
+        DC 0014H
+        DC QERR
+        DC SEMIS
+        ..
+        ..
+        DC 88H,'?LOADIN',0C7H .. ?LOADING
+
+        DC QCSP - 7
+QLDG    DC NEST
+        DC BLK
+        DC AT
+        DC ZEQAL
+        DC LIT
+        DC 0016H
+        DC QERR
+        DC SEMIS
+        ..
+        ..
+        DC 87H,'COMPIL',0C5H .. COMPILE
+        DC QLDG - 11
+CMPL    DC NEST
+        DC QCMP
+        DC RG
+        DC DUP
+        DC PLUS2
+        DC GR
+        DC AT
+        DC COMMA
+        DC SEMIS
+        ..
+        ..
+        DC 0C1DCH          .. [   LEFT BRACKET
+        DC CMPL - 10
+LB      DC NEST
+        DC ZERO
+        DC STT
+        DC EX
+        DC SEMIS
+        ..
+        ..
+        DC 81DDH          .. ]   RIGHT BRACKET
+        DC LB - 4
+RBK     DC NEST
+        DC LIT
+        DC 00C0H
+        DC STT
+        DC EX
+        DC SEMIS
+        ..
+        ..
+        DC 86H,'SMUDG',0C5H .. SMUDGE
+        DC RBK - 4
+SMDG    DC NEST
+        DC LTST
+        DC LIT
+        DC 0020H
+        DC TGLE
+        DC SEMIS
+        ..
+        ..
+        DC 83H,48H,45H,0D8H .. HEX
+        DC SMDG - 9
+MHEX    DC NEST
+        DC LIT
+        DC 0010H
+        DC BASE
+        DC EX
+        DC SEMIS
+        ..
+        ..
+        DC 87H,'DECIMA',0CCH .. DECIMAL
+        DC MHEX - 6
+MDCML   DC NEST
+        DC LIT
+        DC 000AH
+        DC BASE
+        DC EX
+        DC SEMIS
+        ..
+        ..
+        DC 87H,'(;CODE',0A9H .. (;CODE)
+        DC MDCML - 10
+PCODE   DC NEST
+        DC RG
+        DC LTST
+        DC PFA
+        DC CFA
+        DC EX
+        DC SEMIS
+        ..
+        ..
+        DC 0C5H,';COD',0C5H .. ;CODE (IMMEDIATE)
+        DC PCODE - 10
+CODE    DC NEST
+        DC QCSP
+        DC CMPL
+        DC PCODE
+        DC LB
+        DC SMDG
+        DC SEMIS
+        ..
+        ..
+        DC 85H,'COUN',0D4H .. COUNT
+        DC CODE - 8
+CNT     DC NEST
+        DC DUP
+        DC PLUS1
+        DC SWAP
+        DC CAT
+        DC SEMIS
+        ..
+        ..
+        DC 84H,'TYP',0C5H .. TYPE
+        DC CNT - 8
+TYPE    DC NEST
+        DC MDUP
+        DC ZBRCH
+        DC $ + 24
+        DC OVER
+        DC PLUS
+        DC SWAP
+        DC PDO
+TYP1    DC R
+        DC CAT
+        DC EMIT
+        DC LUPE
+        DC TYP1
+        DC BRCH
+        DC $ + 4
+        DC DROP
+        DC SEMIS
+        ..
+        ..
+        DC 89H,'-TRAILIN',0C7H .. -TRAILING
+        DC TYPE - 7
+TRLG    DC NEST
+        DC DUP
+        DC ZERO
+        DC PDO
+TRL1    DC OVER
+        DC OVER
+        DC PLUS
+        DC ONE
+        DC MINS
+        DC CAT
+        DC BL
+        DC MINS
+        DC ZBRCH
+        DC $ + 8
+        DC LVE
+        DC BRCH
+        DC $ + 6
+        DC ONE        
+        DC MINS
+        DC LUPE
+        DC TRL1
+        DC SEMIS
+        ..
+        ..
+        DC 84H,28H,2EH,22H,0A9H .. (.")               "
+        DC TRLG - 12
+PDQ     DC NEST
+        DC R
+        DC CNT
+        DC DUP
+        DC PLUS1
+        DC RG
+        DC PLUS
+        DC GR
+        DC TYPE
+        DC SEMIS
+        ..
+        ..
+        DC 86H,'EXPEC',0D4H .. EXPECT
+        DC PDQ - 7
+EXPT    DC NEST
+        DC OVER
+        DC PLUS
+        DC OVER
+        DC PDO
+EXPT4   DC KEY
+        DC DUP
+        DC LIT
+        DC 000EH
+        DC PORGN
+        DC AT
+        DC EQL
+        DC ZBRCH
+        DC EXPT1
+        DC DROP
+        DC LIT
+        DC 0008H
+        DC OVER
+        DC R
+        DC EQL
+        DC DUP
+        DC RG
+        DC TWO
+        DC MINS
+        DC PLUS
+        DC GR
+        DC MINS
+        DC BRCH
+        DC EXPT2
+EXPT1   DC DUP
+        DC LIT
+        DC 000DH
+        DC EQL
+        DC ZBRCH
+        DC EXPT3
+        DC LVE
+        DC DROP
+        DC BL
+        DC ZERO
+        DC BRCH
+        DC EXPT5
+EXPT3   DC DUP
+EXPT5   DC R
+        DC CEX
+        DC ZERO
+        DC R
+        DC PLUS1
+        DC EX
+EXPT2   DC EMIT
+        DC LUPE
+        DC EXPT4
+        DC DROP
+        DC SEMIS
+        ..
+        ..
+        DC 85H,'QUER',0D9H .. QUERY
+        DC EXPT - 9         .. INPUT LINE OF TEXT
+QUER    DC NEST
+        DC TIB
+        DC AT
+        DC LIT
+        DC 0050H
+        DC EXPT
+        DC ZERO
+        DC FIN
+        DC EX
+        DC SEMIS
+        ..
+        ..
+        DC 0C180H           .. X   (IMMEDIATE)
+        DC QUER - 8
+X       DC NEST
+        DC BLK
+        DC AT
+        DC ZBRCH
+        DC X2
+        DC ONE
+        DC BLK
+        DC PLUSS
+        DC ZERO
+        DC FIN
+        DC EX
+        DC BLK
+        DC AT
+        DC LIT
+        DC 0007H
+        DC FAND
+        DC ZEQAL
+        DC ZBRCH
+        DC X1
+        DC EXC
+        DC RG
+        DC DROP
+X1      DC BRCH
+        DC XEND
+X2      DC RG
+        DC DROP
+XEND    DC SEMIS
+        ..
+        ..
+        DC 84H,'FIL',0CCH .. FILL   FILL MEMORY
+        DC X - 4
+FILL    DC NEST
+        DC SWAP
+        DC GR
+        DC OVER
+        DC CEX
+        DC DUP
+        DC PLUS1
+        DC RG
+        DC ONE
+        DC MINS
+        DC CMOVE
+        DC SEMIS
+        ..
+        ..
+        DC 85H,'ERAS',0C5H .. ERASE   ZERO MEMORY
+        DC FILL - 7
+ERS     DC NEST
+        DC ZERO
+        DC FILL
+        DC SEMIS
+        ..
+        ..
+        DC 86H,'BLANK',0D3H .. BLANKS
+        DC ERS - 8           .. FILL MEMORY WITH
+BLNK    DC NEST              .. ASCII BLANKS
+        DC BL
+        DC FILL
+        DC SEMIS
+        ..
+        ..
+        DC 84H,'HOL',0C4H .. HOLD
+        DC BLNK - 9
+HOLD    DC NEST
+        DC LIT
+        DC 0FFFFH          .. -1
+        DC HLD
+        DC PLUSS
+        DC HLD
+        DC AT
+        DC CEX
+        DC SEMIS
+        ..
+        ..
+        DC 83H,'PA',0C4H  .. PAD
+        DC HOLD - 7
+PAD     DC NEST
+        DC HERE
+        DC LIT
+        DC 0044H
+        DC PLUS
+        DC SEMIS
+        ..
+        ..
+        DC 84H,'WOR',0C4H .. WORD
+        DC PAD - 6
+WORD    DC NEST
+        DC BLK
+        DC AT
+        DC ZBRCH
+        DC WD1
+        DC BLK
+        DC AT
+        DC BLOCK
+        DC BRCH
+        DC WD2
+WD1     DC TIB
+        DC AT
+WD2     DC FIN
+        DC AT
+        DC PLUS
+        DC SWAP
+        DC ENCL
+        DC HERE
+        DC LIT
+        DC 0022H
+        DC BLNK
+        DC FIN
+        DC PLUSS
+        DC OVER
+        DC MINS
+        DC GR
+        DC R
+        DC HERE
+        DC CEX
+        DC PLUS
+        DC HERE
+        DC PLUS1
+        DC RG
+        DC CMOVE
+        DC SEMIS
+        ..
+        ..
+        DC 88H,'(NUMBER',0A9H .. (NUMBER)
+        DC WORD - 7
+PNMBR   DC NEST
+        DC PLUS1
+        DC DUP
+        DC GR
+        DC CAT
+        DC BASE
+        DC AT
+        DC DGT
+        DC ZBRCH
+        DC PNM2
+        DC SWAP
+        DC BASE
+        DC AT
+        DC USTAR
+        DC DROP
+        DC ROT
+        DC BASE
+        DC AT
+        DC USTAR
+        DC DPLUS
+        DC DPL
+        DC AT
+        DC PLUS1
+        DC ZBRCH
+        DC PNM1
+        DC ONE
+        DC DPL
+        DC PLUSS
+PNM1    DC RG
+        DC BRCH
+        DC PNMBR + 2
+PNM2    DC RG
+        DC SEMIS
+        ..
+        ..
+        ..
+        DC 86H,'NUMBE',0D2H .. NUMBER
+        DC PNMBR - 11
+NMBR    DC NEST
+        DC ZERO
+        DC ZERO
+        DC ROT
+        DC DUP
+        DC PLUS1
+        DC CAT
+        DC LIT
+        DC 002DH
+        DC EQL
+        DC DUP
+        DC GR
+        DC PLUS
+        DC LIT
+        DC 0FFFFH          .. -1
+NMB1    DC DPL
+        DC EX
+        DC PNMBR
+        DC DUP
+        DC CAT
+        DC BL
+        DC MINS
+        DC ZBRCH
+        DC NMB2
+        DC DUP
+        DC CAT
+        DC LIT
+        DC 002EH
+        DC MINS
+        DC ZERO
+        DC QERR
+        DC ZERO
+        DC BRCH
+        DC NMB1
+NMB2    DC DROP
+        DC RG
+        DC ZBRCH
+        DC NMB3
+        DC DMIN
+NMB3    DC SEMIS
+        ..
+        ..
+        DC 85H,'-FIN',0C4H .. -FIND
+        DC NMBR - 9
+MFIND   DC NEST
+        DC BL
+        DC WORD
+        DC HERE
+        DC CNTX
+        DC AT
+        DC AT
+        DC FIND
+        DC DUP
+        DC ZEQAL
+        DC ZBRCH
+        DC MF1
+        DC DROP
+        DC HERE
+        DC LTST
+        DC FIND
+MF1     DC SEMIS
+        ..
+        ..
+        DC 87H,'(ABORT',0A9H .. (ABORT)
+        DC MFIND - 8
+PABRT   DC NEST
+        DC ABORT
+        DC SEMIS
+        ..
+        DC 85H,'ERRO',0D2H .. ERROR
+        DC PABRT - 10
+ERROR   DC NEST
+        DC WRNG
+        DC AT
+        DC ZLESS
+        DC ZBRCH
+        DC ERR1
+        DC PABRT
+ERR1    DC HERE
+        DC CNT
+        DC TYPE
+        DC PDQ
+        DC 03,'  ?'
+        DC MSG
+        DC SP1
+        DC FIN
+        DC AT
+        DC BLK
+        DC AT
+        DC QUIT
+        DC SEMIS
+        ..
+        DC 83H,'MI',0CEH  .. MIN
+        DC ERROR - 8
+MIN     DC NEST
+        DC OVER
+        DC OVER
+        DC GTR
+        DC ZBRCH
+        DC MN1
+        DC SWAP
+MN1     DC DROP
+        DC SEMIS
+        ..
+        DC 83H,'ID',0AEH  .. ID.
+        DC MIN - 6
+ID      DC NEST
+        DC PAD
+        DC LIT
+        DC 0020H
+        DC LIT
+        DC 005FH
+        DC FILL
+        DC DUP
+        DC PFA
+        DC LFA
+        DC OVER
+        DC MINS
+        DC PAD
+        DC SWAP
+        DC CMOVE
+        DC PAD
+        DC CNT
+        DC LIT
+        DC 001FH
+        DC FAND
+        DC TYPE
+        DC SPC
+        DC SEMIS
+        ..
+        ..
+        DC 86H,'CREAT',0C5H .. CREATE
+        DC ID - 6
+CRTE    DC NEST
+        DC FSPAT
+        DC HERE
+        DC LIT
+        DC 00A0H
+        DC PLUS
+        DC LESS
+        DC TWO
+        DC QERR
+        DC MFIND
+        DC ZBRCH
+        DC CRT1
+        DC DROP
+        DC NFA
+        DC ID
+        DC LIT
+        DC 0004H
+        DC MSG
+        DC SPC
+CRT1    DC HERE
+        DC DUP
+        DC CAT
+        DC WIDTH
+        DC AT
+        DC MIN
+        DC PLUS1
+        DC ALLOT
+        DC DUP
+        DC LIT
+        DC 00A0H
+        DC TGLE
+        DC HERE
+        DC ONE
+        DC MINS
+        DC LIT
+        DC 0080H
+        DC TGLE
+        DC LTST
+        DC COMMA
+        DC CRNT
+        DC AT
+        DC EX
+        DC HERE
+        DC PLUS2
+        DC COMMA
+        DC SEMIS
+        ..
+        ..
+        DC 0C1BAH          ..     (IMMEDIATE)
+        DC CRTE - 9
+COLON   DC NEST
+        DC EXC
+        DC DCSP
+        DC CRNT
+        DC AT
+        DC CNTX
+        DC EX
+        DC CRTE
+        DC RBK
+        DC LIT
+        DC 0FFFEH          .. -2
+        DC DP
+        DC PLUSS
+        DC CMPL
+        DC NEST
+        DC SEMIS
+        ..
+        ..
+        DC 85H,'!COD',0C5H .. !CODE
+        DC COLON - 4
+DCODE   DC NEST
+        DC CRTE
+        DC SMDG
+        DC LTST
+        DC PFA
+        DC CFA
+        DC EX
+        DC COMMA
+        DC SEMIS
+        ..
+        ..
+        DC 88H,'CONSTAN',0D4H .. CONSTANT
+        DC DCODE - 8
+CNST    DC NEST
+        DC LIT
+        DC CONST
+        DC DCODE
+        DC SEMIS
+        ..
+        ..
+        DC 88H,'VARIABL',0C5H .. VARIABLE
+        DC CNST - 11
+VARB    DC NEST
+        DC LIT
+        DC VAR
+        DC DCODE
+        DC SEMIS
+        ..
+        ..
+        DC 84H,'USE',0D2H .. USER
+        DC VARB - 11
+USR     DC NEST
+        DC LIT
+        DC USER
+        DC DCODE
+        DC SEMIS
+        ..
+        ..
+        DC 87H,'<BUILD',0D3H .. <BUILDS
+        DC USR - 7
+LBLD    DC NEST
+        DC ZERO
+        DC CNST
+        DC SEMIS
+        ..
+        ..
+        DC 85H,'DOES',0BEH .. DOES>
+        DC LBLD - 10
+DOSEG   DC NEST
+        DC RG
+        DC LTST
+        DC PFA
+        DC EX
+        DC PCODE
+DUZ1    SEX R2
+        GHI RA
+        STXD
+        GLO RA
+        STXD
+        LDA RB
+        PHI RA
+        LDA RB
+        PLO RA
+        INC R9
+        INC R9
+        GHI RB
+        STR R9
+        INC R9
+        GLO RB
+        STR R9
+        DEC R9
+        SEP RC
+        ..
+        ..
+        DC 0C7H,'LITERA',0CCH .. LITERAL (IMMEDIATE)
+        DC DOSEG - 8
+LTL     DC NEST
+        DC STT
+        DC AT
+        DC ZBRCH
+        DC LT1
+        DC CMPL
+        DC LIT
+        DC COMMA
+LT1     DC SEMIS
+        ..
+        ..
+        DC 0C8H,'DLITERA',0CCH .. DLITERAL (IMMEDIATE)
+        DC LTL - 10
+DLTL    DC NEST
+        DC STT
+        DC AT
+        DC ZBRCH
+        DC DLTL1
+        DC SWAP
+        DC LTL
+        DC LTL
+DLTL1   DC SEMIS
+        ..
+        ..
+        DC 86H,'?STAC',0CBH .. ?STACK
+        DC DLTL - 11
+QSTK    DC NEST
+        DC SO
+        DC AT
+        DC DUP
+        DC FSPAT
+        DC GTR
+        DC ONE
+        DC QERR
+        DC LIT
+        DC 0100H
+        DC PLUS
+        DC FSPAT
+        DC LESS
+        DC LIT
+        DC 0007H
+        DC QERR
+        DC SEMIS
+        ..
+        ..
+        DC 89H,'INTERPRE',0D4H .. INTERPRET
+        DC QSTK - 9
+INPT    DC NEST
+        DC MFIND
+        DC ZBRCH
+        DC PT1
+        DC STT
+        DC AT
+        DC LESS
+        DC ZBRCH
+        DC PT2
+        DC CFA
+        DC COMMA
+        DC BRCH
+        DC PT3
+PT2     DC CFA
+        DC EXE
+PT3     DC QSTK
+        DC BRCH
+        DC PT4
+PT1     DC HERE
+        DC NMBR
+        DC DPL
+        DC AT
+        DC PLUS1
+        DC ZBRCH
+        DC PT5
+        DC DLTL
+        DC BRCH
+        DC PT6
+PT5     DC DROP
+        DC LTL
+PT6     DC QSTK
+PT4     DC BRCH
+        DC INPT + 2
+        DC SEMIS
+        ..
+        ..
+        DC 8AH,'VOCABULAR',0D9H .. VOCABULARY
+        DC INPT - 12
+VBLY    DC NEST
+        DC LBLD
+        DC LIT
+        DC 81A0H
+        DC COMMA
+        DC CRNT
+        DC AT
+        DC CFA
+        DC COMMA
+        DC HERE
+        DC VL
+        DC AT
+        DC COMMA
+        DC VL
+        DC EX
+        DC DOSEG
+VB1     DC PLUS2
+        DC CNTX
+        DC EX
+        DC SEMIS
+        ..
+        ..
+FRTH    DC 0C5H,'FORT',0C8H .. FORTH (IMMEDIATE)
+        DC VBLY - 13
+        DC DUZ1
+        DC VB1
+        DC 81A0H
+        DC TASK - 7        .. DICTION LINK
+        DC 0000H          .. NOTE THIS MUST BE CHANGED
+                            .. TO REFLECT THE LINK TO THE
+                            .. LAST DICT WORD IN THE
+                            .. FORTH VOCAB
+        ..
+        ..
+        DC 8BH,'DEFINITION',0D3H .. DEFINITIONS
+        DC FRTH
+DFN     DC NEST
+        DC CNTX
+        DC AT
+        DC CRNT
+        DC EX
+        DC SEMIS
+        ..
+        DC 84H,'QUI',0D4H .. QUIT
+        DC DFN - 14
+QUIT    DC NEST
+        DC ZERO
+        DC BLK
+        DC EX
+        DC LB
+Q2      DC RP1
+        DC CR
+        DC QUER
+        DC INPT
+        DC STT
+        DC AT
+        DC ZEQAL
+        DC ZBRCH
+        DC Q1
+        DC PDQ
+        DC 04,'  OK'
+Q1      DC BRCH
+        DC Q2
+        DC SEMIS
+        ..
+        ..
+        DC 85H,'ABOR',0D4H .. ABORT
+        DC QUIT - 7
+ABORT   DC NEST
+        DC SP1
+        DC MDCML
+        DC CR
+        DC PDQ
+        DC 1CH,'1802 FIG-FORTH R0.4  3/16/81'
+        DC DRZER
+        DC MTBUF
+        DC FIRST
+        DC DUP
+        DC PREV
+        DC EX
+        DC USE
+        DC EX
+        DC FRTH + 8
+        DC DFN
+        DC QUIT
+        DC SEMIS
+        ..
+        ..
+        DC 0C1BBH          .. ..   (IMMEDIATE)
+        DC ABORT - 8
+SEMIC   DC NEST
+        DC QCSP
+        DC CMPL
+        DC SEMIS
+        DC SMDG
+        DC LB
+        DC SEMIS
+        ..
+        ..
+        ..
+        DC 0C2H,2EH,0A2H  .. ."   (IMMEDIATE)"
+        DC SEMIC - 4
+DOTQ    DC NEST
+        DC LIT
+        DC 0022H
+        DC STT
+        DC AT
+        DC ZBRCH
+        DC DOTQ1
+        DC CMPL
+        DC PDQ
+        DC WORD
+        DC HERE
+        DC CAT
+        DC PLUS1
+        DC ALLOT
+        DC BRCH
+        DC DOTQ2
+DOTQ1   DC WORD
+        DC HERE
+        DC CNT
+        DC TYPE
+DOTQ2   DC SEMIS
+        ..
+        ..
+        DC 0C9H,'[COMPILE',0DDH .. [COMPILE]
+        DC DOTQ - 5             .. (IMMEDIATE)
+BCOMP   DC NEST
+        DC MFIND
+        DC ZEQAL
+        DC ZERO
+        DC QERR
+        DC DROP
+        DC CFA
+        DC COMMA
+        DC SEMIS
+        ..
+        ..
+        DC 89H,'IMMEDIAT',0C5H .. IMMEDIATE
+        DC BCOMP - 12
+IMMED   DC NEST
+        DC LTST
+        DC LIT
+        DC 0040H
+        DC TGLE
+        DC SEMIS
+        ..
+        ..
+        DC 0C1A8H          .. (   (IMMEDIATE)
+        DC IMMED - 12
+PAREN   DC NEST
+        DC LIT
+        DC 0029H
+        DC WORD
+        DC SEMIS
+        ..
+        ..
+        DC 81B3H          .. 3
+        DC PAREN - 4
+THREE   DC CONST
+        DC 0003H
+        ..
+        ..
+        DC 0C1A7H          .. '   (TICK)   (IMMEDIATE)
+        DC THREE - 4
+TICK    DC NEST
+        DC MFIND
+        DC ZEQAL
+        DC ZERO
+        DC QERR
+        DC DROP
+        DC LTL
+        DC SEMIS
+        ..
+        ..
+        DC 86H,'FORGE',0D4H .. FORGET
+        DC TICK - 4
+FORG    DC NEST
+        DC CRNT
+        DC AT
+        DC CNTX
+        DC AT
+        DC MINS
+        DC LIT
+        DC 0018H
+        DC QERR
+        DC TICK
+        DC DUP
+        DC FNCE
+        DC AT
+        DC LESS
+        DC LIT
+        DC 0015H
+        DC QERR
+        DC DUP
+        DC NFA
+        DC DP
+        DC EX
+        DC LFA
+        DC AT
+        DC CNTX
+        DC AT
+        DC EX
+        DC SEMIS
+        ..
+        ..
+        DC 82H,2BH,0ADH  .. +-
+        DC FORG - 9
+PM      DC NEST
+        DC ZLESS
+        DC ZBRCH
+        DC PM1
+        DC MINUS
+PM1     DC SEMIS
+        ..
+        DC 83H,44H,2BH,0ADH .. D+-
+        DC PM - 5
+DPM     DC NEST
+        DC ZLESS
+        DC ZBRCH
+        DC DPM1
+        DC DMIN
+DPM1    DC SEMIS
+        ..
+        DC 83H,41H,42H,0D3H .. ABS
+        DC DPM - 6
+ABS     DC NEST
+        DC DUP
+        DC PM
+        DC SEMIS
+        ..
+        DC 84H,'DAB',0D3H .. DABS
+        DC ABS - 6
+DABS    DC NEST
+        DC DUP
+        DC DPM
+        DC SEMIS
+        ..
+        DC 83H,4DH,41H,0D8H .. MAX
+        DC DABS - 7
+MAX     DC NEST
+        DC OVER
+        DC OVER
+        DC LESS
+        DC ZBRCH
+        DC MAX1
+        DC SWAP
+MAX1    DC DROP
+        DC SEMIS
+        ..
+        DC 82H,4DH,0AAH  .. M*
+        DC MAX - 6
+MSTAR   DC NEST
+        DC OVER
+        DC OVER
+        DC FXOR
+        DC GR
+        DC ABS
+        DC SWAP
+        DC ABS
+        DC USTAR
+        DC RG
+        DC DPM
+        DC SEMIS
+        ..
+        DC 82H,4DH,0AFH  .. M/
+        DC MSTAR - 5
+MSLAS   DC NEST
+        DC OVER
+        DC GR
+        DC GR
+        DC DABS
+        DC R
+        DC ABS
+        DC USLSH
+        DC RG
+        DC R
+        DC FXOR
+        DC PM
+        DC SWAP
+        DC RG
+        DC PM
+        DC SWAP
+        DC SEMIS
+        ..
+        DC 81AAH          .. *
+        DC MSLAS - 5
+STAR    DC NEST
+        DC MSTAR
+        DC DROP
+        DC SEMIS
+        ..
+        DC 84H,2FH,4DH,4FH,0C4H .. /MOD
+        DC STAR - 4
+SLMOD   DC NEST
+        DC GR
+        DC STOD
+        DC RG
+        DC MSLAS
+        DC SEMIS
+        ..
+        DC 81AFH          .. /
+        DC SLMOD - 7
+SLASH   DC NEST
+        DC SLMOD
+        DC SWAP
+        DC DROP
+        DC SEMIS
+        ..
+        DC 83H,4DH,4FH,0C4H .. MOD
+        DC SLASH - 4
+MODD    DC NEST
+        DC SLMOD
+        DC DROP
+        DC SEMIS
+        ..
+        DC 85H,'*/MO',0C4H .. */MOD
+        DC MODD - 6
+SSMOD   DC NEST
+        DC GR
+        DC MSTAR
+        DC RG
+        DC MSLAS
+        DC SEMIS
+        ..
+        DC 82H,2AH,0AFH .. */
+        DC SSMOD - 8
+SSLA    DC NEST
+        DC SSMOD
+        DC SWAP
+        DC DROP
+        DC SEMIS
+        ..
+        DC 85H,'M/MO',0C4H .. M/MOD
+        DC SSLA - 5
+MSMOD   DC NEST
+        DC GR
+        DC ZERO
+        DC R
+        DC USLSH
+        DC RG
+        DC SWAP
+        DC GR
+        DC USLSH
+        DC RG
+        DC SEMIS
+        ..
+        ..
+        DC 83H,'MO',0CEH  .. MON
+        DC MSMOD - 8       .. RETURN TO MONITOR
+MON     DC $ + 2           .. AT 8000 HEX
+        LDI 80H
+        PHI R0
+        LDI 00
+        PLO R0
+        SEX R0
+        SEP R0
+        ..
+        ..
+        DC 83H,'BY',0C5H  .. BYE
+        DC MON - 6
+BYE     DC NEST
+        DC FLUSH
+        DC MON
+        ..
+        ..
+        DC 84H,'BAC',0CBH .. BACK
+        DC BYE - 6
+BACK    DC NEST
+        DC COMMA
+        DC SEMIS
+        ..
+        DC 0C5H,'BEGI',0CEH .. BEGIN
+        DC BACK - 7
+BEGIN   DC NEST
+        DC QCMP
+        DC HERE
+        DC ONE
+        DC SEMIS
+        ..
+        DC 0C5H,'ENDI',0C6H .. ENDIF
+        DC BEGIN - 8
+ENDIFF  DC NEST
+        DC QCMP
+        DC TWO
+        DC QPR
+        DC HERE
+        DC SWAP
+        DC EX
+        DC SEMIS
+        ..
+        DC 0C4H,'THE',0CEH .. THEN
+        DC ENDIFF - 8
+THEN    DC NEST
+        DC ENDIFF
+        DC SEMIS
+        ..
+        DC 0C2H,44H,0CFH  .. DO
+        DC THEN - 7
+DO      DC NEST
+        DC CMPL
+        DC PDO
+        DC HERE
+        DC THREE
+        DC SEMIS
+        ..
+        DC 0C4H,4CH,4FH,4FH,0D0H .. LOOP
+        DC DO - 5
+LOOP    DC NEST
+        DC THREE
+        DC QPR
+        DC CMPL
+        DC LUPE
+        DC BACK
+        DC SEMIS
+        ..
+        DC 0C5H,'+LOO',0D0H .. +LOOP
+        DC LOOP - 7
+PLOOP   DC NEST
+        DC THREE
+        DC QPR
+        DC CMPL
+        DC PLUPE
+        DC BACK
+        DC SEMIS
+        ..
+        DC 0C5H,'UNTI',0CCH .. UNTIL
+        DC PLOOP - 8
+UNTIL   DC NEST
+        DC ONE
+        DC QPR
+        DC CMPL
+        DC ZBRCH
+        DC BACK
+        DC SEMIS
+        ..
+        DC 0C3H,45H,4EH,0C4H .. END
+        DC UNTIL - 8
+ENDD    DC NEST
+        DC UNTIL
+        DC SEMIS
+        ..
+        DC 0C5H,'AGAI',0CEH .. AGAIN
+        DC ENDD - 6
+AGAIN   DC NEST
+        DC ONE
+        DC QPR
+        DC CMPL
+        DC BRCH
+        DC BACK
+        DC SEMIS
+        ..
+        DC 0C6H,'REPEA',0D4H .. REPEAT
+        DC AGAIN - 8
+REPEA   DC NEST
+        DC GR
+        DC GR
+        DC AGAIN
+        DC RG
+        DC RG
+        DC TWO
+        DC MINS
+        DC ENDIFF
+        DC SEMIS
+        ..
+        DC 0C2H,49H,0C6H .. IF
+        DC REPEA - 9
+IFF     DC NEST
+        DC CMPL
+        DC ZBRCH
+        DC HERE
+        DC ZERO
+        DC COMMA
+        DC TWO
+        DC SEMIS
+        ..
+        DC 0C4H,'ELS',0C5H .. ELSE
+        DC IFF - 5
+ELSEE   DC NEST
+        DC TWO
+        DC QPR
+        DC CMPL
+        DC BRCH
+        DC HERE
+        DC ZERO
+        DC COMMA
+        DC SWAP
+        DC TWO
+        DC ENDIFF
+        DC TWO
+        DC SEMIS
+        ..
+        DC 0C5H,'WHIL',0C5H .. WHILE
+        DC ELSEE - 7
+WHILE   DC NEST
+        DC IFF
+        DC PLUS2
+        DC SEMIS
+        ..
+        DC 86H,'SPACE',0D3H .. SPACES
+        DC WHILE - 8
+SPACS   DC NEST
+        DC ZERO
+        DC MAX
+        DC MDUP
+        DC ZBRCH
+        DC SPAX1
+        DC ZERO
+        DC PDO
+SPAX2   DC SPC
+        DC LUPE
+        DC SPAX2
+SPAX1   DC SEMIS
+        ..
+        DC 82H,3CH,0A3H  .. <
+        DC SPACS - 9
+BDIGS   DC NEST
+        DC PAD
+        DC HLD
+        DC EX
+        DC SEMIS
+        ..
+        DC 82H,23H,0BEH  .. >
+        DC BDIGS - 5
+EDIGS   DC NEST
+        DC DROP
+        DC DROP
+        DC HLD
+        DC AT
+        DC PAD
+        DC OVER
+        DC MINS
+        DC SEMIS
+        ..
+        DC 84H,'SIG',0CEH .. SIGN
+        DC EDIGS - 5
+SIGN    DC NEST
+        DC ROT
+        DC ZLESS
+        DC ZBRCH
+        DC SIGN1
+        DC LIT
+        DC 002DH
+        DC HOLD
+SIGN1   DC SEMIS
+        ..
+        DC 81A3H          .. 
+        DC SIGN - 7
+DIG     DC NEST
+        DC BASE
+        DC AT
+        DC MSMOD
+        DC ROT
+        DC LIT
+        DC 0009H
+        DC OVER
+        DC LESS
+        DC ZBRCH
+        DC DIG1
+        DC LIT
+        DC 0007H
+        DC PLUS
+DIG1    DC LIT
+        DC 0030H
+        DC PLUS
+        DC HOLD
+        DC SEMIS
+        ..
+        DC 82H,23H,0D3H  .. S
+        DC DIG - 4
+DIGS    DC NEST
+DIGS1   DC DIG
+        DC OVER
+        DC OVER
+        DC FFOR
+        DC ZEQAL
+        DC ZBRCH
+        DC DIGS1
+        DC SEMIS
+        ..
+        DC 83H,44H,2EH,0D2H .. D.R
+        DC DIGS - 5
+DDOTR   DC NEST
+        DC GR
+        DC SWAP
+        DC OVER
+        DC DABS
+        DC BDIGS
+        DC DIGS
+        DC SIGN
+        DC EDIGS
+        DC RG
+        DC OVER
+        DC MINS
+        DC SPACS
+        DC TYPE
+        DC SEMIS
+        ..
+        DC 82H,2EH,0D2H  .. .R
+        DC DDOTR - 6
+DOTR    DC NEST
+        DC GR
+        DC STOD
+        DC RG
+        DC DDOTR
+        DC SEMIS
+        ..
+        DC 82H,44H,0AEH  .. D.
+        DC DOTR - 5
+DDOT    DC NEST
+        DC ZERO
+        DC DDOTR
+        DC SPC
+        DC SEMIS
+        ..
+        DC 81AEH          .. .   (DOT)
+        DC DDOT - 5
+DOT     DC NEST
+        DC STOD
+        DC DDOT
+        DC SEMIS
+        ..
+        DC 81BFH          .. ?
+        DC DOT - 4
+QUES    DC NEST
+        DC AT
+        DC DOT
+        DC SEMIS
+        ..
+        DC 82H,55H,0AEH  .. U.
+        DC QUES - 4
+UDOT    DC NEST
+        DC ZERO
+        DC DDOT
+        DC SEMIS
+        ..
+        DC 85H,'VLIS',0D4H .. VLIST
+        DC UDOT - 5
+VLIST   DC NEST
+        DC CR
+        DC LIT
+        DC 0080H
+        DC FOUT
+        DC EX
+        DC CNTX
+        DC AT
+        DC AT
+VLIS1   DC FOUT
+        DC AT
+        DC CL
+        DC GTR
+        DC ZBRCH
+        DC VLIS2
+        DC CR
+        DC ZERO
+        DC FOUT
+        DC EX
+VLIS2   DC DUP
+        DC ID
+        DC SPC
+        DC SPC
+        DC PFA
+        DC LFA
+        DC AT
+        DC DUP
+        DC ZEQAL
+        DC QTERM
+        DC FFOR
+        DC ZBRCH
+        DC VLIS1
+        DC DROP
+        DC SEMIS
+        ..
+        ..
+        DC 87H,'MESSAG',0C5H .. MESSAGE
+        DC VLIST - 8
+MSG     DC NEST
+        DC WRNG
+        DC AT
+        DC ZBRCH
+        DC MESS1
+        DC MDUP
+        DC ZBRCH
+        DC MESS2
+        DC LIT
+        DC 0004H
+        DC OFST
+        DC AT
+        DC BSCR
+        DC SLASH
+        DC MINS
+        DC DLINE
+        DC SPC
+MESS2   DC BRCH
+        DC MESS3
+MESS1   DC PDQ
+        DC 07,' MSG # '
+        DC DOT
+MESS3   DC SEMIS
+        ..
+        ..
+        DC 81C9H          .. I
+        DC MSG - 10
+I       DC $ + 2
+        INC R2
+        INC R9
+        INC R9
+        INC R9
+        LDA R2
+        STR R9
+        DEC R9
+        LDN R2
+        STR R9
+        DEC R2
+        DEC R2
+        SEP RC
+        ..
+        DC 84H,'WAR',0CDH .. WARM
+        DC I - 4
+WRM     DC $ + 2
+        LBR WARM
+        ..
+        ..
+        DC 84H,'COL',0C4H .. COLD
+        DC WRM - 7
+CLD     DC $ + 2
+        LBR COLD
+        ..
+        ..
+        DC 84H,'S->',0C4H .. S->D
+        DC CLD - 7
+STOD    DC $ + 2
+        LDA R9
+        SHL
+        BDF SNEG
+        LDI 00
+        BR SSKP
+SNEG    LDI 0FFH
+SSKP    INC R9
+        STR R9
+        INC R9
+        STR R9
+        DEC R9
+        SEP RC
+        ..
+        DC 86H,'(LINE',0A9H .. (LINE)
+        DC STOD - 7
+PLINE   DC NEST
+        DC GR
+        DC LIT
+        DC 0040H
+        DC BBUF
+        DC SSMOD
+        DC RG
+        DC BSCR
+        DC STAR
+        DC PLUS
+        DC BLOCK
+        DC PLUS
+        DC LIT
+        DC 0040H
+        DC SEMIS
+        ..
+        DC 85H,'.LIN',0C5H .. .LINE
+        DC PLINE - 9
+DLINE   DC NEST
+        DC PLINE
+        DC TRLG
+        DC TYPE
+        DC SEMIS
+        ..
+        DC 83H,'US',0C5H  .. USE (ADDR OF
+        DC DLINE - 8       .. NEXT BUFFER TO USE)
+USE     DC VAR
+        DC FIRSTB
+        ..
+        DC 84H,'PRE',0D6H .. PREV   (ADDR OF
+        DC USE - 6         .. PREVIOUSLY USED BUFFER)
+PREV    DC VAR
+        DC FIRSTB
+        ..
+        DC 84H,'+BU',0C6H .. +BUF
+        DC PREV - 7        .. ADVANCE
+PBUF    DC NEST            ..    BUFFER
+        DC BBUF
+        DC LIT
+        DC 0004H
+        DC PLUS
+        DC PLUS
+        DC DUP
+        DC LIMIT
+        DC EQL
+        DC ZBRCH
+        DC PBUF1
+        DC DROP
+        DC FIRST
+PBUF1   DC DUP
+        DC PREV
+        DC AT
+        DC MINS
+        DC SEMIS
+        ..
+        DC 86H,'UPDAT',0C5H .. UPDATE
+        DC PBUF - 7
+UPDAT   DC NEST
+        DC PREV
+        DC AT
+        DC AT
+        DC LIT
+        DC 8000H
+        DC FFOR
+        DC PREV
+        DC AT
+        DC EX
+        DC SEMIS
+        ..
+        DC 8DH,'EMPTY-BUFFER',0D3H .. EMPTY-BUFFER
+        DC UPDAT - 9
+MTBUF   DC NEST
+        DC FIRST
+        DC LIMIT
+        DC OVER
+        DC MINS
+        DC ERS
+        DC SEMIS
+        ..
+        ..
+        DC 86H,'BUFFE',0D2H .. BUFFER
+        DC MTBUF - 16
+BUFFE   DC NEST
+        DC USE
+        DC AT
+        DC DUP
+        DC GR
+BUFF1   DC PBUF
+        DC ZBRCH
+        DC BUFF1
+        DC USE
+        DC EX
+        DC R
+        DC AT
+        DC ZLESS
+        DC ZBRCH
+        DC BUFF2
+        DC R
+        DC PLUS2
+        DC R
+        DC AT
+        DC LIT
+        DC 7FFFH
+        DC FAND
+        DC ZERO
+        DC RSLW
+BUFF2   DC R
+        DC EX
+        DC R
+        DC PREV
+        DC EX
+        DC RG
+        DC PLUS2
+        DC SEMIS
+        ..
+        DC 85H,'BLOC',0CBH .. BLOCK
+        DC BUFFE - 9
+BLOCK   DC NEST
+        DC OFST
+        DC AT
+        DC PLUS
+        DC GR
+        DC PREV
+        DC AT
+        DC DUP
+        DC AT
+        DC R
+        DC MINS
+        DC DUP
+        DC PLUS
+        DC ZBRCH
+        DC BLOC1
+BLOC2   DC PBUF
+        DC ZEQAL
+        DC ZBRCH
+        DC BLOC3
+        DC DROP
+        DC R
+        DC BUFFE
+        DC DUP
+        DC R
+        DC ONE
+        DC RSLW
+        DC TWO
+        DC MINS
+BLOC3   DC DUP
+        DC AT
+        DC R
+        DC MINS
+        DC DUP
+        DC PLUS
+        DC ZEQAL
+        DC ZBRCH
+        DC BLOC2
+        DC DUP
+        DC PREV
+        DC EX
+BLOC1   DC RG
+        DC DROP
+        DC PLUS2
+        DC SEMIS
+        ..
+        .. Updated for UT71 and 3.5 inch disks
+        DC 83H,52H,2FH,0D7H .. R/W
+        DC BLOCK - 8
+RSLW    DC NEST
+        DC SWAP
+        DC LIT
+        DC 315
+        DC PLUS
+        DC LIT
+        DC 315             .. 315 screens/disk
+        DC SLMOD
+        DC DUP
+        DC LIT
+        DC 0002H           .. 3 disk drives
+        DC GTR
+        DC LIT
+        DC 0005H
+        DC QERR
+
+        DC DV
+        DC CEX
+        DC DUP             .. convert screen number to PSN
+        DC PLUS
+        DC DV              .. and store in parameter block
+        DC LIT
+        DC 0001H
+        DC PLUS
+        DC EX
+        DC SWAP            .. store buffer address
+        DC DV
+        DC LIT
+        DC 0003H
+        DC PLUS
+        DC EX
+        DC ZBRCH
+        DC RWELSE
+        DC BLKRD
+        DC BRCH
+        DC RWEND
+RWELSE  DC BLKWT
+RWEND   DC SEMIS
+
+SEEKS    EQU 87F6H
+READTRS  EQU 87DBH
+WRITETRS EQU 87DEH
+
+        DC 0AH,'BLOCK-REA',0C4H .. BLOCKREAD
+        DC RSLW - 6
+BLKRD   DC $ + 2
+        LDI 70H                 .. DV
+        PHI RF
+        LDI 32H
+        PLO RF
+        ..
+        SEX R2         .. save RD
+        GHI RD
+        STXD
+        GLO RD
+        STXD
+
+BLKRD2  CALL SEEKS
+        LDN RF         .. get unit number
+        ADI 20H        .. read two sectors
+        STR RF
+        CALL READTRS
+        ..
+        SEX R2
+        IRX
+        LDXA
+        PLO RD
+        LDX
+        PHI RD
+        SEP RC
+        ..
+        DC 0BH,'BLOCK-WRIT',0C5H .. BLOCK-WRITE
+        DC BLKRD - 13
+BLKWT   DC $ + 2
+        LDI 70H                 .. DV
+        PHI RF
+        LDI 32H
+        PLO RF
+        LDI 74H
+        ..
+        SEX R2
+        GHI RD
+        STXD
+        GLO RD
+        STXD
+
+        CALL SEEKS
+        LDN RF         .. get unit number
+        ADI 20H        .. write two sectors
+        STR RF
+        CALL WRITETRS
+        ..
+        SEX R2
+        IRX
+        LDXA
+        PLO RD
+        LDX
+        PHI RD
+        SEP RC
+        ..
+        DC 84H,'LOA',0C4H .. LOAD
+        DC BLKWT - 14
+LOAD    DC NEST
+        DC BLK
+        DC AT
+        DC GR
+        DC FIN
+        DC AT
+        DC GR
+        DC ZERO
+        DC FIN
+        DC EX
+        DC BSCR
+        DC STAR
+        DC BLK
+        DC EX
+        DC INPT
+        DC RG
+        DC FIN
+        DC EX
+        DC RG
+        DC BLK
+        DC EX
+        DC SEMIS
+        ..
+        DC 0C3H,'--',0BEH .. -->
+        DC LOAD - 7
+ARROW   DC NEST      
+        DC QLDG
+        DC ZERO
+        DC FIN
+        DC EX
+        DC BSCR
+        DC BLK
+        DC AT
+        DC OVER
+        DC MODD
+        DC MINS
+        DC BLK
+        DC PLUSS
+        DC SEMIS
+        ..
+        ..
+        DC 83H,44H,52H,0B0H .. DR0
+        DC ARROW - 6
+DRZER   DC NEST
+        DC ZERO
+        DC OFST
+        DC EX
+        DC SEMIS
+        ..
+        ..
+        DC 83H,44H,52H,0B1H .. DR1
+        DC DRZER - 6
+DRONE   DC NEST
+        DC BSCR
+        DC LIT             .. 315 SCREENS/DISK
+        DC 0315
+        DC STAR
+        DC OFST
+        DC EX
+        DC SEMIS
+        ..
+        ..
+        DC 84H,'LIS',0D4H .. LIST
+        DC DRONE - 6
+LIST    DC NEST
+        DC MDCML
+        DC CR
+        DC DUP
+        DC FSCR
+        DC EX
+        DC PDQ
+        DC 06,'SCR # '
+        DC DOT
+        DC LIT
+        DC 0010H
+        DC ZERO
+        DC PDO
+LIST1   DC CR
+        DC I
+        DC LIT
+        DC 0003H
+        DC DOTR
+        DC SPC
+        DC I
+        DC FSCR
+        DC AT
+        DC DLINE
+        DC QTERM
+        DC ZBRCH
+        DC LIST2
+        DC LVE
+LIST2   DC LUPE
+        DC LIST1
+        DC CR
+        DC SEMIS
+        ..
+        ..
+        DC 85H,'INDE',0D8H .. INDEX
+        DC LIST - 7
+INDEX   DC NEST
+        DC CR
+        DC PLUS1
+        DC SWAP
+        DC PDO
+INDE1   DC CR      
+        DC I
+        DC LIT
+        DC 0003H
+        DC DOTR
+        DC SPC
+        DC ZERO
+        DC I
+        DC DLINE
+        DC QTERM
+        DC ZBRCH
+        DC INDE2
+        DC LVE
+INDE2   DC LUPE
+        DC INDE1
+        DC SEMIS
+        ..
+        DC 85H,'TRIA',0C4H .. TRIAD
+        DC INDEX - 8
+TRIAD   DC NEST
+        DC CR
+        DC LIT
+        DC 0003H
+        DC SLASH
+        DC LIT
+        DC 0003H
+        DC STAR
+        DC LIT
+        DC 0003H
+        DC OVER
+        DC PLUS
+        DC SWAP
+        DC PDO
+TRIA1   DC CR
+        DC I
+        DC LIST
+        DC QTERM
+        DC ZBRCH
+        DC TRIA2
+        DC LVE
+TRIA2   DC LUPE
+        DC TRIA1
+        DC CR
+        DC LIT
+        DC 000FH
+        DC MSG
+        DC CR
+        DC SEMIS
+        ..
+        ..
+        DC 85H,'FLUS',0C8H .. FLUSH
+        DC TRIAD - 8
+FLUSH   DC NEST
+        DC LIMIT
+        DC FIRST
+        DC MINS
+        DC BBUF
+        DC LIT
+        DC 0004H
+        DC PLUS
+        DC SLASH
+        DC ZERO
+        DC PDO
+FL1     DC LIT
+        DC 7FFFH
+        DC BUFFE
+        DC DROP
+        DC LUPE
+        DC FL1
+        DC SEMIS
+        ..
+        ..
+        DC 84H,'TAS',0CBH .. TASK
+        DC FLUSH - 8
+TASK    DC NEST              
+        DC SEMIS
+        ..
+        ..
+        PAGE
+        ..
+        ..        
+COLD    LDI A.1(START + 12) .. >> 8
+        PHI R7
+        LDI A.0(START + 12)
+        PLO R7
+        LDI A.1(FRTH + 14) .. >> 8
+        PHI R8
+        LDI A.0(FRTH + 14)
+        PLO R8
+        LDA R7
+        STR R8
+        INC R8
+        LDA R7
+        STR R8
+        LDI 16H
+        BR PUTF
+WARM    LDI 10H
+PUTF    PLO RF
+        LDI A.1(START + 10H) .. >> 8
+        PHI R7
+        LDI (START + 10H)
+        PLO R7
+        LDA R7
+        PHI RD
+        PHI R8
+        LDN R7
+        PLO RD
+        PLO R8
+        LDI (START + 12)
+        PLO R7
+WRMLP   LDA R7
+        STR R8
+        INC R8
+        DEC RF
+        GLO RF
+        BNZ WRMLP
+        LDI A.1(NEXT) ..>> 8
+        PHI RC
+        LDI NEXT
+        PLO RC
+        LDI A.0(ABORT + 2)
+        PLO RA
+        LDI A.1(ABORT + 2) ..>> 8
+        PHI RA
+        LBR (RP1 + 2)
+        ..
+LEND    NOP                 .. INITIAL FENCE IS HERE
+        ..
+        .. TO EXTEND THIS PORTION TO INCLUDE
+        .. NEW WORDS, FIRST USE
+        ..    HERE.  TO FIND END OF YOUR NEW VERSION
+        .. THEN USE THE FOLLOWING:
+        ..
+        ..    LATEST 12 +ORIGIN !
+        ..    HERE  28 +ORIGIN !
+        ..    HERE  30 +ORIGIN !
+        ..    HERE FENCE !
+        ..
+        .. THEN USE   BYE TO GET BACK TO YOUR MONITOR
+        .. THEN USE YOUR MONITOR ROUTINES TO SAVE MEMORY
+        .. FROM 0000 TO END ADDRESS
+        ..
+        .. THIS PROCEDURE WILL ALLOW YOU TO CONTINUE
+        .. BUILDING ON YOUR FORTH VOCABULARY WITHOUT THE
+        .. DISC INTERFACE
+        ..
+        ..
+        ..
+        ..
+        ..
+        END

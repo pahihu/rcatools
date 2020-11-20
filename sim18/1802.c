@@ -28,6 +28,7 @@
  *          fixed NOP
  *          fig-FORTH register names
  *          fixed SHL
+ * 201120AP fixed carry/borrow gen
  *
  */
 
@@ -61,7 +62,7 @@ typedef unsigned short Word;
 #define HI(x)           LO((x) >> 8)
 #define HILO(x,y)       ((LO(x) << 8) + LO(y))
 #define FLAG(x)         ((x) ? 1 : 0)
-#define CY(x)           FLAG(0x10000 & (x))
+#define CY(x)           FLAG(0x100 & (x))
 #define MASK8           0x00FF
 
 #define LBR             r[P] = HILO(memrd(r[P]),memrd(r[P]+1))
@@ -275,8 +276,10 @@ Byte inp(Byte port)
    if (TLIO)
       switch (port) {
       case 1: return SEL;
-      case 2: fflush(stdout);
-              c = getchar(); // 1854 char in
+      case 2: fflush(stdout); // 1854 char in
+              c = getchar();
+              if (c == '\n')
+                  c = '\r';
               return c;
       case 3: return 0x81; // 1854 status
       }
@@ -300,7 +303,9 @@ void out(Byte port, Byte data)
    if (TLIO)
       switch (port) {
       case 1: SEL = data; break;
-      case 2: putchar(0x7F & data); break; // 1854 char out
+      case 2: data &= 0x7F; // 1854 char out
+              putchar(data);
+              break;
       case 3: break; // 1854 ctrl
       }
    else if (RC)
@@ -331,8 +336,10 @@ void xecute(Word p)
          if (0==N) {
             // IDL, idle
             // wait for DMA or INT;
-            if (ut40)
+            if (ut40) {
+               fflush(stdout);
                done = 1;
+            }
             else {
                fflush(stdout);
                BUS = memrd(r[0]);
@@ -435,7 +442,7 @@ void xecute(Word p)
             break;
          case 5: // SDB, sub D w/ borrow
             D =  memrd(r[X]) - D - (1 - DF);
-            DF = FLAG(D < 0); D &= MASK8;
+            DF = 1 - FLAG(D < 0); D &= MASK8;
             break;
          case 6: // SHRC, shift right w/ carry
             W = D & 1;
@@ -445,7 +452,7 @@ void xecute(Word p)
             break;
          case 7: // SMB, sub mem w/ borrow
             D = D - memrd(r[X]) - (1 - DF);
-            DF = FLAG(D < 0); D &= MASK8;
+            DF = 1 - FLAG(D < 0); D &= MASK8;
             break;
          case 8: // SAV, save
             memwr(r[X], T);
@@ -467,16 +474,15 @@ void xecute(Word p)
             break;
          case 0xD: // SDBI, sub D w/ borrow imm
             D =  memrd(r[P]) - D - (1 - DF); r[P]++;
-            DF = FLAG(D < 0); D &= MASK8;
+            DF = 1 - FLAG(D < 0); D &= MASK8;
             break;
          case 0xE: // SHLC, shift left w/ carry
-            W = FLAG(D & 0x80);
             D = (D << 1) + DF;
-            DF = W; D &= MASK8;
+            DF = CY(D); D &= MASK8;
             break;
          case 0xF: // SMBI, sub mem w/ borrow imm
             D = D - memrd(r[P]) - (1 - DF); r[P]++;
-            DF = FLAG(D < 0); D &= MASK8;
+            DF = 1 - FLAG(D < 0); D &= MASK8;
             break;
          }
          break;
@@ -561,7 +567,8 @@ void xecute(Word p)
             break;
          case 6: // SHR, shift right (SHL)
             if (8 & N) {
-               DF = FLAG(D & 0x80); D = D << 1; D &= MASK8;
+               D = D << 1;
+               DF = CY(D); D &= MASK8;
                N = 7 & N;
             }
             else {

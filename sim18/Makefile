@@ -23,7 +23,11 @@ nucleus.bin: nucleus.asm
 	a18 nucleus.asm -L nucleus.lst -b $@
 	ls -l $@
 
+fforth.idi: fforth.sr
+	a18 fforth.sr -r -m $@
+
 clean:
 	$(RM) sim18 $(OBJS)
 	$(RM) rom.xxd rom.bin rom.dis
 	$(RM) nucleus.lst nucleus.bin
+	$(RM) forth.idi
