@@ -14,10 +14,18 @@ DS		synonym for BLK
 -i		ignore case in labels
 -m		UT4/IDIOT monitor output format
 -r              define R1..RF as registers
+                stmt separator is ';'
+                comment is '..'
+label=expr      same as EQU
+,expr[,expr]    same as CONST
+T'string'       string constant
+                @,#,%,:,* terminates a token
+
 
 EXPORT label1,...,labelN
 		label export
 -x file.exp	export labels
+
 
 
 

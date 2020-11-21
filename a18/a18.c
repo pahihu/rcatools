@@ -105,13 +105,16 @@ parse the source line convert it into the object bytes that it represents.
 	static void do_label(void),normal_op(void), pseudo_op(void);
 	static void flush(void);
 
+    extern unsigned char valbytes[128];
+
 /*  Define global mailboxes for all modules:				*/
 
 /* Turbo C has "line" as graphic function HRJ */
 
 char errcode, lline[MAXLINE + 1], title[MAXLINE];
 int pass = 0;
-int eject, filesp, forwd, listhex, caphex = 1, ut4mon = 0, lineno;
+int eject, filesp, forwd, listhex, caphex = 1, lineno;
+int comment = ';', multisep = '!', ut4mon = 0;
 unsigned address, bytes, errors, listleft, pagelen, pc;
 unsigned line_bytes, line_obj[MAXLINE], *obj;
 unsigned filler;
@@ -218,7 +221,9 @@ char **argv;
 		case 'I':   symcmp = strcasecmp;
 			    break;
                 case 'r':
-                case 'R':   rcaregs();
+                case 'R':   multisep = ';';
+                            comment = '.';
+                            rcaregs();
                             break;
 		case 'l':   caphex = 0;  // hex address, data lowercase
 		case 'L':   
@@ -332,13 +337,32 @@ int asm_line(int cont)
 	}
     }
 
+LOPS:
     trash(); opcod = NULL;
+    if (2 == cont)
+        pushc(',');
     if ((i = popc()) != '\n') {
-	if (!isalph((char) i)) error('S');
+        if (i == ',') {
+            DIAG(printf(" comma"));
+            opcod = find_code("CONST");
+        }
+        else if (i == '=') {
+            DIAG(printf(" equal"));
+            opcod = find_code("EQU");
+        }
+	else if (!isalph((char) i)) error('S');
 	else {
 	    pushc(i);  pops(token.sval);
 	    DIAG(printf(" sval[%s]",token.sval));
-	    if (!(opcod = find_code(token.sval))) error('O');
+	    if (!(opcod = find_code(token.sval))) {
+                if (!cont && !label[0]) {
+                    strcpy(label, token.sval);
+		    j = strlen(label); if (label[j-1]==':') label[j-1] ='\0';
+		    DIAG(printf(" asm_label>>%s<<",label)); /* HRJ diagnostic */
+                    goto LOPS;
+                }
+                error('O');
+            }
 	}
 	if (!opcod) { listhex = TRUE;  bytes = BIGINST; }
     }
@@ -354,8 +378,12 @@ int asm_line(int cont)
 	else {DIAG(printf(" normal")); normal_op();}
 	if (MULTI == (token.attr & TYPE))
 	    return 1;
+        if (SEP == (token.attr & TYPE)) {
+            return 2;
+        }
 	while ((i = popc()) != '\n') {
-	    if (i == '!') return 1;
+	    if (i == multisep) return 1;
+            if (i == ',') return 2;
 	    if (i != ' ') {
 		if (pass != 1)
 		    error('T');
@@ -486,7 +514,7 @@ LSIXTN:
 static void pseudo_op(void)
 {
     SCRATCH char *s;
-    SCRATCH unsigned *o, u, ulen;
+    SCRATCH unsigned *o, u, ulen, i;
     SCRATCH SYMBOL *l;
     unsigned expr(void);
     unsigned evals(void);
@@ -710,22 +738,33 @@ static void pseudo_op(void)
 			    u = expr();
 			    if (1 == evals()) { /* value? */
 				if (isnum(token.sval[0]) || 
-				    isnumprefix(token.sval[0])) {
+				    isnumprefix(token.sval[0]))
+                                {
 			            ulen = strlen(token.sval);
+                                    if (token.sval[0] == '#')
+                                        ulen = ulen / 2;
+                                    else if (ulen > 4)
+                                        ulen = 2;
+                                    else
+                                        ulen = 1;
 				}
 				else
-				    ulen = 5;
-			        if (u < 256) {
-			            ulen = (ulen > 4) ? 2 : 1;
-			        } else ulen = 2;
+				    ulen = 2;
 			    }
 			}
-			if (2 == ulen) {
+                        if (ulen > 2) {
+                            DIAG(printf(" multi.B"));
+                            for (i = 0; i < ulen; i++) {
+                                *o++ = valbytes[i];
+                                bytes++;
+                            }
+                        }
+			else if (2 == ulen) {
 			    DIAG(printf(" .W"));
 			    *o++ = high(u);  *o++ = low(u);
 			    bytes += 2;
 			}
-			else {
+			else if (1 == ulen) {
 			    DIAG(printf(" .B"));
 			    *o++ = low(u);
 			    bytes++;

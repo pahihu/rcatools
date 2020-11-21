@@ -112,7 +112,7 @@ static void binrecord(unsigned);
 void bseek(unsigned);
 void bputc(unsigned);
 char *backsub(char *str);
-//void error(char);
+void error(char);
 
 /*  Get access to global mailboxes defined in A18.C:			*/
 
@@ -337,6 +337,7 @@ char *nam;
     static OPCODE oprtbl[] = {
 	{ UNARY  + UOP1  + OPR,		'$',		"$"	},
 	{ UNARY  + UOP1  + OPR,		'$',		"*"	}, /* AP */
+	{ UNARY  + UOP3  + OPR,		'A',		"A"	}, /* AP */
 	{ UNARY  + UOP3  + OPR,		LOW,		"A.0"	}, /* AP */
 	{ UNARY  + UOP3  + OPR,		HIGH,		"A.1"	}, /* AP */
 	{ BINARY + LOG1  + OPR,		AND,		"AND"	},

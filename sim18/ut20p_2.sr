@@ -1,0 +1,416 @@
+
+
+
+
+           ORG #8400
+         ..THIS ROUTINE IS USED TO LOAD A PROGRAM
+         ..WRITTEN IN UT2 FORMAT FROM ICOM FDSK
+         ..INTO MEMORY. THIS PROGRAM STARTS ASKING
+         ..FOR THE TRACK# AND UNIT#.THESE
+         ..NUMBERS SHOULD BE ENTERED FROM
+         ..TERMINAL AS HEX DIGITS,THEN THE PROGRAM
+         ..SEEKS THE U/TR AND LOAD THE PGM
+         TYPE2=#81AE
+         PTER=#0C         ..DCB(DATA CONTROL BLOCK) PO
+         ST=#02           ..STACK POINTER
+         PC=#03           ..MAIN PROGRAM COUNTER
+         ASL=#0D
+         AUX=#0E
+         ..I/O PARAMETERS
+        READAH=#813B
+        TYPE=#814A
+        OSTRNG=#83F0
+        DSKGO=#83F6
+        GOUT20=#83F9
+        CKHEX=#83FC
+        LDI A.0(START-#06)   ;PLO R3
+        LDI A.1(START)   ;PHI R3
+        LBR DSKGO
+        LDI #1F  ;PLO R2
+        LDI #8C  ;PHI R2
+ START: LDI #00  ;PLO ASL   ;PHI ASL     ..CLEAR ASL
+        PHI RA   ;STXD                   ..CLEAR RA
+ ASK:   SEP R4 ,A(OSTRNG),#0D,#0A,T'READ?',#00
+
+ ASK1:  SEP R4; ,A(READAH)   ..READ A CHAR
+        XRI #0D              ..CK FOR A CR
+        BNZ ASK1
+        SEP R4,A(OSTRNG),#0A,T'LOADING',#00
+
+        SEX R3
+        OUT 4,#00            ..OUTPUT U/S#00
+        GHI ASL
+        BZ CONTIN            ..BRANCH IF U/S#00
+        LDI #40              ..UNIT#1
+        OUT 4,#40            ..OUTPUT U/S#40
+CONTIN: STR ST               ..STORE U/S# IN DCB
+        DEC ST   ;OUT 5,#21  ..LOAD THE U/S#
+        OUT 5,#0B            ..CLEAR ERROR FLAG
+        OUT 5,#0D            ..SEEK TRACK#00
+        ..THE FOLLOWING ROUTINE CONVERTS A DECIMAL# IN R9.
+        ..HEX AND STORE IT @DCB PTER
+  CVY:   SEX R2;GLO ASL
+         SMI #10
+         BNF RESULT
+         PLO ASL
+         GHI RA
+         ADI #0A
+         PHI RA
+         BR CVY   ..BRANCH IF NOT NEGATIVE
+  RESULT: GLO ASL
+         STR ST
+         GHI RA
+         ADD
+         STXD
+         GLO ST   ;PLO PTER
+         GHI ST    ;PHI PTER   ;INC PTER
+         INC PTER   ;INC PTER   ..PTER @THE BYTE COUN.
+         SEP R4,A(EWAIT)  ..WAIT UNTIL DISK NOT BUSY
+  READX: SEP R4; ,A(READ)   ..READ 1 ASCII DIGIT
+                           ..FROM READ BUFFER->RF.1
+         LBNF GOUT20     ..READ ERROR RESTART
+         XRI #21  ..CK FOR !
+         BZ ISITM
+         XRI #05         ..CHECK FOR $
+         BZ ISITU
+         XRI #37         ..CHECK FOR EOF(DC3)
+         BNZ READX
+DONE:    SEP R4 ,A(OSTRNG) ,#00   ..TYPE NULL MESSAGE RESET DELAY PTR
+         LBR GOUT20         ..TRANSFER CONTROL TO UT20
+ ISITM:  SEP R4; ,A(READ)
+         LBNF GOUT20     ..READ ERROR RESTART
+         XRI #4D  ..CK FOR M
+         BNZ ERRORX    ..IF NOT M->ERROR
+  READX1: SEP R4; ,A(READHX)  ..READ 1 ASCII DIGIT
+                                  ..AND CK IF HEX
+         BDF READX2   ..BR IF HEX
+         XRI #2E  ..CK IF "."
+         BNZ READX1
+  READXA: SEP R4; ,A(READ)
+         LBNF GOUT20     ..READ ERROR RESTART
+         XRI #0D
+         BNZ READXA
+         BR READX1
+  READX2: SEP R4; ,A(READHX)   ..READ 2ND ASCII DIGIT
+                                  ..AND CK IF HEX
+         BDF READX2    ..BR IF HEX
+         XRI #20    ..CK IF SPACE
+         BNZ ERRORX      ..BR IF NOT SPACE
+         GLO ASL   ;PLO R8     ..ADDRESS->R8
+         GHI ASL  ;PHI R8
+  READX3: SEP R4; ,A(READHX)   ..READ AN ASCII DIGIT
+                                  ..AND CK FOR HEX
+         BNF READX4     ..BR IF NOT HEX
+  READXB: SEP R4; ,A(READHX)   ..READ THE 2ND ASCII DI
+                                  ..AND CK IF HEX
+         BNF ERRORX   ..BR IF NOT HEX->ERROR
+         GLO ASL   ;STR R8   ..STORE AT THE SPECIFIED
+                            ..ADDRESS
+        SEX R8; XOR     ..DID IT WRITE CORRECTLY?
+        BZ WRTOK        ..YES
+        SEP R4,A(NOTRAM)        ..NO
+WRTOK:   INC R8
+         BR READX3
+  READX4: XRI #0D ..CK IF CR
+         BZ READX    ..IF CR->DONE
+         XRI #36  ..CK FOR SEMICOLON
+                            ..TEST WITH(CR.XOR.,.XOR.;
+         BZ READXA       ..BR IFSEMICOLON
+         BR READX3
+ ISITU:  SEP R4 ,A(READ)
+         LBNF GOUT20     ..READ ERROR RESTART
+         XRI T'U'
+         BNZ ERRORX
+ ADLP:   SEP R4 ,A(READHX)
+         BDF ADLP
+         GLO ASL   ;PLO R0
+         GHI ASL   ;PHI R0
+         SEP R4; ,A(OSTRNG),#0D0A,#00      ..OUTPUT A LF
+         SEX R0
+         SEP R0
+ ERRORX: SEP R4; ,A(OSTRNG),#0D0A,T'FORMAT ERROR',#00
+         LBR GOUT20
+         ..SUBROUTINES
+         ..THIS ROUTINE READS 1 ASCII DIGIT FROM DISK
+ READHX: SEP R4; ,A(READ)   ..READ 1 ASCII DIGIT
+         LBNF GOUT20      ..READ ERROR RESTART
+         SEP R4; ,A(CKHEX)   ..CK IF HEX
+ EXIT:   SEP R5
+         ORG #8500
+..
+............BRANCH POINTS
+..
+EWRITE: BR WRITE        ..ENTRY TO DISK WRITE ROUTINE
+EREAD: BR READ  ..ENTRY TO DISK READ ROUTINE
+ETRNFR: BR TRNFR1
+EWAIT: BR WAIT1 ..ENTRY TO SIMPLE WAIT ROUTINE
+DER: LBR DERROR
+EWAITD: LBR WAIT
+LINEPR: LBR PRNTRF      ..LINE PRINTER UTILITY
+..
+............SUBROUTINE WAIT1
+..
+WAIT1:  SEX R2
+        INP 6   ..GET DISK STATUS
+        SHR     ..BUSY=>DF
+        BDF WAIT1
+        SEP R5  ..RETURN
+..
+............SUBROUTINE TRNFR1
+..
+TRNFR1: LDI #10; PLO RF    ..16 ERRORS ALLOWED
+        LDA PTER; STR R2        ..GET TRK #, STORE ON STACK
+                        ..POINT TO UNIT-SECT #
+        OUT 4; DEC R2   ..OUTPUT THE TRACK #
+        SEX R3; OUT 5 ,#11; SEX R2   ..LOAD TRK #
+        LDA PTER; STR R2        ..GET UNIT-SECT #,STORE ON STACK
+                        ..POINT TO BYTE COUNT
+        OUT 4; DEC R2   ..OUTPUT UNIT-SECT #
+        SEX R3;OUT 5 ,#21    ..LOAD UNIT-SECT #
+        NOP; NOP; NOP; NOP      ..WAIT 48US FOR DISK
+        OUT 5 ,#09      ..SEEK TRACK
+        SEP R4,A(WAIT)          ..WAIT TO SEEK
+        GHI RF;SHL      ..ERROR FLAG=>DF
+        BDF TRNEXT      ..DRIVE FAIL ERROR, RETURN
+        INP 6; ANI #08  ..CHECK FOR CRC ERROR
+        BZ RDWTCK      ..NO CRC ERROR
+        GHI RF;ORI #40;PHI RF   ..SET SEEK ERROR FLAG
+        BR TRKNG        ..PRINT SEEK ERROR
+RDWTCK: SEX R3; OUT 5 ,#0B      ..CLEAR ERRO FLAGS
+        GHI RF          ..CK READ/WRITE FLAG
+        SHR     ..FLAG INTO DF
+        BDF WRTCK       ..BR IF WRITE
+        OUT 5 ,#03      ..READ
+        BR STATUS  ..WAIT FOR READ
+WRTCK:  OUT 5, #05      ..WRITE
+        SEP R4,A(WAIT)         ..WAIT TO DO THE WRITE
+        SEX R3; OUT 5 ,#07     ..READ CRC
+STATUS: SEP R4,A(WAIT)  ..WAIT FOR COMMAND TO EXECUTE
+        INP 6
+        ANI #08   ..BIT3=1=>CRC ERROR
+        BZ TRNEXT       ..NO CRC ERROR RETURN
+        DEC RF          ..DEC THE ALLOWED ERROR COUNT
+        GLO RF  ..ANY MORE ALLOWED?
+        BNZ RDWTCK       ..BR IF YES
+        SEP R4,A(DERROR)
+        GHI RF;ANI #01;ORI #20;PHI RF   ..SET CRC FLAG
+        BR TRNEXT       ..RETURN
+TRKNG:  SEP R4,A(DERROR)          ..PRINT ERROR
+TRNEXT: GHI RF;XRI #FF;SHL      ..SET/RESET ERROR FLAG=>DF
+        SEP R5 ..RETURN
+..
+............SUBROUTINE READ
+..
+READ:   SEX PTER
+        LDI #00;PHI RF  ..SET READ MODE
+        LDX     ..GET BYTE COUNT
+        BNZ SHFTBR   ..BUFFER NOT EMPTY, SHIFT BUFFER
+REREAD: LDI #00;PHI RF  ..SET READ MODE
+        LDI #80; STXD   ..INITIALIZE BYTE COUNT FOR NEXT SECTOR
+                ..POINT AT UNIT-SECT #
+        LDX; ADI #01; STXD   ..INCR SECTOR #, POINT AT TRK #
+        ANI #1F   ..MASK OUT UNITS BITS
+        SDI #1A   ..SECTOR > 26 ?
+        BDF CNTOK   ..NO, CHECK TRACK #
+        INC PTER   ..POINT AT UNIT SECT #
+        LDX; ANI #C0; ADI #01; STXD  ..RESET SECT # TO 1, POINT TRK #
+        LDX; ADI #01; STR PTER  ..INCR TRK #
+CNTOK:  LDX     ..GET TRK #
+        SDI #4C   ..TRK # > 76 ?
+        BDF TRKOK   ..TRACK IN RANGE, OK
+        INC PTER; INC PTER      ..POINT BYTE COUNT
+ SEX R3;OUT 5,#00       ..SET UP TO READ STATUS
+        BR TRKNG        ..PRINT TRACK RANGE ERROR
+TRKOK:  SEX R2
+        SEP R4,A(TRNFR1)             ..READ A SECTOR FROM DISK TO BUFFER
+        BNF RDXIT       ..ERROR NOT CRC
+        SEX PTER
+        GHI RF;ANI #20;BNZ REREAD       ..READ NEXT SECTOR ON CRC ERR
+        LDI #40   ..EXAMINE READ BUFFER
+        LSKP
+SHFTBR: LDI #41   ..SHIFT READ BUFFER
+        STR R2
+        SEX R2
+        OUT 5; DEC R2
+        INP 6   ..READ A BYTE
+        PLO RF       ..SAVE IT
+        LDN PTER; SMI #01; STR PTER  ..DEC BYTE COUNT
+RDXIT:  GHI RF;XRI #FF;SHL      ..SET/RESET ERROR FLAG=>DF
+        GLO RF    ..GET READ BYTE
+        LSDF    ..IF NO ERROR RETURN CHARACTER
+        LDI #13 ..IF ERROR RETURN DC3
+        PHI RF
+        SEP R5       ..RETURN
+..
+............SUBROUTINE WRITE
+..
+WRITE:  GHI RF; STR R2  ..SAVE DATA BYTE TO STACK
+        OUT 4; DEC R2   ..OUTPUT THE DATA
+        LDI #01;PHI RF  ..SET WRITE MODE
+        SEX R3; OUT 5 ,#31       ..LOAD WRITE BUFFER
+        SEX PTER        ..POINT TO BYTE COUNT
+        LDX; ADI 01    ..INC THE BYTE COUNT
+        STR PTER
+        SMI #80         ..BYTE COUNT< 128 ?
+        LBNF EXWT        ..BR IF YES
+REWRIT: LDI #01;PHI RF  ..SET WRITE MODE
+        LDI #00;STXD        ..ZERO THE BYTE COUNT
+                        ..POINT AT THE SEC#
+        LDX; ADI #01; STXD      ..INC SEC# AND POINT TRK#
+        ANI #1F   ..MASK OUT UNIT NUMBER
+        SDI #1A         ..SECTOR > 26 ?
+        BDF WTCNT       ..NO, CHECK TRK #
+        INC PTER        ..POINT AT UNIT/SEC#
+        LDX; ANI #C0; ADI #01; STXD ..RESET SECT # TO 1, POINT TRK #
+        LDX; ADI #01   ..INC THE TRACK#
+        STR PTER
+WTCNT:  LDX     .. GET THE TRK #
+        SDI #4C   ..TRK # > 76 ?
+        BDF TRKOK1      ..TRACK IN RANGE, OK
+        INC PTER;INC PTER       ..POINT TO BYTE COUNT
+        BR TRKNG        ..PRINT TRACK RANGE ERROR
+TRKOK1: SEX R2
+        SEP R4,A(TRNFR1)        ..WRITE BUFFER TO DISK
+        SEX PTER
+        GHI RF;ANI #20;LBNZ REWRIT       ..CRC ERROR WRITE NEXT SECTOR
+EXWT:   GHI RF;XRI #FF;SHL      ..SET/RESET ERROR FLAG=>DF
+        SEP R5  ..RETURN
+..
+..
+............SUBROUTINE WAIT
+..
+WAIT:   SEX R2
+        INP 6   ..GET STATUS
+        ANI #20     ..DRIVE FAIL ?
+        BNZ FAILUR      ..DRIVE FAILED, PRINT ERROR
+        INP 6   ..GET STATUS
+        ANI #40 ..DRIVE ACTIVE?
+        BNZ NOFAIL      ..YES, NO FAILURE
+FAILUR: LDI #00;PLO RF  ..CLEAR TRY COUNT, DRIVE FAIL
+        SEP R4,A(DERROR)        ..PRINT DRIVE FAILURE
+NOFAIL: INP 6        ..GET STATUS
+        ANI #08         ..CRC ERROR?
+        BNZ RETWAT      ..IF ERROR RETURN
+        INP 6;SHR       ..CHECK IF OPERATION DONE
+        BDF WAIT        ..NOT DONE
+RETWAT: SEP R5  ..RETURN
+..
+...........SUBROUTINE DISK ERROR
+..
+DERROR: SEX R2
+        GHI RC;STXD;GLO RC;STXD ..SAVE DCB POINTER
+        GHI RF;STXD;GLO RF;STXD ..SAVE FLAGS AND ERROR COUNT
+        GHI RA;STXD;GLO RA;STXD ..SAVE RA
+        DEC RC  ..POINT TO UNIT-SECT#
+        LDN RC;ANI #7F;PLO RA   ..SAVE UNIT-SECTOR# IN RA.0
+        DEC RC  ..POINT TO TRK#
+        LDN RC;PHI RA   ..SAVE TRACK# IN RA.1
+        GHI RF;STXD   ..SAVE FLAGS
+        ANI #40         ..CHECK FOR SEEK ERROR
+        BZ ERR10        ..NOT SEEK ERROR
+        SEP R4,A(OSTRNG),#0D0A,T'TRACK SEEK ERROR',#00
+        BR RDWRPT
+ERR10:  INP 6;ANI #20   ..CHECK FOR DRIVE FAILURE
+        BZ ERR20        ..NOT DRIVE FAILURE
+        SEP R4,A(OSTRNG),#0D0A,T'DRIVE FAILURE',#00
+        BR RDWRPT
+ERR20:  INP 6;ANI #08   ..CHECK FOR CRC ERROR
+        BZ ERR30        ..NOT CRC ERROR
+        SEP R4,A(OSTRNG),#0D0A,T'CRC ERROR',#00
+        GLO RA;ORI #80;PLO RA   ..SET CRC FLAG
+        BR RDWRPT
+ERR30:  INP 6;ANI #40   ..DRIVE ACTIVE?
+        BNZ ERR40       ..YES
+        SEP R4,A(OSTRNG),#0D0A,T'DRIVE NOT ACTIVE',#00
+        IRX
+        LBR DERXT        ..EXIT
+ERR40:  SEP R4,A(OSTRNG),#0D0A,T'TRACK > 76',#00
+RDWRPT: IRX;LDX ..GET FLAGS
+        SHR     ..WRITE FLAG=>DF
+        BDF WROP        ..PRINT "DURING WRITE"
+RDOP:   SEP R4,A(OSTRNG),T' DURING READ',#00
+        BR UTSPT        ..PRINT "UNIT TRACK SECTOR"
+WROP:   SEP R4,A(OSTRNG),T' DURING WRITE',#00
+UTSPT:  SEP R4,A(OSTRNG),T' UNIT ',#00
+        GLO RA;ANI #40  ..GET UNIT-SECT # AND TEST UNIT BIT
+        LSZ    ..NOT UNIT 1
+        LDI #01
+        ADI #30
+        PHI RF
+        SEP R4,A(TYPE)  ..TYPE UNIT #
+        SEP R4,A(OSTRNG),T', TRACK ',#00
+        GHI RA; PHI RF  ..GET TRACK #
+        SEP R4,A(TYPBCD)        ..TYPE TRACK #
+        SEP R4,A(OSTRNG),T', SECTOR ',#00
+        GLO RA;ANI #1F;PHI RF   ..GET SECTOR #
+        SEP R4,A(TYPBCD)        ..TYPE SECTOR #
+        GLO RA;ANI #80;BZ NOSKIP        ..CHECK CRC FLAG
+        SEP R4,A(OSTRNG),T' SKIPPED',#00
+NOSKIP: SEP R4,A(OSTRNG),#0D0A00        ..TYPE CR-LF
+DERXT:  IRX    ..RECOVER REGISTERS FROM STACK
+        LDXA;PLO RA;LDXA;PHI RA ..GET OLD RA
+        LDXA;PLO RF;LDXA     ..GET FLAGS AND ERROR COUNT
+        ANI #01;ORI #80;PHI RF  ..SET ERROR FLAG
+        LDXA;PLO RC;LDX;PHI RC  ..GET DCB POINTER
+        SEX R3;OUT 5,#0B        ..CLEAR ERROR FLAGS
+        SEP R5  ..RETURN
+..
+............SUBROUTINE TO PRINT HEX IN RF.1 AS BCD #
+..
+TYPBCD: GHI RF  ..GET INPUT
+        ANI #F0 ..STORE AS 2 HEX DIGITS
+        SHR;SHR;SHR;SHR
+        PLO RF
+        GHI RF;ANI #0F;PHI RF
+        SMI 10  ..DECIMAL ADJUST LOW DIGIT
+        BNF SIXLP
+        GHI RF;ADI 6;PHI RF
+SIXLP:  GLO RF  ..ADD 16 TO BCD NUMBER FOR EACH HIGH HEX COUNT
+        BZ EXITBC       ..IF HIGH COUNT=0, EXIT
+        DEC RF
+        GHI RF;ADI #16;PHI RF
+        ANI #0F
+        SMI 10  ..DECIMAL ADJUST BCD RESULT
+        BNF SIXLP
+        GHI RF;ADI 6;PHI RF
+        BR SIXLP        ..LOOP UNTIL DONE
+EXITBC: SEP R4,A(TYPE2)
+        SEP R5  ..RETURN
+.................................................
+NOTRAM: GLO RC;STXD
+        GHI RC;STXD
+        SEP R4,A(OSTRNG),#0D0A,T'RAM AT ',#00
+        GHI R8;PHI RF
+        SEP R4,A(TYPE2)
+        GLO R8;PHI RF
+        SEP R4,A(TYPE2)
+        SEP R4,A(OSTRNG),T' ?',#00
+        INC R2
+        LDA R2;PHI RC
+        LDN R2;PLO RC
+        SEP R5
+.................................................
+..THIS ROUTINE PRINTS TO THE LINE PRINTER, THE CONTENTS OF RF.1
+..IT SUPRESSES PRINTING OF LINE FEEDS, AND REPLACES CARRIAGE RETURNS
+..WITH A CR-LF PAIR.
+..NORMALLY, THIS ROUTINE RETURNS WITH THE DFLAG SET, BUT IF THE
+..CHARACTER IN RF.1 WAS A DC3(END OF FILE), THE DFLAG WILL BE RESET
+..ON RETURN.
+..
+..
+PRNTRF: GHI RF;XRI #0A  ..IF LINE FEED, EXIT
+        BZ EXITDF
+        GHI RF;XRI #13  ..IF DC3, EXIT
+        BZ EXITEF
+PRINT1: GHI RF;XRI #FF;STR R2   ..INVERT DATA
+        B1 *            ..WAIT UNTIL READY
+        OUT 6; DEC R2   ..OUTPUT CHARACTER
+        GHI RF;XRI #0D  ..CARRIAGE RETURN?
+        BNZ EXITDF      ..NO, EXIT
+        LDI #0A;PHI RF  ..YES, PRINT A LINE FEED
+        BR PRINT1
+EXITDF: LDI #01;SHR     ..SET DFLAG
+        SEP R5          ..AND RETURN
+EXITEF: SHR             ..RESET DFLAG
+        SEP R5          ..AND RETURN
+        END

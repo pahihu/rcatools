@@ -1,0 +1,778 @@
+..  UT20 IS A UTILITY PROGRAM USED TO ALTER
+..  MEMOY, DUMP MEMORY, AND BEGIN PROGRAM
+..  EXECUTION AT A GIVEN LOCATION.  THE COMMANDS
+..  ACCEPTED ARE $PHHHH (BEGIN EXECUTION AT THE
+..  SPECIFIED LOCATION WITH R0 AS PROGRAM
+..  COUNTER), !MHHHH DATA (PUT DATA AT SPECIFIED
+..  LOCATION), AND ?MHHHH HHHH (OUTPUT DATA
+..  FROM SPECIFIED LOCATION FOR SPECIFIC COUNT).
+..  AT THE BEGINNING OF A COMMAND ALL CHARACTERS
+..  ARE IGNORED UNTIL A ?, !, OR $ IS
+..  ENCOUNTERED.  IN THE ?M AND !M COMMANS NON
+..  HEX CHARACTERS ARE IGNORED AFTER M UNTIL A
+..  HEX IS READ, THEN THE FIRST NON HEX
+..  CHARACTER MUST BE A SPACE.  NON HEX
+..  CHARACTERS BETWEEN HEX PAIRS OF THE DATA IN
+..  THE !M COMMAND ARE IGNORED EXCEPT FOR CR,
+..  SEMICOLON, AND COMMA.
+..  $L LOADS DATA (WRITTEN IN UT20 FORMAT) FROM
+..   FLOPPY DSK INTO MEMORY. THERE ARE 77 TRACKS
+..  AVAILABLE ON A DISKETTE (TRACK 0-76).
+..  LOADING STOPS IF THE EOF (DC3) IS DETECTED.
+..  THE BAUD RATE OF UT20 IS DEPENDENT UPON THE
+..  TERMINAL BEING USED.  A CR OR LF IS ENTERED
+..  AT THE BEGINNING TO SPECIFY THE APPROPRIATE
+..  DELAY BETWEEN BITS.  UT20 WILL ECHO
+..  CHARACTERS IF A CR IS CHOSEN AS THE
+..  TIMING CHARACTER.  ECHOING WILL NOT TAKE
+..  PLACE IF A LF IS INPUT AS THE TIMING
+..  CHARACTER.
+..  UT20, AT INITIATION, STORES ALL REGISTERS
+..  BETWEEN WRAM-32 AND WRAM IF IT FINDS RAM
+..  THERE (BUT R0, R1, AND R4.1 ARE CLOBBERED).
+..  ?R CAN BE USED TO TYPE THE CONTENTS OF THE 16
+..  REGISTERS (R0-RF). R0,R1,R4.1 WILL BE
+..  TYPED AS X'S (DON'T CARE).
+   PTER=#00   ..AUXILIARY FOR MAIN ROUTINE
+     CL=#01   ..CLOBBERED
+     ST=#02   ..STACK POINTER ONLY REFERENCE TO RAM
+    SUB=#03   ..SUBROUTINE PROGRAM COUNTER
+     PC=#05   ..MAIN PROGRAM COUNTER
+ SWITCH=CL    ..DISTINGUISHES BETWEEN ?M AND !M
+  DELAY=#0C   ..DELAY ROUTINE PROGRAM COUNTER
+    ASL=#0D   ..HEX ASSEMBLY REGISTER ON INPUT;
+              ..AUX FOR HEX OUTPUT
+  CNTER=ASL   ..USED TO COUNT OUTPUT BYTES
+    AUX=#0E   ..AUX.1 HOLDS BIT-TIME CONSTANT
+   CHAR=#0F   ..CHAR.1 HOLDS I/O BYTE
+   WRAM=#8C1F ..REGISTERS STORED IN RAM
+ LOADER=#8400 ..LOCATION LOADER PROGRAM
+..
+..  ENTER IN R0
+..
+        ORG#8000                ..UT20 STARTS AT
+                                ..M(8000)
+        DIS,#00                 ..P=X=0
+        LDI A.1(UT20) ;PHI R0   ..HOLDS HIGH BIT
+                                ..AFTER FINGER OFF
+..  MAY TRY TO GO TO 8000, NOT 0000
+..  UNTIL FINGER IS OFF BUTTON
+..
+..  THE FOLLOWING WRITES REGISTER CONTENTS INTO
+..  WRAM-32 THRU WRAM IF IT EXISTS. WRAM-34 IS
+..  ASSUMED NOT TO BE RAM (ELSE ROUTINE OVERRUNS).
+
+..
+        LDI A.1(WRAM) ;PHI CL   ..CL IS CLOB-
+                                ..BERED
+        LDI A.0(WRAM-1) ;PLO CL ..SET UP WHERE RF.0
+                                ..IS TO GO, MINUS 1
+        LDI #A0 ;PHI R4         ..R4.1 STORES A
+                                ..MODIFIED INSTRUC.
+        SEX CL
+LOOP2:  LDI #D0 ;STR CL         ..SET UP SEP INSTR.
+                                ..FOR RETURN
+        XOR                     ..CHECK IT WROTE
+        BNZ UT20
+        DEC CL                  ..PREPARE FOR MODI-
+                                ..FIED INSTRUCTION
+        GHI R4 ;ADI #70         ..IN THE 90'S?
+        BDF*+#04
+        ADI #21                 ..NO, 8N -> 9N
+        ADI #7F                 ..YES, 9N -> 8(N-1)
+        PHI R4 ;STR CL          ..SET MODIFIED
+                                ..INSTRUC INTO RAM
+        SEP CL                  ..EXECUTE INSTRUCS
+                                ..(80-9F)
+        STXD                    ..STORE RESULT RAM
+        DEC CL                  ..& BACK UP FOR
+        GHI R4 ;XRI#90        ..CK IF STORAGE DONE
+        BNZ LOOP2               ..NEXT BYTE
+..
+UT20:   GHI R0 ;PHI PC ;PHI SUB ..#80->PC.1 & SUB.1
+        LDI A.0(UT20A) ;PLO PC
+        SEP PC
+UT20A:  SEX PC
+        DIS,#55                 ..NOTE PC=5 ASSUMED
+        OUT 1,#01               ..SELECT RCA GROUP
+        LDI A.1(WRAM)   ;PHI ST ..SET STACK POINTER
+        LDI#00  ;PLO ST
+                                ..TO M(8C00), ONLY
+                                ..RAM USED
+        LDI A.0(TIMALC) ;PLO SUB..READ ONE CHAR
+                                ..TO SET TIMER
+        SEP SUB
+..
+... INITIATION NOW DONE
+..
+START:  LDI A.0(TYPE5D) ;PLO SUB
+        LDI A.1(TYPE5D)   ;PHI SUB
+        SEP SUB; ,#0D           ..CR=CARRIAGE RET
+ST2:    SEP SUB; ,#0A           ..LF=LINE FEED
+        SEP SUB; ,#2A           ..* PROMPT CHARAC
+IGNORE: LDI#00 ;PLO ASL;PHI ASL ..PREPARE TO INPUT
+                                ..HEX DIGITS,
+                                ..CLEAR ASL
+        LDI A.0(READAH) ;PLO SUB
+        SEP SUB                 ..INPUT COMMAND
+        XRI #24                 ..IS IT "$" ?
+        LBZ DOLLAR
+        XRI #05                 ..IS IT "!" ?
+                                ..TEST $ XRI !
+        PLO SWITCH              ..AND SAVE RESULT
+        LSZ
+        XRI #1E                 ..IS IT "$" ?
+                                ..TES # XRI ! XRI ?
+        BNZ IGNORE              ..IGNORE ALL UNTIL
+                                ..COMMAND IS READ
+..
+..  THE FOLLOWING IS COMMON FOR ?M AND !M
+..  (SWITCH.0 = 0 FOR THE LATTER)
+..
+RDARGS: SEP SUB                 ..NOTE SUB AT
+                                ..READAH.  READ
+                                ..HEX ARGUMENTS
+        XRI #4D                 ..SHOULD BE "M"
+        BNZ ISITR               ..CK FOR ?R
+RD1:    SEP SUB
+        BNF *-#01               ..IGNORE NON HEX
+                                ..CHARS. AFTER "M"
+        SEP SUB
+        BDF *-#01               ..READ FIRST ARG
+                                ..(LOCA. IN MEMORY)
+        GHI ASL ;PHI PTER
+        GLO ASL ;PLO PTER       ..PTER NOW POINTS
+                                ..TO USER MEMORY
+        LDI#00 ;PLO ASL ;PHI ASL..CLEAR ASL
+        INC ASL                 ..?MXXXXCR PRINTS
+                                ..TWO HEX DIGITS
+        GHI RF  ;XRI#0D         ..CK FOR CR
+        BNZ TEST                ..BR IF NOT A CR
+        GLO SWITCH
+        BNZ LINE-#03            ..BR IF ?
+        BR SYNERR               ..OTHERWISE ERROR
+TEST:   XRI#2D                  ..CK FOR SPACE
+        BNZ SYNERR
+        DEC ASL                 ..ADJUST ASL
+        GLO SWITCH              ..LOOK AT SWITCH
+        BZ EX1                  ..IF 0 IT IS "!"
+                                ..OTHERWISE IT'S ?
+..
+..  THE FOLLOWING DOES (?M LOC COUNT) AND
+..  (?MXXXXCR) COMMANDS
+RD2:    SEP SUB
+        BDF RD2                 ..READ SECOND ARG
+                                ..(NUMBER OF BYTES)
+        XRI #0D                 ..NEXT CK FOR CR
+        BNZ SYNERR
+        LDI A.0(TYPE5D) ;PLO SUB..TYPE
+LINE:   SEP SUB; ,#0A           ..LF
+        GHI PTER ;PHI CHAR      ..PREPARE LINE
+                                ..HEADING
+        LDI A.0(TYPE2) ;PLO SUB
+        SEP SUB                 ..TYPE 2 HEX DIGITS
+        GLO PTER ;PHI CHAR
+        LDI A.0(TYPE2) ;PLO SUB
+        SEP SUB                 ..TYPE OTHER TWO
+TSPACE: SEP SUB; ,#20           ..SPACE
+..
+TLOOP:  LDA PTER ;PHI CHAR      ..FETCH ONE BYTE
+                                ..FOR TYPING
+        LDI A.0(TYPE2) ;PLO SUB
+        SEP SUB                 ..TYPE 2 HEX
+        DEC CNTER
+        GLO CNTER
+        BNZ TL3                 ..BRANCH NOT DONE
+        GHI CNTER
+        BZ START                ..BRANCH IF DONE
+TL3:    GLO PTER ;ANI #0F       ..PTER DIV BY 16?
+        BNZ TL2
+        SEP SUB; ,#3B           ..YES TYPE ";"
+        SEP SUB; ,#0D           ..THEN CR
+        BR LINE
+TL2:    SHR                     ..DIV BY 2?
+        BDF TLOOP               ..NO, LOOP BACK
+        BR TSPACE               ..ELSE TYPE SPACE &
+                                ..LOOP BACK
+..
+..  THE FOLLOWING DOES (!M LOC DATA) COMMAND
+..  ENTER AT EX1
+..
+..  EFFECT OF THE FOLLOWING IS TO READ IN HEX
+..  TERMINATING WITH A CR, IGNORING NON-HEX CHAR
+..  PAIRS; EXCEPTIONS: A COMMA BEFORE A CR ALLOWS
+..  THE INPUT TO CONTINUE ON THE NEXT LINE AND A
+..  SEMICOLON ALLOWS THE !M COMMAND TO BE ASSUMED.
+..
+EX3:    SEP SUB                 ..INPUT UNTIL A
+                                ..HEX IS READ
+        BNF EX3
+EX2:    SEP SUB                 ..LOOK FOR SECOND
+                                ..HEX DIGIT
+        BNF SYNERR              ..BR IF NOT HEX
+        GLO ASL ;STR PTER       ..**SET BYTE**
+        INC PTER
+EX1:    SEP SUB                 ..NOTE SUB @ READAH
+        BDF EX2                 ..BRANCH IF HEX
+        XRI #0D                 ..CHECK IF CR
+        BZ START
+EX4:    XRI #21                 ..ELSE CK FOR COMMA
+                                ..(TEST CR XRI ",")
+        BZ EX3                  ..IF ELSE BRANCH
+        XRI #17                 ..ELSE CK FOR ";"
+                                ..(TEST CR XRI
+                                .."," XRI ";")
+        BNZ EX1                 ..IGNORE ALL ELSE
+        SEP SUB                 ..ON ";" IGNORE ALL
+                                ..UNTIL CR, THEN
+                                ..LOOP BACK
+        XRI #0D
+        BNZ *-03
+        BR RD1                  ..THEN BRANCH BACK
+                                ..FOR !M COMMAND
+ISITR:  XRI#1F                  ..IS IT R?
+        LBZ TYPER               ..BR IF R
+..
+SYNERR: LDI A.0(TYPE5D);PLO SUB ..GENERAL RESULT
+                                ..SYNTACTIC ERROR
+        SEP SUB; ,#0D           ..CR
+        LBR FSYNER
+..
+..
+..
+..  SUBROUTINES
+..
+..
+        ORG*+#01
+..  DELAY ROUTINE
+..  DELAY IS 2(1+AUX.1(3+@SUB))
+..  USED BY TYPE, READ, AND TIMALC.
+..  AUX.1 IS ASSUMED TO HOLD A DELAY CONSTANT
+..  =((BIT TIME OF TERMINAL)/
+..  (20*INSTR TIME OF COSMAC))-1.
+..  THIS CONSTANT CAN BE GENERATED
+..  AUTOMATICALLY BY THE TIMALC ROUTINE.
+..
+DEXIT:  SEP RC;SEP RC;SEP RC;SEP RC     ..4 NOP'S
+        SEP SUB         ..RETURN
+DELAY1: GHI AUX ;SHR ;PLO AUX   ..SHIFT OUT
+                                ..ECHO FLAG
+DELAY2: DEC AUX                 ..AUX.0 HOLDS BASIC
+                                ..BIT DELAY
+        LDA SUB ;SMI #01        ..PICK UP CONSTANT
+        BNZ *-#02               ..LOOP AS SPECIFIED
+                                ..BY CALL
+        GLO AUX                 ..DONE YET?
+        BZ DEXIT
+        DEC SUB                 ..POINTS SUB AT
+                                ..DELAY POINTER
+        BR DELAY2
+..
+..  ROUTINE TO CALCULATE BYTE TIME AND ECHO
+..  FLAG.  WAITS FOR LF(NO ECHO) OR CR(ECHO)
+..  TO BE TYPED IN.  ALSO SETS UP POINTER TO
+..  DELAY ROUTINE.
+..  AUX.1 ENDS UP HOLDING, IN THE MOST
+..  SIGNIFICANT 7 BITS, THE DELAY CONSTANT.
+..  LEAST SIGNIFICANT BIT IS ZERO FOR ECHO,
+..  ONE FOR NO ECHO.
+..
+TIMALC: GHI SUB ;PHI DELAY
+        LDI A.0(DELAY1) ;PLO DELAY
+        LDI #00 ;PLO AUX ;PLO CHAR
+                                ..DELAY ROUT. READY
+        B4*                     ..WAIT START BIT
+        BN4*                    ..WAIT FOR FIRST
+                                ..NONZERO DATA BIT
+        LDI #03                 ..SET UP FOR 10
+                                ..EXECUTIONS SO
+                                ..ROUND-OFF MINIMAL
+TC2:    SMI #01
+        BNZ *-#02
+        GLO CHAR                ..LOOK TO SEE IF
+                                ..DATA CHANGED
+                               ..PREVIOUSLY
+        BNZ ZRONE               ..BR IF IT 6HAD
+        B4 INCR                 ..ELSE LOOK FOR
+                                ..CHANGE TO ZERO
+                                ..BRANCH IF NO
+        INC CHAR                ..YES, SET SWITCH
+ZRONE:  B4 DAUX                 ..LOOK FOR CHANGE
+                                ..TO 1, BR IF YES
+INCR:   INC AUX
+        LDI #07                 ..SET UP FOR 20
+                                ..INSTRUCTION LOOPS
+        BR TC2
+..
+..  AUX.0 NOW HOLDS #LOOPS IN 2 BIT TIMES
+..
+DAUX:   DEC AUX ;DEC AUX        ..REDUCE COUNT TO
+                                ..BALANCE FIXED
+                                ..OVERLOAD IN
+                                ..CALLING DELAY
+        GLO AUX ;ORI #01 ;PHI AUX..LSB AUX.1 = 1.5
+        SEP RC; ,#0C            ..BIT TIME DELAY
+        BN4 WAIT                ..BR IF LF(NO ECHO)
+                                ..LSB AUX.1=1
+        GHI AUX ;ANI#FE
+        PHI AUX                 ..CR(ECHO)
+                                ..LSB AUX.1=0
+WAIT:   SEP RC; ,#26
+        SEP R5
+..
+..
+..  READ ROUTINE--READS 1 BYTE INTO CHAR.1. WHEN
+..  ENTERED VIA READAH, THEN IF INPUT IS A HEX
+..  DIGIT ITS HEX VALUE IS SHIFTED INTO ASL FROM
+..  THE RIGHT AND DF=1, ELSE DF=0; CLOBBERS CHAR,
+..  AUX.0, (ASL ON READAH).  LEAVES BYTE IN D
+..  (BUT CLOBBERED IF SUBR LINKAGE IS USED).
+..  LEAVES PC AT READAH ENTRY POINT; EXITS TO R5.
+..
+..
+..      WARNING: READ PROCESS HAS NOT FINISHED.  DO
+..      NOT TYPE IMMEDIATELY, OR ELSE ENTER TYPE VIA
+..      TYPE5D.
+..
+..
+CKDEC:  ADI #07                 ..CK FOR ASCII
+                                ..DECIMAL INPUT
+        BDF NFND
+        ADI #0A
+        BDF FND                 ..SUB NET 30
+NFND:   ADI #00                 ..SETS DF=0
+REXIT:  GHI CHAR                ..CHARACTER INTO D
+        SEP R5
+READAH: LDI #00
+        SKP                     ..SKIP OVER
+                                ..TO READ1
+READ:   GHI SUB                 ..CONSTANT WITH
+                                ..A VALUE > 0
+READ1:  PLO CHAR                ..SET ENTRY FLAG
+READ2:  LDI #80 ;PHI CHAR       ..INITIALIZE INPUT
+                                ..BYTE-WHEN SHIFTED
+                                ..80 IS 1, WILL BE
+                                ..DONE
+        SEX ST
+        BN4 *                   ..WAIT FOR END OF
+                                ..LAST DATA BIT
+        B4 *                    ..WAIT FOR PRESENT
+                                ..START BIT
+        SEP RC; ,#02            ..DELAY HALF
+                                ..BIT TIME
+..
+NOBIT:  LDI #00 ;STR ST
+LOOP5:  GHI AUX ;ANI #01        ..CHECK IF ECHO
+                                ..INDICATOR IS
+                                ..LSB OF AUX.1
+        OR ;STR ST              ..OUTPUT IS ONE(NO
+                                ..EFFECT) ON NOECHO
+        OUT 7 ;DEC ST
+..
+LOOP5B: SEP RC; ,#07            ..DELAY ONE
+                                ..BIT TIME
+        LDI #01 ;STR ST
+        GHI CHAR ;SHR ;PHI CHAR ..SHIFT INPUT CHAR.
+        BDF NEXT                ..BR IF INPUT
+                                ..FINISHED D=CHAR.1
+        ORI #80
+        BN4 NOBIT               ..BR IF INPUT
+                                ..BIT A ZERO
+        PHI CHAR                ..ELSE PUT OK'D
+                                ..VALUE AWAY
+        BR LOOP5
+..
+..  NOW HAVE BYTE READ INTO CHAR.1
+..
+NEXT:   OUT 7; DEC ST           ..OUTPUT STOP BIT
+        BZ READ2                ..BR IF D=0,
+                                ..CHAR.1 IS A NULL
+        GLO CHAR                ..CHECK ENTRY FLAG
+        BNZ REXIT               ..BR IF ENTRY VIA
+                                ..READ
+CHKXE:  GHI CHAR
+        SMI #41                 ..CK FOR ASCII HEX
+        BNF CKDEC               ..AT TOP OF ROUTINE
+        SMI #06                 ..CK FOR A THRU F
+        BDF NFND
+        ADI #10                 ..SUB NET 47
+..
+FND:    PLO AUX                 ..SAVE TO SHIFT
+                                ..INTO ASL
+        GHI ASL
+        SHL ;SHL ;SHL ;SHL      ..SHIFT ASL.1
+                                ..LEFT FOUR
+        STR ST
+        GLO ASL
+        SHR ;SHR ;SHR ;SHR      ..SHIFT ASL.0 RT 4
+        OR ;PHI ASL             ..COMBINE
+        GLO ASL
+        SHL ;SHL ;SHL ;SHL      ..SHIFT ASL.0
+                                ..LEFT FOUR
+        STR ST
+        GLO AUX ;ANI #0F ;OR ; PLO ASL ..COMBINE
+        SMI #00                 ..SET DF
+        BR REXIT
+..
+..  TYPE ROUTINE -- TYPES 1 BYTE FROM @R5!, @R6!,
+..  OR CHAR.1, OR TYPES A BYTE AS 2 HEX DIGITS FROM
+..  CHAR.1 FOLLOWS A LINE FEED BY SIX NULLS.
+..  USES 2 AUXILIARY REGS - AUX AND CHAR - PLUS
+..  RAM LOCATION @ST.  EXITS READY TO TYPE 1 BYTE
+..  FROM @R5!.  EXITS TO R5 WHEN ENTERED AT TYPE5D,
+..  PAUSES TO ALLOW AN EARLIER READ TO COMPLETE.
+..
+..  AUX.0 HOLDS OUTPUT CHAR (AT FIRST), THEN THE
+..  DELAY CONSTANT BETWEEN BITS.  CHAR.0 HOLDS THE
+..  NUMBER OF BITS (11) IN ITS LOWER DIGIT, AND
+..  IN ITS UPPER DIGIT HOLDS A CODE --
+..          0 FOR BYTE OUTPUT
+..          1 FOR FIRST HEX OUTPUT
+..          2 FOR LAST NULL OUTPUT
+..          8 FOR LF OUTPUT
+..
+..
+        ORG #819C
+TYPE5D: SEP RC; ,#17            ..3 BIT TIME DELAY
+        SKP                     ..SKIP TO TYPE5
+TEXIT:  SEP R5
+TYPE5:  LDA R5 ;SKP             ..ENTRY FOR UT20
+                                ..SKIP TO TYPE
+TYPE6:  LDA R6 ;SKP             ..ENTRY FOR G.P.
+                                ..IMMED,TH
+TYPE:   GHI CHAR
+TY1:    PLO AUX                 ..SAVE BYTE
+        XRI#0A                  ..IS IT LINE FEED?
+        BNZ TY2
+        LDI#8B                  ..(# BITS)+(# NULLS
+                                ..TO FOLLOW LF + 1)
+        BR TY3
+TYPE2:  GHI CHAR                ..UT20 ENTRY
+TY4:    SHR ;SHR ;SHR ;SHR      ..SHIFT FIRST HEX
+                                ..TO THE RIGHT
+        ADI#F6                  ..CONVERT TO HEX
+        BNF *+#04               ..IF "A" OR MORE
+        ADI#07                  ..ADD NET 37
+        SMI#C6 ;PLO AUX         ..ELSE ADD NET 30
+        LDI#1B                  ..10+(# OF BITS)
+        BR TY3
+..
+TY2:    LDI#0B                  ..#BITS TO OUTPUT
+TY3:    PLO CHAR                ..SAVE MAIN TALLY
+                                ..VALUE
+        SEX ST
+..
+BEGIN:  LDI#00 ;STR ST          ..FOR START BIT
+        OUT 7
+        DEC ST                  ..BACK TO WHERE
+                                ..IT WAS
+        GLO AUX                 ..PUT CHAR BACK
+PREBIT: STR ST
+BITS:   SEP RC; ,#07            ..DELAY 1 BIT TIME
+        DEC CHAR                ..DECREMENT TALLY
+        LDX ;PLO AUX ;ANI#01 ;STR ST
+        OUT 7                   ..OUTPUT DATA BIT
+        DEC ST
+        GLO CHAR ;ANI#0F
+        BZ NXCHAR ;GLO AUX      ..AUX.0 TO STRETCH
+                                ..DELAY
+        GLO AUX ;SHR ;ORI#80    ..SHIFT TO
+        STR ST                  ..NEXT BIT
+        BR PREBIT
+..
+NXCHAR: GLO CHAR ;ADI#FB        ..SET UP FOR
+        PLO CHAR                ..NEXT CHAR
+        BNF TEXIT               ..EXIT IF NO MORE
+        SMI#1B                  ..TEST FOR
+                                ..ALTERNATIVES
+        BZ TEXIT                ..IF JUST TYPED
+                                ..LAST NULL
+        BNF HEX2                ..IF JUST TYPED
+                                ..FIRST NULL, LF
+                                ..OR NULL
+        LDI#00                  ..PREPARE TO TYPE
+                                ..NULL
+        BR HX22
+..
+HEX2:   GHI CHAR ;ANI#0F        ..GET SECOND HEX
+                                ..DIGIT
+        ADI#F6                  ..CONVERT TO HEX
+        BNF *+#04               ..IF "A" OR MORE
+        ADI#07                  ..ADD NET 37
+        SMI#C6                  ..ELSE ALL NET 30
+HX22:   PLO AUX                 ..STORE CHAR AWAY
+        BR BEGIN
+..
+..
+FSYNER: SEP SUB; ,#0A           ..LF
+        SEP SUB; ,#3F           ..?
+        LBR START
+..
+..  THE FOLLOWING DOES $P HHHH ,$U HHHH
+..
+ DOLLAR:LDI A.0(INTRPT)   ;PLO R1 ..R1 IS POINTING
+        LDI A.1(INTRPT)   ;PHI R1 ..AT INTRPT
+        SEP SUB                 ..SUB.0=READAH
+        XRI #55                 ..CHECK FOR "U"
+        BZ D1                   ..CON'T WITH "U"
+        XRI #19                 ..CHECK FOR "L"
+        BZ DOLL                 ..IF "L"
+        XRI#1C                  ..CK FOR "P"
+        LBNZ SYNERR             ..NOT P EITHER
+        SEP SUB
+        BDF *-#01                  ..ASSEMBLE HEX
+                                ..STRING INTO ASL
+        XRI #0D                 ..FIRST NON-HEX
+                                ..MUST BE CR
+        LBNZ SYNERR
+        LDI A.0(TYPE5D) ;PLO SUB
+        SEP SUB; ,#0A           ..LF
+        SEX PC
+        RET,#55
+        OUT 1,#00               ..CLEAR I/O DECODER
+        OUT 7,#04               ..BIT 2 DESELECT!
+                                ..THE 2 LEVEL I/O
+        BR D2
+D1:     SEP SUB
+        BDF D1                  ..ASSEMBLE HEX
+                                ..STRING INTO ASL
+        XRI #0D                 ..FIRST NON-HEX
+                                ..MUST BE CR
+        LBNZ SYNERR
+D2:     GHI ASL ;PHI R0
+        GLO ASL ;PLO R0         ..SET UP NEXT PC
+        LDI A.0(TYPE5D) ;PLO SUB
+        SEP SUB; ,#0A           ..LF
+        SEX PC
+        RET, #00                ..AND USER PROGRAM
+                                ..BEGINS (IN R0)
+                                ..EXIT TO UT20
+..  THE FOLLOWING DOES $L
+ DOLL:LDI A.0(LOADER)  ;PLO R0
+        LDI A.1(LOADER)   ;PHI R0
+        SEX R0
+        SEP R0
+..  MSGE ROUTINE
+..  THIS ROUTINE INITIALIZES RC TO
+..  POINT AT THE DELAY ROUTINE.
+..  IT TYPES OUT DATA POINTED TO BY R6. THIS
+..  ROUTINE USES THE STANDARD CALL AND RET ROUTINES.
+ MSGE:LDI A.0(DELAY1)   ;PLO RC
+        LDI A.1(DELAY1)   ;PHI RC
+        SEP RC,#12               ..DELAY
+ STRNG:LDA R6   ;PHI RF          ..LOAD CHAR TO RF.1
+        BZ EXIT1
+        SEP R4; ,A(TYPE)         ..TYPE OUT CHAR
+        BR STRNG
+ EXIT1:SEP R5
+..  INTERRUPT ROUTINE
+..  IT INITIALIZES R4,R5 TO POINT AT
+..  THE CALL AND RETURN ROUTINES. IT CALLS OSTRNG,
+..  AND OUTPUT 'INTRPT ON' MESSAGE.
+..  IT EXITS OSTRNG WITH R3 AS PROGRAM COUNTER,
+..  THEN IT TRANSFERS CONTROL TO UT20.
+ INTRPT:LDI A.0(CALL)   ;PLO R4  ..INITIALIZE CALL
+                                 ..POINTER
+        LDI A.0(RET)   ;PLO R5   ..INIITALIZE RET
+                                 ..POINTER
+        LDI A.1(CALL)  ;PHI R4   ..CALL AND RET ON
+        PHI R5                   ..SAME PAGE
+        LDI#1F   ;PLO R2         ..INITIALIZE I/O
+        LDI A.1(WRAM)   ;PHI R2  ..POINTER
+        LDI A.0(MSG)   ;PLO R3   ..INITIALIZE PC
+        LDI A.1(MSG)   ;PHI R3
+        SEP R3
+ MSG:SEP R4; ,A(MSGE)
+         ,T'INTRPT!',#00
+
+..  ENTER ROUTINE
+..  THIS ROUTINE INITIALIZES RC TO POINT AT
+..  THE DELAY ROUTINE. IT ALSO INITIALIZES R2 TO
+..  LOC #8C00 (THE I/O LOCATION USED BY UT20).
+..  IT DISABLES INTERRUPT, SELECTS RCA I/O
+..  GROUP, AND TRANSFERS CONTROL TO UT20.
+ ENTER:SEX R3                      ..X=P=3
+        LDI A.0(DELAY1)   ;PLO RC  ..INITIALIZE RC
+                                  ..TO POINT AT THE
+                                  ..DELAY ROUTINE
+        LDI A.1(DELAY1)   ;PHI RC
+        LDI A.0(START)   ;PLO R5  ..INITIALIZE PC
+        LDI A.1(START)   ;PHI R5
+        LDI#00  ;PLO R2           ..R2 POINTS TO
+        LDI A.1(WRAM)   ;PHI R2   ..M(8C00)
+        OUT 1,#01                 ..SELECT RCA I/O
+                                  ..GROUP
+        DIS,#55                   ..DISABLE INTRPT
+                                  ..P=X=5
+..  DSKGO ROUTINE
+..  THIS ROUTINE INITIALIZES R4,R5,RC TO
+..  POINT AT THE CALL, RET, AND DELAY
+..  ROUTINES RESPECTIVELY.
+..  THIS ROUTINE DYNAMICALLY DETERMINES THE
+..  STACK LOCATION,AND INITIALIZE R2 TO
+..  POINT AT THAT LOCATION.
+..  IT ALSO HOMES BOTH DSK DRIVES IF POSSIBLE.
+ DSKGO1:LDI#05   ;PLO R3
+        LDI#00   ;PHI R3
+ DSKGO2:ORG *
+        LDI A.0(CALL)  ;PLO R4   ..INITIALIZE R4 TO
+                                 ..POINT AT THE
+                                 ..CALL ROUTINE
+        LDI A.0(RET)  ;PLO R5    ..INITIALIZE R5 TO
+                                 ..POINT AT RET ROU-
+                                 ..TINE
+        LDI A.1(CALL)  ;PHI R4   ..R4,R5 ON
+        PHI R5                   ..SAME PAGE
+        LDI#80   ;PHI R2
+        LDI#FF   ;PLO R2
+ STACK: GHI R2 ;SMI#01  ;PHI R2  ..ASSUME 4K BANKS
+                                 ..OF MEMORY
+        LDI#5A   ;STR R2   ;LDN R2 ..CK IF RAM EXIST
+        XRI#5A   ;BNZ STACK      ..BR IF NO RAM
+ HOMDSK: OUT 5,#0B               ..CLEAR ERROR FLAGS
+        OUT 4,#01                ..OUTPUT UNIT#00
+        OUT 5,#21                ..LOAD U/S#
+        SEX R2   ;INP 6          ..READ STATUS
+        ANI#20                   ..CK DRIVE
+        SEX R0
+        BNZ UNIT2                ..BR IF DRIVE FAIL
+        OUT 5,#0D                ..SEEK TRACK#00
+ UNIT1:SEX R2  ;INP 6            ..READ STATUS
+        SHR                      ..CK FOR BUSY
+        BDF UNIT1                ..BR IF BUSY
+        SEX R0
+ UNIT2:OUT 5,#0B                 ..CLEAR ERROR FLAGS
+        OUT 4,#41                ..OUTPUT UNIT#1
+        OUT 5,#21                ..LOAD U/S#
+        SEX R2   ;INP 6          ..READ STATUS
+        ANI#20                   ..CK DRIVE
+        SEX R0
+        BNZ EXIT2                ..BR IF DRIVE FAIL
+        OUT 5,#0D                ..SEEK TRACK#00
+ UNIT:SEX R2   ;INP 6            ..READ STATUS
+        SHR                      ..CK FOR BUSY
+        BDF UNIT                 ..BR IF BUSY
+        SEX R0
+ EXIT2:OUT 1,#01                 ..SELECT RCA I/O
+                                 ..GROUP
+        SEX R2
+        SEP R3
+..  THE FOLLOWING ROUTINE DOES (?R) COMMAND
+..
+..
+..
+TYPER: GLO SWITCH                ..CK IF ?
+        LBZ SYNERR               ..BR IF NOT ?
+        LDI A.0(TYPE5D) ;PLO SUB ..SUB IS POINTING
+                                 ..TO TYPE5D ROUTINE
+        SEP SUB,#0D              ..TYPE CR
+        SEP SUB,#0A              ..TYPE LF
+        LDI#02   ;PLO CNTER      ..TYPE R0,R1
+TYPEX:  SEP SUB,T'X'             ..TYPE X
+        SEP SUB,T'X'             ..SINCE R0,R1 ARE
+        SEP SUB,T'X'             ..CLOBBERED BY UT20
+        SEP SUB,T'X'             ..X=DON'T CARE
+        SEP SUB,#20              ..TYPE SPACE
+        DEC CNTER
+        GLO CNTER
+        LBNZ TYPEX               ..BR TO TYPE R1
+        LDI#04   ;PLO PTER       ..TYPE R2,R3
+        LDI#8C   ;PHI PTER       ..LOAD ADDERSS
+        LDI#02   ;PLO CNTER      ..LOAD CNTER
+TYPER2: LDA PTER ;PHI CHAR       ..PRINT 2 HEX DIGIT
+        LDI A.0(TYPE2) ;PLO SUB
+        SEP SUB
+        LDA PTER   ;PHI CHAR
+        LDI A.0(TYPE2) ;PLO SUB
+        SEP SUB
+        LDI A.0(TYPE5D) ;PLO SUB
+        GLO PTER ;XRI#08
+        LSNZ
+        SEP SUB,T','
+        SEP SUB,#20
+        DEC CNTER
+        GLO CNTER   ;BNZ TYPER2
+        SEP SUB,T'X'
+        SEP SUB,T'X'
+        LDI#09 ;PLO PTER
+        LDI#8C ;PHI PTER
+        LDI#16 ;PLO CNTER
+        LDA PTER ;PHI CHAR
+        LDI A.0(TYPE2) ;PLO SUB
+        SEP SUB                  ..TYPE OTHER TWO
+TSPCE: SEP SUB; ,#20             ..SPACE
+..
+TLOOPX:  LDA PTER ;PHI CHAR      ..FETCH ONE BYTE
+                                 ..FOR TYPING
+        LDI A.0(TYPE2) ;PLO SUB
+        SEP SUB                  ..TYPE 2 HEX
+        DEC CNTER
+        GLO CNTER
+        BNZ TL3A                 ..BRANCH NOT DONE
+        GHI CNTER
+        LBZ START                ..BRANCH IF DONE
+TL3A:   GLO PTER ;XRI#18         ..CK IF RC?
+        BNZ TLX
+        SEP SUB,T','
+TLX:    GLO PTER ;ANI #0F        ..PTER DIV BY 16?
+        BNZ TL2A
+        SEP SUB; ,#0D            ..THEN CR
+        SEP SUB,#0A              ..TYPE LF
+        BR TLOOPX
+TL2A:    SHR                     ..DIV BY 2?
+        BDF TLOOPX               ..NO, LOOP BACK
+        BR TSPCE                 ..ELSE TYPE SPACE &
+                                 ..LOOP BACK
+..  STANDARD CALL ROUTINE
+ EXITA:SEP R3                     ..R3 IS POINTING
+                                  ..TO FIRST INSTR.
+                                  ..IN SUBROUTINE
+ CALL:SEX R2                      ..POINT TO STACK
+        GHI R6                    ..PUSH R6 ONTO
+        STXD                      ..STACK TO PREPARE
+                                  ..IT  FOR POINTING
+        GLO R6                    ..TO ARGUMENTS,
+                                  ..AND DECREMENT
+        STXD                      ..TO FREE LOCATION.
+        GHI R3                    ..COPY R3 INTO R6
+        PHI R6                    ..TO SAVE RETURN
+                                  ..ADDRESS
+        GLO R3                    ..SAVE THE RETURN
+                                  ..ADDRESS
+        PLO R6                    ..SAVE THE RETURN
+                                  ..ADDRESS
+        LDA R6                    ..LOAD THE ADDRESS
+                                  ..OF SUBROUTINE
+        PHI R3                    ..INTO R3
+        LDA R6                    ..INTO R3
+        PLO R3                    ..INTO R3
+        BR EXITA                  ..BRANCH TO ENTRY
+                                  ..POINT
+..  STANDARD RETURN ROUTINE
+ EXITR:SEP R3                     ..RETURN TO MAIN
+                                  ..PROGRAM
+ RET:GHI R6                       ..COPY R6 INTO R3
+        PHI R3                    ..R3 CONTAINS THE
+                                  ..RETURN
+        GLO R6                    ..ADDRESS
+        PLO R3                    ..ADDRESS
+        SEX R2                    ..POINT TO STACK
+        INC R2                    ..POINT TO SAVED
+                                  ..OLD R6
+        LDXA                      ..RESTORE THE
+                                  ..CONTENTS
+        PLO R6                    ..OF R6
+        LDX                       ..OF R6
+        PHI R6                    ..OF R6
+        GHI RF
+       LBR EXITR                  ..BRANCH TO ENTRY
+                                  ..POINT
+..  UT20 VECTOR TABLE
+        ORG#83F0
+ OSTRNG:LBR MSGE
+ INIT1:LBR DSKGO1
+ INIT2:LBR DSKGO2
+ GOUT20:LBR ENTER
+CKHEX:  LBR CHKXE
+..
+END

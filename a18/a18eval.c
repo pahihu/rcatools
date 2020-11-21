@@ -75,6 +75,8 @@ arithmetic expressions.
 #include <string.h>
 #include <stdlib.h> /* for backslash code */
 
+unsigned char valbytes[128];
+
 /* local  prototypes HRJ*/
 static unsigned eval(unsigned);
 static void exp_error(char);
@@ -89,7 +91,6 @@ int isnum(char), isnumprefix(char);
 static int isalpnum(char c);
 
 /* external prototypes HRJ*/
-void error(char);
 void pops(char *), trash(void);
 OPCODE *find_operator(char *);
 SYMBOL *find_symbol(char *);
@@ -110,6 +111,7 @@ extern int filesp, forwd, pass;
 extern unsigned pc;
 extern FILE *filestk[], *source;
 extern TOKEN token;
+extern int comment, multisep;
 
 /*  Expression analysis routine.  The token stream from the lexical	*/
 /*  analyzer is processed as an arithmetic expression and reduced to an	*/
@@ -166,6 +168,7 @@ unsigned pre;
 			    case HIGH:	u = high(u); break;
 
 			    case LOW:	u = low(u); break;
+                            case 'A':   break;
 			}
 			if (MULTI == (token.attr & TYPE))
 			    return u;
@@ -269,7 +272,17 @@ TOKEN *lex(void) /* function lex() */
 
     if (oldt) { oldt = FALSE;  return &token; }
     trash();
+LAGAIN:
     if (isalph(c = popc())) {
+        if ('T' == c) {
+            c = popc();
+            if (c == '\'') {
+                pushc(c); goto LAGAIN;
+            }
+            else {
+                pushc(c); c = 'T';
+            }
+        }
 	pushc(c);  pops(token.sval);
 	DIAG(printf(" lex_sval=[%s]",token.sval));
 	if ((o = find_operator(token.sval))) {
@@ -376,13 +389,14 @@ opr2:		    token.attr = BINARY + RELAT + OPR;
 	case ',':   token.attr = SEP;
 		    break;
 
-        case '!':   token.attr = MULTI;
-		    DIAG(printf(" separator"));
-                    break;
-
         case '\n':  token.attr = EOL;
 		    DIAG(printf(" eol"));
 		    break;
+
+        default:    if (multisep == c) {
+                        token.attr = MULTI;
+		        DIAG(printf(" stmtsep"));
+                    }
     }
     return &token;
 }
@@ -429,6 +443,10 @@ unsigned make_number2(char *str, unsigned base)
     for (p = str, i = 0; i < n; p++, i++) {
 	d = toupper(*p) - (isnum(*p) ? '0' : 'A' - 10);
 	valu = valu * base + d;
+        if (16 == base && 0 == (n & 1)) {
+            if (i & 1)
+                valbytes[i / 2] = valu & 0xFF;
+        }
 	if (!ishex(*p) || d >= base) { exp_error('D');  break; }
     }
     clamp(valu);
@@ -452,6 +470,11 @@ int isalph(char c)
 {
     return (c >= '@' && c <= '~') || c == '#' || c == '*' || c == '$' || c == '%' || c == '&' || c == '.' || c == ':' || c == '?';
 
+}
+
+int isterm(char c)
+{
+    return c == '@' || c == '#' || c == '*' || c == '$' || c == '%' || c == '&' || c == ':' || c == '?';
 }
 
 int isnum(char c)
@@ -484,9 +507,19 @@ void unlex(void)
 void pops(s)
 char *s;
 {
+    int beg = 1;
+
     trash();
-    for (; isalpnum(*s = popc()); ++s);
-    pushc(*s);  *s = '\0';
+    for (; isalpnum(*s = popc()); ++s) {
+        if (!beg && isterm(*s))
+            break;
+        beg = 0;
+    }
+    if (*s == ':') {
+        s++;
+    } else
+        pushc(*s);
+    *s = '\0';
     return;
 }
 
@@ -507,7 +540,7 @@ void trash()
 /*  Semicolon is mapped to \n.  In addition, a copy of all input is set	*/
 /*  up in a line buffer for the benefit of the listing.			*/
 
-static int oldc, eol, xoldc;
+static int oldc, oldc2, eol, xoldc;
 static char *lptr;
 
 static int xgetc(FILE *source)
@@ -525,11 +558,11 @@ int popc(void)
 {
     SCRATCH int c, doskip;
 
-    if (oldc) { c = oldc;  oldc = '\0';  return c; }
+    if (oldc) { c = oldc;  oldc = oldc2; oldc2 = '\0';  return c; }
     if (eol) return '\n';
     for (;;) {
         c = xgetc(source);
-        if (c != EOF && !quote && (c == ';' || c == '.')) {
+        if (c != EOF && !quote && (comment == c)) {
             doskip = 1;
             if (c == '.') {
                c = xgetc(source);
@@ -558,6 +591,7 @@ int popc(void)
 
 void pushc(char c)
 {
+    oldc2 = oldc;
     oldc  = c;
     return;
 }
@@ -567,7 +601,7 @@ void pushc(char c)
 
 void multiline()
 {
-  oldc = xoldc = '\0'; oldt = eol = FALSE;
+  oldc = oldc2 = xoldc = '\0'; oldt = eol = FALSE;
 }
 
 int newline()
