@@ -167,7 +167,7 @@ void timrst(void)
    // EF4 - idle
    EF |= EF4;
    SIORX = 0;
-   SIO_IN0 = 0;
+   SIO_IN0 = 1;
 }
 
 void timin(void)
@@ -217,10 +217,13 @@ void timout(Byte data)
    int bus0;
 
    bus0 = 1 & data;
+// H("rcvd %d\r\n",bus0);
    if (0 == SIORX) {
       if ((1 == SIO_IN0) && !bus0) {
+         SIO_IN = 0;
          SIO_IMSK = 1 << 10;
          SIORX = 1;
+// H("begin\r\n");
       }
    }
    if (1 == SIORX) {
@@ -230,10 +233,15 @@ void timout(Byte data)
             SIO_IN |= 1;
          SIO_IMSK >>= 1;
       }
-      else {
+      if (!SIO_IMSK) {
+// H("end\r\n");
          SIO_IN >>= 3;
 // H("SIO_IN: %c\r\n", SIO_IN);
-         putchar(SIO_IN); fflush(stdout);
+         SIO_IN &= 0x7F;
+         putchar(SIO_IN);
+         if (0x0D == SIO_IN)
+            putchar(0x0A);
+         fflush(stdout);
          SIO_IN = 0; 
          SIORX = 0;
       }
