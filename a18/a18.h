@@ -437,3 +437,5 @@ typedef struct {
 /* to fix Turbo C extern HRJ */
 
 static int zyzzy = 0;
+void error_(char,char*,int);
+#define error(x)        error_(x,__FILE__,__LINE__)

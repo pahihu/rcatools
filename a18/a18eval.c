@@ -98,7 +98,7 @@ SYMBOL *find_symbol(char *);
 int  asm_line(void);
 void lclose(void), lopen(char *), lputs(void);
 void hclose(void), hopen(char *), hputc(unsigned);
-void error(char), fatal_error(char *), warning(char *);
+void fatal_error(char *), warning(char *);
 void hseek(unsigned);
 void unlex(void);
 char *backsub(char *str); /*loren Christesen*/

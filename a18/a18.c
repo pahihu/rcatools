@@ -95,7 +95,7 @@ parse the source line convert it into the object bytes that it represents.
     void hclose(void), hopen(char *), hputc(unsigned);
     void bclose(void), bopen(char *), bputc(unsigned);
     void xclose(void), xopen(char *);
-    void error(char), fatal_error(char *), warning(char *);
+    void fatal_error(char *), warning(char *);
     void pops(char *), pushc(int), trash(void);
 	void hseek(unsigned);
 	void unlex(void);

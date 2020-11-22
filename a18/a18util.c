@@ -112,7 +112,6 @@ static void binrecord(unsigned);
 void bseek(unsigned);
 void bputc(unsigned);
 char *backsub(char *str);
-void error(char);
 
 /*  Get access to global mailboxes defined in A18.C:			*/
 
@@ -765,10 +764,10 @@ unsigned b;
 /*  the error code is filled in and the	number of lines with errors	*/
 /*  is adjusted.							*/
 
-void error(char code)
+void error_(char code,char *path,int line)
 {
     if (errcode == ' ') { errcode = code;  ++errors; }
-    DIAG(printf(" error:[%c]",code));
+    DIAG(printf("%s:%d: error '%c' at line %d\n",code));
     return;
 }
 
