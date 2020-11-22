@@ -30,6 +30,9 @@
  *          fixed SHL
  * 201120AP fixed carry/borrow gen
  *          updated disk geometry: 128 b/sec * 26 sec/tr * 76 tr
+ * 201122AP fixed page-crossing BR
+ *          TIM and FDD interfaces
+ *          LPR interface
  *
  */
 
@@ -144,7 +147,7 @@ Byte memwr(int addr, Byte data)
 }
 
 /*
- *  TIM
+ *  TIM - CDP18S507
  *
  *  2MHz - 0.5us
  *  16CLK - 8us
@@ -154,39 +157,39 @@ Byte memwr(int addr, Byte data)
  *   1200  833   208
  */
 
-int SIO, SIO_OUT, SIO_DLY, SIO_OMSK;
-int SIO_IN, SIO_IMSK;
+int SIOTX, SIO_OUT, SIO_DLY, SIO_OMSK;
+int SIORX, SIO_IN0, SIO_IN, SIO_IMSK;
 
 void timrst(void)
 {
    // serial input - chk char
-   SIO = 0;
-   SIO_IMSK = 1 << 10;
+   SIOTX = 0;
    // EF4 - idle
    EF |= EF4;
+   SIORX = 0;
+   SIO_IN0 = 0;
 }
 
 void timin(void)
 {
    int c;
 
-   switch (SIO) {
+   switch (SIOTX) {
    case 0: // idle
            EF |= EF4;
            if (MCLK & 32767)
                return;
            if (has_key()) {
                c = getkey(0);
-//H("got %02X\r\n",c);
+// H("got %02X\r\n",c);
                kbflush();
                c &= 0x7F;
                putchar(c); fflush(stdout);
                SIO_OUT = (c << 3) + 7;
-//H("sending %03X\r\n",SIO_OUT);
+// H("sending %03X\r\n",SIO_OUT);
                SIO_DLY = 833; 
                SIO_OMSK = 1 << 10;
-               SIO = 1;
-// 00001101111
+               SIOTX = 1;
            }
            break;
    case 1: // send
@@ -199,11 +202,11 @@ void timin(void)
                        EF |=  EF4;
                    else
                        EF &= ~EF4;
-//H("sent %d\r\n",EF & EF4);
+// H("sent %d\r\n",EF & EF4);
                    SIO_OMSK >>= 1;
                }
                else
-                   SIO = 0;
+                   SIOTX = 0;
            }
            break;
    }
@@ -211,23 +214,35 @@ void timin(void)
 
 void timout(Byte data)
 {
-   if (SIO_IMSK) {
-       SIO_IN <<= 1;
-       if (data & 1)
-           SIO_IN |= 1;
-       SIO_IMSK >>= 1;
+   int bus0;
+
+   bus0 = 1 & data;
+   if (0 == SIORX) {
+      if ((1 == SIO_IN0) && !bus0) {
+         SIO_IMSK = 1 << 10;
+         SIORX = 1;
+      }
    }
-   else {
-       SIO_IMSK = 1 << 10;
-       SIO_IN >>= 3;
-//H("SIO_IN: %c\r\n", SIO_IN);
-       putchar(SIO_IN); fflush(stdout);
-       SIO_IN = 0; 
+   if (1 == SIORX) {
+      if (SIO_IMSK) {
+         SIO_IN <<= 1;
+         if (bus0)
+            SIO_IN |= 1;
+         SIO_IMSK >>= 1;
+      }
+      else {
+         SIO_IN >>= 3;
+// H("SIO_IN: %c\r\n", SIO_IN);
+         putchar(SIO_IN); fflush(stdout);
+         SIO_IN = 0; 
+         SIORX = 0;
+      }
    }
+   SIO_IN0 = bus0;
 }
 
 /*
- * DSK
+ * DSK - CDP18S813
  *
  */
 struct {
@@ -290,6 +305,38 @@ void fddctrl(Byte data)
       DSK.input = DSK.buf[DSK.ptr];
       DSK.ptr++;
       break;
+   }
+}
+
+/*
+ * LPR - Line Printer
+ *
+ * 150 lines/min, 120 chars/line
+ *
+ * 833 MCLK/char
+ *
+ */
+char lprnm[32] = "lpr.out";
+FILE *lpr = NULL;
+int LPR_OUT, LPR_DLY;
+
+void lprout(Byte data)
+{
+   if (!LPR_DLY) {
+      LPR_OUT = ~data;
+      LPR_DLY = 833;
+      EF |= EF1;
+   }
+}
+
+void lprin(void)
+{
+   if (LPR_DLY && !--LPR_DLY) {
+      if (!lpr)
+         lpr = fopen(lprnm, "a");
+      fputc(LPR_OUT, lpr);
+      fflush(lpr);
+      EF &= ~EF1;
    }
 }
 
@@ -403,8 +450,10 @@ void prinregs()
 void cycle(void)
 {
    MCLK++;
-   if (TLIO)
+   if (TLIO && 1 == SEL) {
       timin();
+      lprin();
+   }
 }
 
 Byte eflag(int x)
@@ -423,18 +472,27 @@ Byte xinp(Byte port)
 Byte inp(Byte port)
 {
    int c;
-//H("INP %d\r\n",port);
+// H("INP %d\r\n",port);
 
    if (TLIO)
       switch (port) {
       case 1: return SEL;
-      case 2: fflush(stdout); // 1854 char in
-              c = getchar();
-              if (c == '\n')
-                  c = '\r';
-              return c;
-      case 3: return 0x81; // 1854 status
-      case 6: return DSK.input;
+      case 2: if (2 == SEL) {
+                 fflush(stdout); // 1854 char in
+                 c = getchar();
+                 if (c == '\n')
+                    c = '\r';
+                 return c;
+              }
+              break;
+      case 3: if (2 == SEL) {
+                 return 0x81; // 1854 status
+              }
+              break;
+      case 6: if (1 == SEL) {
+                 return DSK.input;
+              }
+              break;
       }
    else if (RC)
       switch (port) {
@@ -453,19 +511,36 @@ void xout(Byte port, Byte data)
 
 void out(Byte port, Byte data)
 {
-// H("OUT %d %02X\r\n",port,data);
+// H("%04X OUT %d,%02X\r\n",r[P],port,data);
    if (TLIO)
       switch (port) {
       case 1: SEL = data; break;
-      case 2: data &= 0x7F; // 1854 char out
-              putchar(data);
+      case 2: if (2 == SEL) {
+                 data &= 0x7F; // 1854 char out
+                 putchar(data);
+              }
               break;
-      case 3: break; // 1854 ctrl
-      case 4: DSK.data = data;
+      case 3: if (2 == SEL) {
+                 ; // 1854 ctrl
+              }
               break;
-      case 5: fddctrl(data);
+      case 4: if (1 == SEL) {
+                 DSK.data = data;
+              }
               break;
-      case 7: timout(data);
+      case 5: if (1 == SEL) {
+                 fddctrl(data);
+              }
+              break;
+      case 6: if (1 == SEL) {
+                 lprout(data);
+              }
+              break;
+      case 7: if (1 == SEL) {
+                 timout(data);
+                 if (4 & data)
+                    TLIO = 0;
+              }
               break;
       }
    else if (RC)
@@ -521,7 +596,6 @@ void xecute(Word p)
          break;
       case 3: // short branch
          cond = 0;
-         W = memrd(r[P]); r[P]++;
          switch (7 & N) {
          case 0: // BR, br (NBR,SKP)
             cond = 1;
@@ -550,8 +624,12 @@ void xecute(Word p)
          }
          if (8 & N)
             cond = !cond;
-         if (cond)
+         if (cond) {
+            W = memrd(r[P]);
             r[P] = HILO(HI(r[P]),W);
+         }
+         else
+            r[P]++;
          break;
       case 4: // LDA, load advance
          D = memrd(r[N]); r[N]++;
@@ -1161,6 +1239,8 @@ void fini(void)
    int i;
 
    prepterm(0);
+   if (!lpr)
+      fclose(lpr);
    if (MCLK)
       printf("MCLK = %d\n", MCLK);
    for (i = 0; i < 4; i++)
@@ -1183,16 +1263,17 @@ void storage(void)
 
 void usage(void)
 {
-   fprintf(stderr,"usage: sim18 [-24gmutx] [-bxxxx] [-d -exxxx] [-f<fdd.img>] -s<kbytes> <file>...\n");
+   fprintf(stderr,"usage: sim18 [-24gmputx] [-bxxxx] [-d -exxxx] [-f<fdd.img>] -s<kbytes> <file>...\n");
    fprintf(stderr,"options:\n");
    fprintf(stderr,"   -2         enable TLIO\n");
    fprintf(stderr,"   -4         fig-FORTH register names\n");
    fprintf(stderr,"   -bxxxx     disasm/load/start 'begin' address\n");
    fprintf(stderr,"   -d         disassemble only\n");
    fprintf(stderr,"   -exxxx     end address\n");
-   fprintf(stderr,"   -ffdd.img  use disk file (max. 4)\n");
+   fprintf(stderr,"   -f<fdd>    use disk file (max. 4)\n");
    fprintf(stderr,"   -g         GLL-MAG register names\n");
    fprintf(stderr,"   -m         set M-rec fmt\n");
+   fprintf(stderr,"   -p<file>   lpr file name, default \"lpr.out\"\n");
    fprintf(stderr,"   -s<kbytes> memory size (default 64KB)\n");
    fprintf(stderr,"   -t         trace\n");
    fprintf(stderr,"   -u         start BUT20 (?DMR,!AM,$LPQUXY)\n");
@@ -1264,6 +1345,8 @@ int main(int argc, char *argv[])
             break;
          case 'g': regs = gllregs; break;
          case 'm': readdat = readidi; break;
+         case 'p': strcpy(lprnm, argv[i]+2);
+                   break;
          case 'u': ut20 = 1; break;
          case 's': MAX_MEM = atoi(argv[i] + 2);
                    if (MAX_MEM > 1024) MAX_MEM = 1024;
