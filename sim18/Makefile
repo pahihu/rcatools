@@ -1,7 +1,7 @@
 CC = cc
 CFLAGS = -O2
 LDFLAGS = #-g
-SRCS = 1802.c
+SRCS = 1802.c curterm.c
 OBJS = $(SRCS:.c=.o)
 
 all: sim18
@@ -23,6 +23,12 @@ nucleus.bin: nucleus.asm
 	a18 nucleus.asm -L nucleus.lst -b $@
 	ls -l $@
 
+ut20p_1.bin: ut20p_1.sr
+	a18 ut20p_1.sr -r -f 0C4H -L ut20p_1.lst -b ut20p_1.bin
+
+ut20p_2.bin: ut20p_2.sr
+	a18 ut20p_2.sr -r -f 0C4H -L ut20p_2.lst -b ut20p_2.bin
+
 fforth.idi: fforth.sr
 	a18 fforth.sr -r -m $@
 
@@ -31,3 +37,5 @@ clean:
 	$(RM) rom.xxd rom.bin rom.dis
 	$(RM) nucleus.lst nucleus.bin
 	$(RM) forth.idi
+	$(RM) ut20p_1.lst ut20p_1.bin
+	$(RM) ut20p_2.lst ut20p_2.bin

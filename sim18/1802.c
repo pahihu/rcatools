@@ -50,6 +50,8 @@
 #include <ctype.h>
 #include <string.h>
 
+#include "curterm.h"
+
 typedef unsigned char Byte;
 typedef unsigned short Word;
 
@@ -139,6 +141,156 @@ Byte memwr(int addr, Byte data)
    }
    M[addr] = data;
    return data;
+}
+
+/*
+ *  TIM
+ *
+ *  2MHz - 0.5us
+ *  16CLK - 8us
+ *  baud  us    MCLK
+ *    110 9091  2273
+ *    300 3333   833
+ *   1200  833   208
+ */
+
+int SIO, SIO_OUT, SIO_DLY, SIO_OMSK;
+int SIO_IN, SIO_IMSK;
+
+void timrst(void)
+{
+   // serial input - chk char
+   SIO = 0;
+   SIO_IMSK = 1 << 10;
+   // EF4 - idle
+   EF |= EF4;
+}
+
+void timin(void)
+{
+   int c;
+
+   switch (SIO) {
+   case 0: // idle
+           EF |= EF4;
+           if (MCLK & 32767)
+               return;
+           if (has_key()) {
+               c = getkey(0);
+//H("got %02X\r\n",c);
+               kbflush();
+               c &= 0x7F;
+               putchar(c); fflush(stdout);
+               SIO_OUT = (c << 3) + 7;
+//H("sending %03X\r\n",SIO_OUT);
+               SIO_DLY = 833; 
+               SIO_OMSK = 1 << 10;
+               SIO = 1;
+// 00001101111
+           }
+           break;
+   case 1: // send
+           if (SIO_DLY)
+               SIO_DLY--;
+           else {
+               SIO_DLY = 833;
+               if (SIO_OMSK) {
+                   if (SIO_OMSK & SIO_OUT)
+                       EF |=  EF4;
+                   else
+                       EF &= ~EF4;
+//H("sent %d\r\n",EF & EF4);
+                   SIO_OMSK >>= 1;
+               }
+               else
+                   SIO = 0;
+           }
+           break;
+   }
+}
+
+void timout(Byte data)
+{
+   if (SIO_IMSK) {
+       SIO_IN <<= 1;
+       if (data & 1)
+           SIO_IN |= 1;
+       SIO_IMSK >>= 1;
+   }
+   else {
+       SIO_IMSK = 1 << 10;
+       SIO_IN >>= 3;
+//H("SIO_IN: %c\r\n", SIO_IN);
+       putchar(SIO_IN); fflush(stdout);
+       SIO_IN = 0; 
+   }
+}
+
+/*
+ * DSK
+ *
+ */
+struct {
+   Byte cmd;
+   Byte data;
+   Byte input;
+   Byte unit;
+   Byte sector;
+   Byte track;
+   Byte status;
+   Byte buf[128];
+   Byte ptr;
+} DSK;
+
+#define  DE_BSY   0x01
+#define  DE_CRC   0x08
+#define  DE_FAIL  0x20
+#define  DE_ACT   0x40
+
+void fddctrl(Byte data)
+{
+   DSK.cmd = data;
+   switch (data) {
+   case 0x00: // read status
+      DSK.input = DSK.status;
+      break;
+   case 0x03: // read sector
+      DSK.status |= DE_FAIL;
+      break;
+   case 0x05: // write sector
+      DSK.status |= DE_FAIL;
+      break;
+   case 0x07: // read CRC
+      DSK.status |= DE_CRC;
+      break;
+   case 0x09: // seek track
+      DSK.status |= DE_FAIL;
+      break;
+   case 0x0B: // clear error flags
+      DSK.status = 0;
+      break;
+   case 0x11: // load track#, (1 - 76)
+      DSK.track = DSK.data;
+      break;
+   case 0x21: // load unit-sec#
+      DSK.unit = (0x40 & DSK.data)? 1 : 0;
+      DSK.sector = (0x1F & DSK.data); // 1-26
+      if (!fdd[DSK.unit])
+         DSK.status |= DE_FAIL;
+      break;
+   case 0x31: // load write buffer
+      DSK.buf[DSK.ptr] = DSK.data;
+      DSK.ptr++;
+      break;
+   case 0x40: // read buffer
+      DSK.ptr = 0;
+      DSK.input = DSK.buf[DSK.ptr++];
+      break;
+   case 0x41: // shift read buffer
+      DSK.input = DSK.buf[DSK.ptr];
+      DSK.ptr++;
+      break;
+   }
 }
 
 void dasminit(void)
@@ -251,15 +403,13 @@ void prinregs()
 void cycle(void)
 {
    MCLK++;
+   if (TLIO)
+      timin();
 }
 
 Byte eflag(int x)
 {
-   if (TLIO) {
-      switch (x) {
-      case EF4: EF |= EF4; break; // 1854 serial data in
-      }
-   }
+//H("EF %d\r\n",EF & x);
    return EF & x;
 }
 
@@ -273,6 +423,7 @@ Byte xinp(Byte port)
 Byte inp(Byte port)
 {
    int c;
+//H("INP %d\r\n",port);
 
    if (TLIO)
       switch (port) {
@@ -283,6 +434,7 @@ Byte inp(Byte port)
                   c = '\r';
               return c;
       case 3: return 0x81; // 1854 status
+      case 6: return DSK.input;
       }
    else if (RC)
       switch (port) {
@@ -301,6 +453,7 @@ void xout(Byte port, Byte data)
 
 void out(Byte port, Byte data)
 {
+// H("OUT %d %02X\r\n",port,data);
    if (TLIO)
       switch (port) {
       case 1: SEL = data; break;
@@ -308,6 +461,12 @@ void out(Byte port, Byte data)
               putchar(data);
               break;
       case 3: break; // 1854 ctrl
+      case 4: DSK.data = data;
+              break;
+      case 5: fddctrl(data);
+              break;
+      case 7: timout(data);
+              break;
       }
    else if (RC)
       switch (port) {
@@ -316,6 +475,8 @@ void out(Byte port, Byte data)
       }
    BUS = data;
 }
+
+void fini(void);
 
 void xecute(Word p)
 {  
@@ -999,11 +1160,13 @@ void fini(void)
 {
    int i;
 
+   prepterm(0);
    if (MCLK)
       printf("MCLK = %d\n", MCLK);
    for (i = 0; i < 4; i++)
       if (fdd[i])
          fclose(fdd[i]);
+   exit(0);
 }
 
 void storage(void)
@@ -1138,8 +1301,13 @@ int main(int argc, char *argv[])
       SEL = 0x01;
       ut20mon(stdin);
    }
-   else
+   else {
+      if (TLIO) {
+         prepterm(1);
+         timrst();
+      }
       xecute(begin);
+   }
 
    return 0;
 }

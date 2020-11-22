@@ -34,3 +34,41 @@ CDP1802 NOTES
    or
    DIS      ; return and disable IE
 
+- UT20 notes
+   2.0MHz - 16 clocks/instr
+   terminal
+        BDDDDDDDPFF
+        B=0 start, 7bits of data, P=1 (ignored), F=1 stop
+        max. 110/300/1200 baud
+   line-printer
+        EOF is ^S
+        EF1 comm with printer, EF1=1 busy, EF1=0 rdy
+        OUT 6 send data to printer (must be inverted!)
+   disk
+        unit-sector# only lower 7bits used
+                bit6 unit selector, 0 - unit0, 1 - unit1
+                bit5-b0 sector #
+        track#
+        disk status flags
+                #40     drive active
+                #20     drive failure
+                #08     CRC error
+                #01     busy
+        OUT 4           data out
+        INP 6           data in
+
+        OUT 5,#11       load track#
+        OUT 5,#21       load unit-sect#
+        wait 48us
+        OUT 5,#09       seek track
+        wait to seek
+        OUT 5,#0B       clear errors
+        OUT 5,#03       read
+        OUT 5,#05       write
+        OUT 5,#07       read CRC
+        OUT 5,#00       read status
+        OUT 5,#40       read buffer, from beg
+        OUT 5,#41       increment buffer, read
+
+        OUT 4           data out
+        OUT 5,#31       load write buffer, increment
