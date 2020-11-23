@@ -33,6 +33,7 @@
  * 201122AP fixed page-crossing BR
  *          TIM and FDD interfaces
  *          LPR interface
+ * 201123AP FDD interface
  *
  */
 
@@ -155,10 +156,17 @@ Byte memwr(int addr, Byte data)
  *    110 9091  2273
  *    300 3333   833
  *   1200  833   208
+ *
+ *  Format: 7/-/2 LSB first, parity bit ignored
+ *
  */
 
-int SIOTX, SIO_OUT, SIO_DLY, SIO_OMSK;
-int SIORX, SIO_IN0, SIO_IN, SIO_IMSK;
+#define TIM_110   2273
+#define TIM_300    833
+#define TIM_1200   208
+
+int SIOTX, SIO_OUT, SIO_DLY, SIO_OCNT;
+int SIORX, SIO_IN0, SIO_IN, SIO_ICNT;
 
 void timrst(void)
 {
@@ -175,8 +183,7 @@ void timin(void)
    int c;
 
    switch (SIOTX) {
-   case 0: // idle
-           EF |= EF4;
+   case 0: EF |= EF4;                        // idle state, wait for KBD
            if (MCLK & 32767)
                return;
            if (has_key()) {
@@ -184,22 +191,21 @@ void timin(void)
 // H("got %02X\r\n",c);
                kbflush();
                c &= 0x7F;
-               putchar(c); fflush(stdout);
-               SIO_OUT = (c << 1);
-               SIO_OUT |= 0x700;
+               putchar(c); fflush(stdout);   // local echo
+               SIO_OUT = (c << 1);           // 1S+7D
+               SIO_OUT |= 0x700;             // 1P+2S
 // H("sending %03X\r\n",SIO_OUT);
-               SIO_DLY = 833; 
-               SIO_OMSK = 0x0B;
+               SIO_DLY = TIM_300;            // 300baud
+               SIO_OCNT = 0x0B;              // send 11bits: 1S+7D+1P+2S
                SIOTX = 1;
            }
            break;
-   case 1: // send
-           if (SIO_DLY)
+   case 1: if (SIO_DLY)                      // wait
                SIO_DLY--;
            else {
-               SIO_DLY = 833;
-               if (SIO_OMSK && SIO_OMSK--) {
-                   if (1 & SIO_OUT)
+               SIO_DLY = TIM_300;            // reset delay
+               if (SIO_OCNT && SIO_OCNT--) {
+                   if (1 & SIO_OUT)          // send LSB
                        EF |=  EF4;
                    else
                        EF &= ~EF4;
@@ -207,7 +213,7 @@ void timin(void)
                    SIO_OUT >>= 1;
                }
                else
-                   SIOTX = 0;
+                   SIOTX = 0;                // back to wait for char
            }
            break;
    }
@@ -219,37 +225,40 @@ void timout(Byte data)
 
    bus0 = 1 & data;
 // H("rcvd %d\r\n",bus0);
-   if (0 == SIORX) {
-      if ((1 == SIO_IN0) && !bus0) {
+   if (0 == SIORX) {                   // idle, wait for char
+      if ((1 == SIO_IN0) && !bus0) {   // detect START bit
          SIO_IN = 0;
-         SIO_IMSK = 0x0B;
+         SIO_ICNT = 0x0B;              // rcv 11bits: 1S+7D+1P+2S
          SIORX = 1;
 // H("begin\r\n");
       }
    }
-   if (1 == SIORX) {
-      if (SIO_IMSK && SIO_IMSK--) {
+   if (1 == SIORX) {                   // receive
+      if (SIO_ICNT && SIO_ICNT--) {
          if (bus0) {
-            SIO_IN |= (1 << 10);
+            SIO_IN |= (1 << 10);       // get bit
          }
          SIO_IN >>= 1;
       }
-      if (!SIO_IMSK) {
+      if (!SIO_ICNT) {
 // H("end\r\n");
-         if (0x300 == (0x300 & SIO_IN)) {
+         if (0x300 == (0x300 & SIO_IN)) { // detect 2 STOP bits
 // H("rcvd %03X\r\n",SIO_IN);
             SIO_IN &= 0x7F;
             putchar(SIO_IN);
             fflush(stdout);
          }
-         SIORX = 0;
+         SIORX = 0;                    // back to idle state
       }
    }
-   SIO_IN0 = bus0;
+   SIO_IN0 = bus0; // save curr BUS0
 }
 
 /*
  * DSK - CDP18S813
+ *
+ * 250kbit/s ~ 128byte 1024bit ~ 1000MCLK
+ * 10ms one track move ~ 2500MCLK
  *
  */
 struct {
@@ -262,6 +271,8 @@ struct {
    Byte status;
    Byte buf[128];
    Byte ptr;
+   int  delay;
+   Byte ptrack;
 } DSK;
 
 #define  DE_BSY   0x01
@@ -269,48 +280,87 @@ struct {
 #define  DE_FAIL  0x20
 #define  DE_ACT   0x40
 
+void fddrst(void)
+{
+   DSK.delay = 0;
+   DSK.status = 0;
+   DSK.ptrack = 1;
+}
+
+void fddcyc(void)
+{
+   if (DSK.delay && !--DSK.delay)
+      DSK.status &= ~DE_BSY;
+}
+
 void fddctrl(Byte data)
 {
+   size_t s;
+
    DSK.cmd = data;
    switch (data) {
    case 0x00: // read status
       DSK.input = DSK.status;
       break;
    case 0x03: // read sector
-      DSK.status |= DE_FAIL;
+      DSK.status |= DE_BSY;
+      DSK.delay = 1000;
+      s = fread(DSK.buf, sizeof(Byte), 128, fdd[DSK.unit]);
+      if (128 != s)
+         DSK.status |= DE_FAIL;
+      DSK.ptr = 0;
       break;
    case 0x05: // write sector
-      DSK.status |= DE_FAIL;
+      DSK.status |= DE_BSY;
+      DSK.delay = 1000;
+      fwrite(DSK.buf, sizeof(Byte), DSK.ptr, fdd[DSK.unit]);
+      if (DSK.ptr != s)
+         DSK.status |= DE_FAIL;
+      DSK.ptr = 0;
       break;
    case 0x07: // read CRC
-      DSK.status |= DE_CRC;
+      DSK.status |= DE_BSY;
+      DSK.delay = 1000;
+      DSK.status &= ~DE_CRC;
       break;
    case 0x09: // seek track
-      DSK.status |= DE_FAIL;
+      DSK.status |= DE_BSY;
+      DSK.delay   = abs(DSK.track - DSK.ptrack) * 2500;
+      s = fseek(fdd[DSK.unit],
+                sizeof(DSK.buf) * ((DSK.track - 1) * 26 + DSK.sector - 1),
+                SEEK_SET);
+      if (s < 0)
+         DSK.status |= DE_FAIL;
+      else
+         DSK.ptrack = DSK.track;
       break;
    case 0x0B: // clear error flags
       DSK.status = 0;
       break;
    case 0x11: // load track#, (1 - 76)
+      DSK.status |= DE_BSY;
+      DSK.delay = 12;
       DSK.track = DSK.data;
+      if (DSK.track > 76)
+         DSK.status |= DE_ACT;
       break;
    case 0x21: // load unit-sec#
-      DSK.unit = (0x40 & DSK.data)? 1 : 0;
+      DSK.unit = FLAG(0x40 & DSK.data);
       DSK.sector = (0x1F & DSK.data); // 1-26
-      if (!fdd[DSK.unit])
+      if (!fdd[DSK.unit] || !DSK.sector || DSK.sector > 26)
          DSK.status |= DE_FAIL;
       break;
    case 0x31: // load write buffer
       DSK.buf[DSK.ptr] = DSK.data;
-      DSK.ptr++;
+      DSK.ptr = 0x7F & (DSK.ptr + 1);
       break;
    case 0x40: // read buffer
       DSK.ptr = 0;
-      DSK.input = DSK.buf[DSK.ptr++];
+      DSK.input = DSK.buf[DSK.ptr];
       break;
    case 0x41: // shift read buffer
+      DSK.ptr = 0x7F & (DSK.ptr + 1);
       DSK.input = DSK.buf[DSK.ptr];
-      DSK.ptr++;
       break;
    }
 }
@@ -460,6 +510,7 @@ void cycle(void)
    if (TLIO && 1 == SEL) {
       timin();
       lprin();
+      fddcyc();
    }
 }
 
@@ -1395,6 +1446,7 @@ int main(int argc, char *argv[])
       if (TLIO) {
          prepterm(1);
          timrst();
+         fddrst();
       }
       xecute(begin);
    }

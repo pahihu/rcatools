@@ -39,7 +39,7 @@ clean:
 	$(RM) sim18 $(OBJS)
 	$(RM) rom.xxd rom.bin rom.dis
 	$(RM) nucleus.lst nucleus.bin
-	$(RM) forth.idi
+	$(RM) fforth.idi
 	$(RM) ut20.rom
 	$(RM) ut20p_1.lst ut20p_1.bin
 	$(RM) ut20p_2.lst ut20p_2.bin
