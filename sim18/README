@@ -1,0 +1,26 @@
+sim18
+=====
+
+This is the beginning of a CDSII-CDP18S005 simulator.
+For more information, check the "Operator Manual for 
+the RCA COSMAC Development System II CDP18S005", MPM-216
+manual.
+
+The included `.sr' ASM source files can be assembled
+with the included A18 assembler.
+
+
+To run fig-FORTH execute
+
+        make fforth.idi
+        sim18 -2 -u -m fforth.idi
+        *$u
+
+To run the original UT20 monitor
+
+        make ut20.rom
+        ./ut20
+
+
+
+pahihu 23 / 11 / 2020

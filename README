@@ -3,6 +3,11 @@ CDP1802 tools
 
 a18/            assembler, tweaked to compile RCA ASM sources
 disasm/         disassembler, tweaked to read binary data
-sim18/          simulator, microFORTH nucleus reconstruction, work in-progress
+sim18/          simulator, microFORTH nucleus reconstruction, figFORTH,
+                UT20 monitor, work in-progress
 
-Good luck!
+
+NOTE: For the excellent 'Emma 02 Emulator' see 
+https://www.emma02.hobby-site.com/index.html, for the original A18 assembler 
+see Herb Johnson's site at http://www.retrotechnology.com/memship/a18.html.
+Otherwise here is the code. Good luck!

@@ -23,19 +23,23 @@ nucleus.bin: nucleus.asm
 	a18 nucleus.asm -L nucleus.lst -b $@
 	ls -l $@
 
+fforth.idi: fforth.sr
+	a18 fforth.sr -r -m $@
+
 ut20p_1.bin: ut20p_1.sr
 	a18 ut20p_1.sr -r -f 0C4H -L ut20p_1.lst -b ut20p_1.bin
 
 ut20p_2.bin: ut20p_2.sr
 	a18 ut20p_2.sr -r -f 0C4H -L ut20p_2.lst -b ut20p_2.bin
 
-fforth.idi: fforth.sr
-	a18 fforth.sr -r -m $@
+ut20.rom: ut20p_1.bin ut20p_2.bin
+	touch ut20.rom
 
 clean:
 	$(RM) sim18 $(OBJS)
 	$(RM) rom.xxd rom.bin rom.dis
 	$(RM) nucleus.lst nucleus.bin
 	$(RM) forth.idi
+	$(RM) ut20.rom
 	$(RM) ut20p_1.lst ut20p_1.bin
 	$(RM) ut20p_2.lst ut20p_2.bin

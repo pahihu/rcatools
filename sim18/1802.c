@@ -185,10 +185,11 @@ void timin(void)
                kbflush();
                c &= 0x7F;
                putchar(c); fflush(stdout);
-               SIO_OUT = (c << 3) + 7;
+               SIO_OUT = (c << 1);
+               SIO_OUT |= 0x700;
 // H("sending %03X\r\n",SIO_OUT);
                SIO_DLY = 833; 
-               SIO_OMSK = 1 << 10;
+               SIO_OMSK = 0x0B;
                SIOTX = 1;
            }
            break;
@@ -197,13 +198,13 @@ void timin(void)
                SIO_DLY--;
            else {
                SIO_DLY = 833;
-               if (SIO_OMSK) {
-                   if (SIO_OMSK & SIO_OUT)
+               if (SIO_OMSK && SIO_OMSK--) {
+                   if (1 & SIO_OUT)
                        EF |=  EF4;
                    else
                        EF &= ~EF4;
 // H("sent %d\r\n",EF & EF4);
-                   SIO_OMSK >>= 1;
+                   SIO_OUT >>= 1;
                }
                else
                    SIOTX = 0;
@@ -221,28 +222,26 @@ void timout(Byte data)
    if (0 == SIORX) {
       if ((1 == SIO_IN0) && !bus0) {
          SIO_IN = 0;
-         SIO_IMSK = 1 << 10;
+         SIO_IMSK = 0x0B;
          SIORX = 1;
 // H("begin\r\n");
       }
    }
    if (1 == SIORX) {
-      if (SIO_IMSK) {
-         SIO_IN <<= 1;
-         if (bus0)
-            SIO_IN |= 1;
-         SIO_IMSK >>= 1;
+      if (SIO_IMSK && SIO_IMSK--) {
+         if (bus0) {
+            SIO_IN |= (1 << 10);
+         }
+         SIO_IN >>= 1;
       }
       if (!SIO_IMSK) {
 // H("end\r\n");
-         SIO_IN >>= 3;
-// H("SIO_IN: %c\r\n", SIO_IN);
-         SIO_IN &= 0x7F;
-         putchar(SIO_IN);
-         if (0x0D == SIO_IN)
-            putchar(0x0A);
-         fflush(stdout);
-         SIO_IN = 0; 
+         if (0x300 == (0x300 & SIO_IN)) {
+// H("rcvd %03X\r\n",SIO_IN);
+            SIO_IN &= 0x7F;
+            putchar(SIO_IN);
+            fflush(stdout);
+         }
          SIORX = 0;
       }
    }
