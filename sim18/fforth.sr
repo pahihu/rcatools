@@ -43,8 +43,6 @@
 .... Oct 2016 modified for ASM8 and MicroDOS by DW Schultz	
 .... Includes disk I/O using UT71 calls supporting three disks
 .... 
-.... Nov 2020 modified using Group 2 I/O for CDP18S005 by A Pahi
-....
 ..
 ..   ADDRESS COMMENTS & CORRECTIONS TO  JIM MCDANIEL.
 ..
@@ -188,7 +186,7 @@ RSTACK  EQU 2
         .. SET-UP ROUTINES
         ..
         DIS;DC 0
-        OUT 1;DC 2               .. SET LEVEL 1 I/O
+        OUT 1;DC 1               .. SET LEVEL 1 I/O
         OUT 3;DC 1DH			.. SET UP UART
         LDI 6FH
         PHI 2

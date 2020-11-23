@@ -1,4 +1,4 @@
-// CDP1802
+// CDS II - CDP18S005
 
 /*
  * History
@@ -34,6 +34,7 @@
  *          TIM and FDD interfaces
  *          LPR interface
  * 201123AP FDD interface
+ *          switchable UART iface group
  *
  */
 
@@ -93,6 +94,7 @@ int  TLIO; // Two-level I/O
 Byte SEL;
 int RC;    // Mark Riley, port extender
 int MAPPER[16];
+int GRP_UART = 2; // default UART group
 
 char *m, *ma[16], *a, *aa[16];
 
@@ -123,6 +125,25 @@ char **regs = cdpregs;
 
 FILE *fdd[4];
 int nfdd = 0;
+
+static int ucase(int c)
+{
+   if ('a' <= c && c <= 'z')
+      c = c + 'A' - 'a';
+   return c;
+}
+
+static int ishex(int c)
+{
+   return ('0' <= c && c <= '9') || ('A' <= c && c <= 'F');
+}
+
+static int digit(int c)
+{
+   if (c <= '9')
+      return c - '0';
+   return 10 + c - 'A';
+}
 
 Byte memrd(int addr)
 {
@@ -316,6 +337,8 @@ void fddctrl(Byte data)
       fwrite(DSK.buf, sizeof(Byte), DSK.ptr, fdd[DSK.unit]);
       if (DSK.ptr != s)
          DSK.status |= DE_FAIL;
+      else
+         fflush(fdd[DSK.unit]);
       DSK.ptr = 0;
       break;
    case 0x07: // read CRC
@@ -535,7 +558,7 @@ Byte inp(Byte port)
    if (TLIO)
       switch (port) {
       case 1: return SEL;
-      case 2: if (2 == SEL) {
+      case 2: if (GRP_UART == SEL) {
                  fflush(stdout); // 1854 char in
                  c = getchar();
                  if (c == '\n')
@@ -543,7 +566,7 @@ Byte inp(Byte port)
                  return c;
               }
               break;
-      case 3: if (2 == SEL) {
+      case 3: if (GRP_UART == SEL) {
                  return 0x81; // 1854 status
               }
               break;
@@ -573,12 +596,12 @@ void out(Byte port, Byte data)
    if (TLIO)
       switch (port) {
       case 1: SEL = data; break;
-      case 2: if (2 == SEL) {
+      case 2: if (GRP_UART == SEL) {
                  data &= 0x7F; // 1854 char out
                  putchar(data);
               }
               break;
-      case 3: if (2 == SEL) {
+      case 3: if (GRP_UART == SEL) {
                  ; // 1854 ctrl
               }
               break;
@@ -894,25 +917,6 @@ void xecute(Word p)
          IE = 0;
       }
    } // while
-}
-
-static int ucase(int c)
-{
-   if ('a' <= c && c <= 'z')
-      c = c + 'A' - 'a';
-   return c;
-}
-
-static int ishex(int c)
-{
-   return ('0' <= c && c <= '9') || ('A' <= c && c <= 'F');
-}
-
-static int digit(int c)
-{
-   if (c <= '9')
-      return c - '0';
-   return 10 + c - 'A';
 }
 
 static int issep(int c)
@@ -1324,7 +1328,7 @@ void usage(void)
    fprintf(stderr,"usage: sim18 [-24gmputx] [-bxxxx] [-d -exxxx] [-f<fdd.img>] -s<kbytes> <file>...\n");
    fprintf(stderr,"options:\n");
    fprintf(stderr,"   -2         enable TLIO\n");
-   fprintf(stderr,"   -4         fig-FORTH register names\n");
+   fprintf(stderr,"   -4         fig-FORTH reg names, UART on Grp 1\n");
    fprintf(stderr,"   -bxxxx     disasm/load/start 'begin' address\n");
    fprintf(stderr,"   -d         disassemble only\n");
    fprintf(stderr,"   -exxxx     end address\n");
@@ -1386,7 +1390,7 @@ int main(int argc, char *argv[])
       if (*argv[i] == '-') {
          switch (argv[i][1]) {
          case '2': TLIO = 1; break;
-         case '4': regs = figregs; break;
+         case '4': regs = figregs; GRP_UART = 1; break;
          case 'd': onlydasm = 1; break;
          case 'b': begin = strtol(argv[i] + 2, &endptr, 16); break;
          case 'e': end   = strtol(argv[i] + 2, &endptr, 16); break;
