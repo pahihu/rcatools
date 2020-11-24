@@ -40,6 +40,7 @@
  *          break with Ctrl-C
  *          stop at IDL
  *          fig-FORTH disk read works
+ *          fig-FORTH disk write works
  *
  */
 
@@ -346,9 +347,15 @@ void fddrst(void)
 void fddcyc(void)
 {
    if (DSK.busy && !--DSK.busy) {
+// H("/BSY\r\n");
       DSK.status &= ~DE_BSY;
       DSK.input   = DSK.status;     // update input from disk ctrl
    }
+}
+
+int skipcmd(Byte data)
+{
+   return 0x41 == data || 0x31 == data;
 }
 
 void fddctrl(Byte data)
@@ -356,8 +363,8 @@ void fddctrl(Byte data)
    size_t s;
    int sent;
 
-//   if (data != 0x41)
-//      H("FDD %02X\r\n",data);
+//   if (!skipcmd(data))
+//      H("FDD %02X",data);
 
    sent = 0;
    DSK.cmd = data;
@@ -394,7 +401,7 @@ void fddctrl(Byte data)
             DSK.status |= DE_FAIL;
          else {
             s = fwrite(DSK.wbuf, sizeof(Byte), DSK_BSEC, fdd[DSK.unit]);
-            if (DSK.wptr != s)
+            if (DSK_BSEC != s)
                DSK.status |= DE_FAIL;
             else
                fflush(fdd[DSK.unit]);
@@ -475,8 +482,8 @@ LSEEK:
    if (!sent)
       DSK.input = DSK.status;
 
-//    if (data != 0x41)
-//       H("\n");
+//    if (!skipcmd(data))
+//        H("\r\n");
 }
 
 /*
@@ -733,7 +740,7 @@ void xecute(Word p)
    r[P] = p; done = 0;
    while (!done) {
       if (has_ctrlc()) {
-         H("Ctrl-C pressed!\r\n");
+         H("\r\n\r\nCtrl-C pressed!\r\n");
          done = 1;
          break;
       }
