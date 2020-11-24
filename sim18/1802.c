@@ -35,6 +35,8 @@
  *          LPR interface
  * 201123AP FDD interface
  *          switchable UART iface group
+ * 201124AP FDD interface
+ *          MPM-232 disk geometry & controller
  *
  */
 
@@ -54,6 +56,7 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <string.h>
+#include <errno.h>
 
 #include "curterm.h"
 
@@ -123,7 +126,9 @@ int trace = 0;
 int ut20 = 0;
 char **regs = cdpregs;
 
-FILE *fdd[4];
+#define NFDD   4
+FILE *fdd[NFDD];
+int fddro[NFDD];
 int nfdd = 0;
 
 static int ucase(int c)
@@ -278,10 +283,27 @@ void timout(Byte data)
 /*
  * DSK - CDP18S813
  *
- * 250kbit/s ~ 128byte 1024bit ~ 1000MCLK
- * 10ms one track move ~ 2500MCLK
+ * IBM 33FD
+ *    128 bytes/sector, 26 sectors/track, 77 tracks/disk
+ *    tracks:  0 - 76
+ *    sectors: 1 - 26 
+ *
+ * transfer rate: 250kbit/s
+ *
+ *                      ms    MCL
+ * sector read/write     6    1500
+ * one track move       10    2500
+ * head settling        20    5000
  *
  */
+#define DSK_BSEC      128
+#define DSK_STRK       26
+#define DSK_TRKS       77
+
+#define DSK_RWSECT   1500
+#define DSK_TRSEEK   2500
+#define DSK_HDSETL   5000
+
 struct {
    Byte cmd;
    Byte data;
@@ -290,27 +312,31 @@ struct {
    Byte sector;
    Byte track;
    Byte status;
-   Byte buf[128];
-   Byte ptr;
-   int  delay;
-   Byte ptrack;
+   Byte rbuf[DSK_BSEC], rptr;
+   Byte wbuf[DSK_BSEC], wptr;
+
+   int  busy;       // busy delay;
+   Byte prevtr;     // prev. track to calc seek time
+   long offtr;      // curr. track offset
 } DSK;
 
 #define  DE_BSY   0x01
 #define  DE_CRC   0x08
+#define  DE_WRP   0x10
 #define  DE_FAIL  0x20
 #define  DE_ACT   0x40
 
 void fddrst(void)
 {
-   DSK.delay = 0;
+   DSK.busy   = 0;
    DSK.status = 0;
-   DSK.ptrack = 1;
+   DSK.prevtr = random() % DSK_TRKS;
+   DSK.offtr  = DSK_STRK * DSK_BSEC * DSK.prevtr;
 }
 
 void fddcyc(void)
 {
-   if (DSK.delay && !--DSK.delay)
+   if (DSK.busy && !--DSK.busy)
       DSK.status &= ~DE_BSY;
 }
 
@@ -325,65 +351,96 @@ void fddctrl(Byte data)
       break;
    case 0x03: // read sector
       DSK.status |= DE_BSY;
-      DSK.delay = 1000;
-      s = fread(DSK.buf, sizeof(Byte), 128, fdd[DSK.unit]);
-      if (128 != s)
+      DSK.busy = DSK_RWSECT;
+      s = fseek(fdd[DSK.unit], DSK.offtr+DSK_BSEC*(DSK.sector-1), SEEK_SET);
+      if (!(s < 0)) {
+         s = fread(DSK.rbuf, sizeof(Byte), DSK_BSEC, fdd[DSK.unit]);
+         if (DSK_BSEC != s)
+            DSK.status |= DE_FAIL;
+      }
+      else
          DSK.status |= DE_FAIL;
-      DSK.ptr = 0;
       break;
    case 0x05: // write sector
-      DSK.status |= DE_BSY;
-      DSK.delay = 1000;
-      fwrite(DSK.buf, sizeof(Byte), DSK.ptr, fdd[DSK.unit]);
-      if (DSK.ptr != s)
+      if (DE_WRP & DSK.status)
          DSK.status |= DE_FAIL;
-      else
-         fflush(fdd[DSK.unit]);
-      DSK.ptr = 0;
+      else {
+         DSK.status |= DE_BSY;
+         DSK.busy = DSK_RWSECT;
+         s = fseek(fdd[DSK.unit], DSK.offtr+DSK_BSEC*(DSK.sector-1), SEEK_SET);
+         if (s < 0)
+            DSK.status |= DE_FAIL;
+         else {
+            s = fwrite(DSK.wbuf, sizeof(Byte), DSK_BSEC, fdd[DSK.unit]);
+            if (DSK.wptr != s)
+               DSK.status |= DE_FAIL;
+            else
+               fflush(fdd[DSK.unit]);
+            DSK.wptr = 0;
+         }
+      }
       break;
    case 0x07: // read CRC
       DSK.status |= DE_BSY;
-      DSK.delay = 1000;
+      DSK.busy = DSK_RWSECT;
       DSK.status &= ~DE_CRC;
       break;
    case 0x09: // seek track
+LSEEK:
       DSK.status |= DE_BSY;
-      DSK.delay   = abs(DSK.track - DSK.ptrack) * 2500;
+      DSK.busy  = DSK_HDSETL + abs(DSK.track - DSK.prevtr) * DSK_TRSEEK;
+      DSK.offtr = DSK_STRK * DSK_BSEC * DSK.track;
       s = fseek(fdd[DSK.unit],
-                sizeof(DSK.buf) * ((DSK.track - 1) * 26 + DSK.sector - 1),
+                DSK.offtr,
                 SEEK_SET);
       if (s < 0)
          DSK.status |= DE_FAIL;
       else
-         DSK.ptrack = DSK.track;
+         DSK.prevtr = DSK.track;
       break;
    case 0x0B: // clear error flags
-      DSK.status = 0;
+      DSK.status &= ~(DE_CRC | 0x80);
       break;
-   case 0x11: // load track#, (1 - 76)
+   case 0x0D: // seek 0
+      DSK.track = 0;
+      goto LSEEK;
+      break;
+   case 0x11: // load track#, (0 - 76)
       DSK.status |= DE_BSY;
-      DSK.delay = 12;
+      DSK.busy = 12;
       DSK.track = DSK.data;
-      if (DSK.track > 76)
-         DSK.status |= DE_ACT;
+      if (DSK.track > (DSK_TRKS - 1))
+         DSK.status |= DE_CRC;
       break;
-   case 0x21: // load unit-sec#
-      DSK.unit = FLAG(0x40 & DSK.data);
-      DSK.sector = (0x1F & DSK.data); // 1-26
-      if (!fdd[DSK.unit] || !DSK.sector || DSK.sector > 26)
+   case 0x21: // load unit-sec#, (0 - 3), (1 - 26)
+      DSK.unit = (0xC0 & DSK.data) >> 6;
+      DSK.sector = (0x1F & DSK.data);
+      if (!fdd[DSK.unit])
          DSK.status |= DE_FAIL;
+      else if (!DSK.sector || DSK.sector > DSK_STRK)
+         DSK.status |= DE_CRC;
+      else {
+         DSK.status &= ~0x06;
+         DSK.status |= (DSK.unit << 1);
+         if (fddro[DSK.unit])
+            DSK.status |= DE_WRP;
+      }
       break;
    case 0x31: // load write buffer
-      DSK.buf[DSK.ptr] = DSK.data;
-      DSK.ptr = 0x7F & (DSK.ptr + 1);
+      DSK.wbuf[DSK.wptr] = DSK.data;
+      DSK.wptr = 0x7F & (DSK.wptr + 1);
       break;
    case 0x40: // read buffer
-      DSK.ptr = 0;
-      DSK.input = DSK.buf[DSK.ptr];
+      DSK.rptr = 0;
+      DSK.input = DSK.rbuf[DSK.rptr];
       break;
    case 0x41: // shift read buffer
-      DSK.ptr = 0x7F & (DSK.ptr + 1);
-      DSK.input = DSK.buf[DSK.ptr];
+      DSK.rptr = 0x7F & (DSK.rptr + 1);
+      DSK.input = DSK.rbuf[DSK.rptr];
+      break;
+   case 0x81: // clear
+      DSK.busy = 0;
+      DSK.status &= ~DE_BSY;
       break;
    }
 }
@@ -619,7 +676,7 @@ void out(Byte port, Byte data)
               break;
       case 7: if (1 == SEL) {
                  timout(data);
-                 if (4 & data)
+                 if (0x04 & data) // deselect TLIO
                     TLIO = 0;
               }
               break;
@@ -1208,10 +1265,10 @@ int ut20mon(FILE *inp)
             err = 1;
             if (adr) {
                unit = HI(adr); track = LO(adr);
-               err = unit>3 || track>76 || track<1 || !fdd[unit];
+               err = unit>3 || track>(DSK_TRKS-1) || !fdd[unit];
                if (!err) {
                   H("loading (%X,%2X)...\n", unit, track);
-                  fseek(fdd[unit], (track - 1) * 26 * 128, SEEK_SET);
+                  fseek(fdd[unit], track * DSK_STRK * DSK_BSEC, SEEK_SET);
                   ut20mon(fdd[unit]);
                }
             }
@@ -1368,6 +1425,8 @@ int main(int argc, char *argv[])
    if (argc < 2)
       usage();
 
+   srandom(1802);
+
    regs = cdpregs;
    onlydasm = begin = end = 0;
    ut20 = 0;
@@ -1376,8 +1435,10 @@ int main(int argc, char *argv[])
    MAX_MEM = 64 * 1024;
 
    nfdd = 0;
-   for (i = 0; i < 4; i++)
+   for (i = 0; i < 4; i++) {
       fdd[i] = NULL;
+      fddro[i] = 0;
+   }
 
    TLIO = 0; SEL = 0x00;
 
@@ -1397,6 +1458,12 @@ int main(int argc, char *argv[])
          case 'f':
             if (nfdd < 4) {
                fin = fopen(argv[i]+1, "r+");
+               if (!fin) {
+                  if (EACCES == errno) {
+                     fddro[nfdd] = 1;
+                     fin = fopen(argv[i]+1, "r");
+                  }
+               }
                if (!fin)
                   fprintf(stderr,"no FDD %s",argv[i]+1);
                else
