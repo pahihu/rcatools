@@ -246,6 +246,7 @@ int main(int argc, char *argv[])
 
 	c = 0;
 	prepterm(1);
+        cbreak(0);
 	while (c != 'q') {
 		if (has_key()) {
 			printf("%d ", (c = getkey(0)));
@@ -255,6 +256,10 @@ int main(int argc, char *argv[])
 			}
 			printf("\n");
 		}
+                else if (has_ctrlc()) {
+                        printf("Ctrl-C pressed!\n");
+                        break;
+                }
 	}
 	prepterm(0);
 	return 0;

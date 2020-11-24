@@ -37,6 +37,8 @@
  *          switchable UART iface group
  * 201124AP FDD interface
  *          MPM-232 disk geometry & controller
+ *          break with Ctrl-C
+ *          stop at IDL
  *
  */
 
@@ -124,6 +126,7 @@ static char *figregs[16] = {
 
 int trace = 0;
 int ut20 = 0;
+int noidle = 1; // no IDL processing
 char **regs = cdpregs;
 
 #define NFDD   4
@@ -268,8 +271,8 @@ void timout(Byte data)
       }
       if (!SIO_ICNT) {
 // H("end\r\n");
-         if (0x300 == (0x300 & SIO_IN)) { // detect 2 STOP bits
 // H("rcvd %03X\r\n",SIO_IN);
+         if (0x300 == (0x300 & SIO_IN)) { // detect 2 STOP bits
             SIO_IN &= 0x7F;
             putchar(SIO_IN);
             fflush(stdout);
@@ -294,6 +297,11 @@ void timout(Byte data)
  * sector read/write     6    1500
  * one track move       10    2500
  * head settling        20    5000
+ *
+ * controller capability
+ * -   4 drives
+ * - 128 tracks
+ * -  32 sectors/track
  *
  */
 #define DSK_BSEC      128
@@ -343,25 +351,35 @@ void fddcyc(void)
 void fddctrl(Byte data)
 {
    size_t s;
+   int sent;
 
+// H("FDD %02X\r\n",data);
+
+   sent = 0;
    DSK.cmd = data;
    switch (data) {
    case 0x00: // read status
-      DSK.input = DSK.status;
+      DSK.input = DSK.status; sent = 1;
       break;
    case 0x03: // read sector
-      DSK.status |= DE_BSY;
-      DSK.busy = DSK_RWSECT;
-      s = fseek(fdd[DSK.unit], DSK.offtr+DSK_BSEC*(DSK.sector-1), SEEK_SET);
-      if (!(s < 0)) {
-         s = fread(DSK.rbuf, sizeof(Byte), DSK_BSEC, fdd[DSK.unit]);
-         if (DSK_BSEC != s)
+      if (!fdd[DSK.unit])
+         DSK.status |= DE_FAIL;
+      else {
+         DSK.status |= DE_BSY;
+         DSK.busy = DSK_RWSECT;
+         s = fseek(fdd[DSK.unit], DSK.offtr+DSK_BSEC*(DSK.sector-1), SEEK_SET);
+         if (!(s < 0)) {
+            s = fread(DSK.rbuf, sizeof(Byte), DSK_BSEC, fdd[DSK.unit]);
+            if (DSK_BSEC != s)
+               DSK.status |= DE_FAIL;
+         }
+         else
             DSK.status |= DE_FAIL;
       }
-      else
-         DSK.status |= DE_FAIL;
       break;
    case 0x05: // write sector
+      if (!fdd[DSK.unit])
+         DSK.status |= DE_FAIL;
       if (DE_WRP & DSK.status)
          DSK.status |= DE_FAIL;
       else {
@@ -387,16 +405,18 @@ void fddctrl(Byte data)
       break;
    case 0x09: // seek track
 LSEEK:
-      DSK.status |= DE_BSY;
-      DSK.busy  = DSK_HDSETL + abs(DSK.track - DSK.prevtr) * DSK_TRSEEK;
-      DSK.offtr = DSK_STRK * DSK_BSEC * DSK.track;
-      s = fseek(fdd[DSK.unit],
-                DSK.offtr,
-                SEEK_SET);
-      if (s < 0)
+      if (!fdd[DSK.unit])
          DSK.status |= DE_FAIL;
-      else
-         DSK.prevtr = DSK.track;
+      else {
+         DSK.status |= DE_BSY;
+         DSK.busy  = DSK_HDSETL + abs(DSK.track - DSK.prevtr) * DSK_TRSEEK;
+         DSK.offtr = DSK_STRK * DSK_BSEC * DSK.track;
+         s = fseek(fdd[DSK.unit], DSK.offtr, SEEK_SET);
+         if (s < 0)
+            DSK.status |= DE_FAIL;
+         else
+            DSK.prevtr = DSK.track;
+      }
       break;
    case 0x0B: // clear error flags
       DSK.status &= ~(DE_CRC | 0x80);
@@ -432,17 +452,20 @@ LSEEK:
       break;
    case 0x40: // read buffer
       DSK.rptr = 0;
-      DSK.input = DSK.rbuf[DSK.rptr];
+      DSK.input = DSK.rbuf[DSK.rptr]; sent = 1;
       break;
    case 0x41: // shift read buffer
       DSK.rptr = 0x7F & (DSK.rptr + 1);
-      DSK.input = DSK.rbuf[DSK.rptr];
+      DSK.input = DSK.rbuf[DSK.rptr]; sent = 1;
       break;
    case 0x81: // clear
       DSK.busy = 0;
       DSK.status &= ~DE_BSY;
       break;
    }
+   // send status
+   if (!sent)
+      DSK.input = DSK.status;
 }
 
 /*
@@ -698,11 +721,17 @@ void xecute(Word p)
 
    r[P] = p; done = 0;
    while (!done) {
+      if (has_ctrlc()) {
+         H("Ctrl-C pressed!\r\n");
+         done = 1;
+         break;
+      }
+
       if (trace) {
          H("\n"); dasm(r[P]);
          H("\n"); prinregs();
-         // if ('Q' == getchar())
-         //     break;
+         if ('Q' == getchar())
+            break;
       }
       W = memrd(r[P]); r[P]++; cycle();
       I = Hi(W); N = Lo(W);
@@ -711,7 +740,8 @@ void xecute(Word p)
          if (0==N) {
             // IDL, idle
             // wait for DMA or INT;
-            if (ut20) {
+            if (noidle) {
+               H("idle\r\n");
                fflush(stdout);
                done = 1;
             }
@@ -974,6 +1004,8 @@ void xecute(Word p)
          IE = 0;
       }
    } // while
+   prinregs();
+   fflush(stdout);
 }
 
 static int issep(int c)
@@ -1120,10 +1152,10 @@ int ut20mon(FILE *inp)
    FILE *out;
 
    err = 0; utc = 0; bytes = 0;
-   H("* ");
+   H("*");
    while (!feof(inp)) {
       if (utc == '\n') {
-         H("* ");
+         H("*");
          utc = utget(inp);
       }
       while (utc != EOF && utc != '?' && utc != '!' && utc != '$')
@@ -1358,14 +1390,13 @@ void fini(void)
    int i;
 
    prepterm(0);
-   if (!lpr)
+   if (lpr)
       fclose(lpr);
    if (MCLK)
       printf("MCLK = %d\n", MCLK);
-   for (i = 0; i < 4; i++)
+   for (i = 0; i < NFDD; i++)
       if (fdd[i])
          fclose(fdd[i]);
-   exit(0);
 }
 
 void storage(void)
@@ -1382,7 +1413,7 @@ void storage(void)
 
 void usage(void)
 {
-   fprintf(stderr,"usage: sim18 [-24gmputx] [-bxxxx] [-d -exxxx] [-f<fdd.img>] -s<kbytes> <file>...\n");
+   fprintf(stderr,"usage: sim18 [-24gimputx] [-bxxxx] [-d -exxxx] [-f<fdd.img>] -s<kbytes> <file>...\n");
    fprintf(stderr,"options:\n");
    fprintf(stderr,"   -2         enable TLIO\n");
    fprintf(stderr,"   -4         fig-FORTH reg names, UART on Grp 1\n");
@@ -1391,6 +1422,7 @@ void usage(void)
    fprintf(stderr,"   -exxxx     end address\n");
    fprintf(stderr,"   -f<fdd>    use disk file (max. 4)\n");
    fprintf(stderr,"   -g         GLL-MAG register names\n");
+   fprintf(stderr,"   -i         enable IDL processing\n");
    fprintf(stderr,"   -m         set M-rec fmt\n");
    fprintf(stderr,"   -p<file>   lpr file name, default \"lpr.out\"\n");
    fprintf(stderr,"   -s<kbytes> memory size (default 64KB)\n");
@@ -1431,6 +1463,7 @@ int main(int argc, char *argv[])
    onlydasm = begin = end = 0;
    ut20 = 0;
    trace = 0;
+   noidle = 1;
    readdat = readbin;
    MAX_MEM = 64 * 1024;
 
@@ -1473,6 +1506,7 @@ int main(int argc, char *argv[])
                fprintf(stderr,"max. 4 FDDs\n");
             break;
          case 'g': regs = gllregs; break;
+         case 'i': noidle = 0; break;
          case 'm': readdat = readidi; break;
          case 'p': strcpy(lprnm, argv[i]+2);
                    break;
@@ -1516,6 +1550,7 @@ int main(int argc, char *argv[])
    else {
       if (TLIO) {
          prepterm(1);
+         cbreak(0);
          timrst();
          fddrst();
       }
