@@ -9,12 +9,23 @@ manual.
 The included `.sr' ASM source files can be assembled
 with the included A18 assembler.
 
+The fforth.sr and fforth.img disk file is from DW Schultz' 
+MicroDOS package (http://web.archive.org/web/20191012004706/http://home.earthlink.net/~schultdw/1802/microdos/index.html). I have replaced
+the UT71 monitor calls with the original UT20 calls found in
+http://www.forth.org/fig-forth/fig-forth_1802.pdf.
+
+The original fig-FORTH uses the CD1854 UART on Group 1.
+The CDP18S005 by default uses the UART on Group 2, although
+the UT20 ROM does not include support for it (UT21 does).
+Hence the -4 switch for the simulator to configure the
+register display using the fig-FORTH virtual registers and
+reconfigure the UART using Group 1 I/O.
+
 
 To run fig-FORTH execute
 
-        make fforth.idi
-        sim18 -2 -4 -u -m fforth.idi
-        *$u
+        make ut20.rom fforth.idi
+        ./fig
 
 To run the original UT20 monitor
 
@@ -23,4 +34,4 @@ To run the original UT20 monitor
 
 
 
-pahihu 23 / 11 / 2020
+pahihu 24 / 11 / 2020

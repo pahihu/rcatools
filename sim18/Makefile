@@ -4,7 +4,7 @@ LDFLAGS = #-g
 SRCS = 1802.c curterm.c
 OBJS = $(SRCS:.c=.o)
 
-all: sim18
+all: sim18 ut20.rom fforth.idi
 
 sim18: $(OBJS)
 	$(CC) $(LDFLAGS) -o $@ $(OBJS)

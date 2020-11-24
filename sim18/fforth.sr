@@ -43,6 +43,9 @@
 .... Oct 2016 modified for ASM8 and MicroDOS by DW Schultz	
 .... Includes disk I/O using UT71 calls supporting three disks
 .... 
+.... Nov 2020 modified bye A Pahi
+.... Original disk I/O using UT20 calls
+....
 ..
 ..   ADDRESS COMMENTS & CORRECTIONS TO  JIM MCDANIEL.
 ..
@@ -3426,107 +3429,166 @@ BLOC1   DC RG
         DC PLUS2
         DC SEMIS
         ..
-        .. Updated for UT71 and 3.5 inch disks
-        DC 83H,52H,2FH,0D7H .. R/W
-        DC BLOCK - 8
-RSLW    DC NEST
-        DC SWAP
-        DC LIT
-        DC 315
-        DC PLUS
-        DC LIT
-        DC 315             .. 315 screens/disk
-        DC SLMOD
-        DC DUP
-        DC LIT
-        DC 0002H           .. 3 disk drives
-        DC GTR
-        DC LIT
-        DC 0005H
-        DC QERR
-
-        DC DV
-        DC CEX
-        DC DUP             .. convert screen number to PSN
-        DC PLUS
-        DC DV              .. and store in parameter block
-        DC LIT
-        DC 0001H
-        DC PLUS
-        DC EX
-        DC SWAP            .. store buffer address
-        DC DV
-        DC LIT
-        DC 0003H
-        DC PLUS
-        DC EX
-        DC ZBRCH
-        DC RWELSE
-        DC BLKRD
-        DC BRCH
-        DC RWEND
-RWELSE  DC BLKWT
-RWEND   DC SEMIS
-
-SEEKS    EQU 87F6H
-READTRS  EQU 87DBH
-WRITETRS EQU 87DEH
-
-        DC 0AH,'BLOCK-REA',0C4H .. BLOCKREAD
-        DC RSLW - 6
-BLKRD   DC $ + 2
-        LDI 70H                 .. DV
-        PHI RF
-        LDI 32H
-        PLO RF
+        DB 83H,52H,2FH,0D7H .. R/W
+        DW BLOCK - 8
+RSLW:   DW NEST
+        DW SWAP
+        DW LIT
+        DW $00FA
+        DW SLMOD
+        DW DUP
+        DW LIT
+        DW $0003
+        DW GTR
+        DW LIT
+        DW $0005
+        DW QERR
+        DW SWAP
+        DW LIT
+        DW $0008
+        DW STAR
+        DW LIT
+        DW $0001
+        DW PLUS
+        DW LIT
+        DW $001A
+        DW SLMOD
+        DW DV
+        DW CEX
+        DW ONE
+        DW MINS
+        DW SWAP
+        DW LIT
+        DW $0040
+        DW STAR
+        DW PLUS
+        DW DV
+        DW PLUS1
+        DW CEX
+        DW ZERO
+        DW DV
+        DW PLUS2
+        DW CEX
+        DW DV
+        DW BBUF
+        DW ROT
+        DW ZBRCH
+        DW RWELSE
+        DW BLKRD
+        DW BRCH
+        DW RWEND
+RWELSE: DW BLKWT
+RWEND:  DW SEMIS
         ..
-        SEX R2         .. save RD
-        GHI RD
+        DB 0AH,"BLOCK-REA",0C4H .. BLOCKREAD
+        DW RSLW - 6
+BLKRD:  DW $ + 2
+        LDI $83
+        PHI R4
+        PHI R5
+        LDI $64
+        PLO R4
+        LDI $74
+        PLO R5
+        ..
+        SEX R2
+        GHI RC
         STXD
-        GLO RD
+        GLO RC
         STXD
-
-BLKRD2  CALL SEEKS
-        LDN RF         .. get unit number
-        ADI 20H        .. read two sectors
-        STR RF
-        CALL READTRS
+        LDA R9
+        PHI R7
+        LDN R9
+        PLO R7
+        DEC R9
+        DEC R9
+        LDN R9
+        PLO RC
+        DEC R9
+        LDN R9
+        PHI RC
+        INC RC
+        INC RC
+        DEC R9
+        LDN R9
+        PLO R8
+        DEC R9
+        LDN R9
+        PHI R8
+        DEC R9
+        DEC R9
+BLKRD2: SEP R4
+        DW 8502H
+        GHI RF
+        STR R8
+        INC R8
+        DEC R7
+        GHI R7
+        LBNZ BLKRD2
+        GLO R7
+        LBNZ BLKRD2
         ..
         SEX R2
         IRX
         LDXA
-        PLO RD
+        PLO RC
         LDX
-        PHI RD
+        PHI RC
         SEP RC
         ..
-        DC 0BH,'BLOCK-WRIT',0C5H .. BLOCK-WRITE
-        DC BLKRD - 13
-BLKWT   DC $ + 2
-        LDI 70H                 .. DV
-        PHI RF
-        LDI 32H
-        PLO RF
-        LDI 74H
+        DB 0BH,"BLOCK-WRIT",0C5H .. BLOCK-WRITE
+        DW BLKRD - 13
+BLKWT:  DW $ + 2
+        LDI $83
+        PHI R4
+        PHI R5
+        LDI $64
+        PLO R4
+        LDI $74
+        PLO R5
         ..
         SEX R2
-        GHI RD
+        GHI RC
         STXD
-        GLO RD
+        GLO RC
         STXD
-
-        CALL SEEKS
-        LDN RF         .. get unit number
-        ADI 20H        .. write two sectors
-        STR RF
-        CALL WRITETRS
+        LDA R9
+        PHI R7
+        LDN R9
+        PLO R7
+        DEC R9
+        DEC R9
+        LDN R9
+        PLO RC
+        DEC R9
+        LDN R9
+        PHI RC
+        INC RC
+        INC RC
+        DEC R9
+        LDN R9
+        PLO R8
+        DEC R9
+        LDN R9
+        PHI R8
+        DEC R9
+        DEC R9
+BLKWT2: LDA R8
+        PHI RF
+        SEP R4
+        DW 8500H
+        DEC R7
+        GHI R7
+        LBNZ BLKWT2
+        GLO R7
+        LBNZ BLKWT2
         ..
         SEX R2
         IRX
         LDXA
-        PLO RD
+        PLO RC
         LDX
-        PHI RD
+        PHI RC
         SEP RC
         ..
         DC 84H,'LOA',0C4H .. LOAD

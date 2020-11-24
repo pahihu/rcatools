@@ -39,6 +39,7 @@
  *          MPM-232 disk geometry & controller
  *          break with Ctrl-C
  *          stop at IDL
+ *          fig-FORTH disk read works
  *
  */
 
@@ -344,8 +345,10 @@ void fddrst(void)
 
 void fddcyc(void)
 {
-   if (DSK.busy && !--DSK.busy)
+   if (DSK.busy && !--DSK.busy) {
       DSK.status &= ~DE_BSY;
+      DSK.input   = DSK.status;     // update input from disk ctrl
+   }
 }
 
 void fddctrl(Byte data)
@@ -353,7 +356,8 @@ void fddctrl(Byte data)
    size_t s;
    int sent;
 
-// H("FDD %02X\r\n",data);
+//   if (data != 0x41)
+//      H("FDD %02X\r\n",data);
 
    sent = 0;
    DSK.cmd = data;
@@ -410,6 +414,7 @@ LSEEK:
       else {
          DSK.status |= DE_BSY;
          DSK.busy  = DSK_HDSETL + abs(DSK.track - DSK.prevtr) * DSK_TRSEEK;
+// H(" BSY=%04X", DSK.busy);
          DSK.offtr = DSK_STRK * DSK_BSEC * DSK.track;
          s = fseek(fdd[DSK.unit], DSK.offtr, SEEK_SET);
          if (s < 0)
@@ -429,12 +434,14 @@ LSEEK:
       DSK.status |= DE_BSY;
       DSK.busy = 12;
       DSK.track = DSK.data;
+// H(" T=%02X", DSK.track);
       if (DSK.track > (DSK_TRKS - 1))
          DSK.status |= DE_CRC;
       break;
    case 0x21: // load unit-sec#, (0 - 3), (1 - 26)
       DSK.unit = (0xC0 & DSK.data) >> 6;
       DSK.sector = (0x1F & DSK.data);
+// H(" U/S=%02X U=%X S=%02X", DSK.data, DSK.unit, DSK.sector);
       if (!fdd[DSK.unit])
          DSK.status |= DE_FAIL;
       else if (!DSK.sector || DSK.sector > DSK_STRK)
@@ -442,6 +449,7 @@ LSEEK:
       else {
          DSK.status &= ~0x06;
          DSK.status |= (DSK.unit << 1);
+         DSK.status |= DE_ACT;
          if (fddro[DSK.unit])
             DSK.status |= DE_WRP;
       }
@@ -466,6 +474,9 @@ LSEEK:
    // send status
    if (!sent)
       DSK.input = DSK.status;
+
+//    if (data != 0x41)
+//       H("\n");
 }
 
 /*
@@ -1490,15 +1501,15 @@ int main(int argc, char *argv[])
          case 'e': end   = strtol(argv[i] + 2, &endptr, 16); break;
          case 'f':
             if (nfdd < 4) {
-               fin = fopen(argv[i]+1, "r+");
+               fin = fopen(argv[i]+2, "r+");
                if (!fin) {
                   if (EACCES == errno) {
                      fddro[nfdd] = 1;
-                     fin = fopen(argv[i]+1, "r");
+                     fin = fopen(argv[i]+2, "r");
                   }
                }
                if (!fin)
-                  fprintf(stderr,"no FDD %s",argv[i]+1);
+                  fprintf(stderr,"no FDD %s",argv[i]+2);
                else
                   fdd[nfdd++] = fin;
             }
