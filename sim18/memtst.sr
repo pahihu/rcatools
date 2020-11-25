@@ -8,86 +8,39 @@ PTR=#02         .. MEMORY LOCATION
 PC=#03
 TST=#07         .. TEST#
 VAL=#08         .. VALUE WRITTEN
+SUB=#09         .. SUBR. ADDRESS
 
         ORG#0000
 
         DIS,#33                 .. X=P=3
         SEX PTR                 .. X=PTR
-        LDI #01 ;PLO TST        .. TST=#01
-        GHI PC ;PHI PTR
+        GHI PC ;PLO TST         .. CLEAR TST,PTR,SUB
+        PHI PTR ;PHI SUB
 ..
 ..  WRITE 00 TO ALL LOCATIONS AND CHECK
 ..
-TST1:   LDI A.0(START) ;PLO PTR .. PTR=START
-        GHI PC ;PLO VAL         .. VAL=#00
-WILE1:  GLO PTR                 .. PTR=0 ?
-        BNZ BODY1
-        GHI PTR
-        BZ TST2
-BODY1:  GLO VAL ;STR PTR        .. M[PTR]=VAL
-        ADD                     .. D=D+M[PTR]
-        BNZ FAIL                .. FAIL IF NE
-        INC PTR
-        BR WILE1
+        LDI A.0(WRALL) ;PLO SUB .. SUB=WRALL
+        GHI PC ;SHR ;SEP SUB    .. D=#00, DF=0, CALL WRALL
 ..
 ..  WRITE FF TO ALL LOCATIONS AND CHECK
 ..
-TST2:   INC TST                 .. TST=#02
-        LDI A.0(START) ;PLO PTR
-        LDI #FF ;PLO VAL        .. VAL=#FF
-WILE2:  GLO PTR
-        BNZ BODY2
-        GHI PTR
-        BZ TST3
-BODY2:  GLO VAL ;STR PTR
-        XOR
-        BNZ FAIL
-        INC PTR
-        BR WILE2
+        LDI A.0(WRALL) ;PLO SUB .. SUB=WRALL
+        LDI #FF ;SEP SUB        .. D=#FF, CALL WRALL
 ..
 ..  WRITE PAGE NUMBER TO ALL CELLS
 ..
-TST3:   INC TST                 .. TST=#03
-        LDI A.0(START) ;PLO PTR .. PTR=START
-WILE3:  GLO PTR
-        BNZ BODY3
-        GHI PTR
-        BZ TST4
-BODY3:  GHI PTR ;STR PTR        .. SAVE PAGE#
-        XOR
-        BNZ FAIL
-        INC PTR
-        BR WILE3
+        LDI A.0(WRPAG); PLO SUB .. SUB=WRPAG
+        SEP SUB                 .. DF STILL 0, CALL WRPAG
 ..
 ..  WRITE INVERSE PAGE NUMBER TO ALL CELLS
 ..
-
-TST4:   INC TST                 .. TST=#04
-        LDI A.0(START) ;PLO PTR .. PTR=START
-WILE4:  GLO PTR
-        BNZ BODY4
-        GHI PTR
-        BZ TST5
-BODY4:  GHI PTR ;XRI #FF ;STR PTR.. SAVE INVERSE PAGE#
-        XOR
-        BNZ FAIL
-        INC PTR
-        BR WILE4
+        LDI A.0(WRPAG) ;PLO SUB .. SUB=WRPAG
+        SMI #00 ;SEP SUB        .. DF=1, CALL WRPAG
 ..
 ..  WRITE SEQ NUMBER TO ALL CELLS
 ..
-TST5:   INC TST                 .. TST=#05
-        LDI A.0(START) ;PLO PTR .. PTR=START
-        GHI PC ;PLO VAL         .. VAL=#00
-WILE5:  GLO PTR
-        BNZ BODY5
-        GHI PTR
-        BZ TST6
-BODY5:  GLO VAL ;STR PTR         .. SAVE SEQ NUMBER
-        XOR
-        BNZ FAIL
-        INC PTR ;INC VAL
-        BR WILE5
+        LDI A.0(WRALL) ;PLO SUB .. SUB=WRALL
+        SEP SUB                 .. DF STILL 1, CALL WRALL
 ..
 .. WRITE ALL VALUES TO ALL CELLS
 ..
@@ -112,5 +65,43 @@ FAIL:   LDI #DE ;PHI 4          .. #4=#DEAD
 OK:     LDI #60 ;PHI 4          .. #4=#600D
         LDI #0D ;PLO 4
         IDL                     .. STOP
-START:  NOP
+..
+..  WRALL - WRITE D TO ALL LOCS AND CHK
+..  IF DF=1 INCREMENT VAL
+..
+WRALL:  INC TST                 .. BUMP TEST#
+        PLO VAL                 .. SAVE D
+        LDI A.0(START) ;PLO PTR .. PTR=START
+WILE1:  GLO PTR                 .. PTR=0 ?
+        BNZ BODY1
+        GHI PTR
+        BZ RET1
+BODY1:  GLO VAL ;STR PTR        .. SAVE VAL
+        XOR                     .. CHK
+        BNZ FAIL                .. FAIL IF NEQU
+        INC PTR                 .. INCR. PTR
+        BNF WILE1               .. IF DF=1
+        INC VAL                 ..   INCR.VAL
+        BR WILE1
+RET1:   SEP PC                  .. RETURN
+..
+..  WRPAG - WRITE PAGE# TO ALL LOCS AND CHK
+..  IF DF=1 INVERT PAGE NUMBER
+..
+WRPAG:  INC TST                 .. BUMP TEST#
+        LDI A.0(START) ;PLO PTR .. PTR=START
+WILE2:  GLO PTR
+        BNZ BODY2
+        GHI PTR
+        BZ RET2
+BODY2:  GHI PTR                 .. GET PAGE#
+        LSNF ;XRI #FF           .. IF DF=0 DON'T INVERT
+        STR PTR                 .. SAVE PAGE#
+        XOR                     .. CHK
+        BNZ FAIL                .. FAIL IF NEQU
+        INC PTR                 .. INCREMENT PTR
+        BR WILE2
+RET2:   SEP PC                  .. RETURN
+
+START:  NOP                     .. MEMTEST STARTS HERE
         END

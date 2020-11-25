@@ -41,6 +41,7 @@
  *          stop at IDL
  *          fig-FORTH disk read works
  *          fig-FORTH disk write works
+ * 201125AP BUT40 brkptr $Badr 
  *
  */
 
@@ -126,7 +127,7 @@ static char *figregs[16] = {
    "IPC", "UP ", "RE ", "DSK"
 };
 
-int trace = 0;
+int trace = 0, brkadr = 0;
 int ut20 = 0;
 int noidle = 1; // no IDL processing
 char **regs = cdpregs;
@@ -744,11 +745,15 @@ void xecute(Word p)
          done = 1;
          break;
       }
-
+      if (brkadr && brkadr == r[P])
+         trace = 1;
       if (trace) {
          H("\n"); dasm(r[P]);
          H("\n"); prinregs();
-         if ('Q' == getchar())
+         cond = ucase(getchar());
+         if ('C' == cond)
+            trace = 0;
+         else if ('Q' == cond)
             break;
       }
       W = memrd(r[P]); r[P]++; cycle();
@@ -1289,7 +1294,11 @@ int ut20mon(FILE *inp)
          break;
       case '$':
          utc = utget(inp);
-         if (utc == 'U' || utc == 'P') {
+         if (utc == 'B') {
+            utc = utget(inp);
+            brkadr = utadr(inp);
+         } 
+         else if (utc == 'U' || utc == 'P') {
             cmd = utc;
             utc = utget(inp);
             adr = utadr(inp);
@@ -1445,7 +1454,7 @@ void usage(void)
    fprintf(stderr,"   -p<file>   lpr file name, default \"lpr.out\"\n");
    fprintf(stderr,"   -s<kbytes> memory size (default 64KB)\n");
    fprintf(stderr,"   -t         trace\n");
-   fprintf(stderr,"   -u         start BUT20 (?DMR,!AM,$LPQUXY)\n");
+   fprintf(stderr,"   -u         start BUT20 (?DMR,!AM,$BLPQUXY)\n");
    fprintf(stderr,"   -x         Mark Riley's port extender+mapper\n");
    fprintf(stderr,"   file       load bin/M-rec fmt at 'begin' adr\n");
    fprintf(stderr,"\n");
@@ -1455,6 +1464,7 @@ void usage(void)
    fprintf(stderr,"   ?R                        register dump\n");
    fprintf(stderr,"   !Aadr instr[, instr..]    1-line asm\n");
    fprintf(stderr,"   !Madr bytes[,; bytes..]   memory entry\n");
+   fprintf(stderr,"   $Badr                     set brkptr, 0 disable\n");
    fprintf(stderr,"   $L                        load (unit,track)\n");
    fprintf(stderr,"   $Padr                     xecute\n");
    fprintf(stderr,"   $Q                        quit\n");
