@@ -10,6 +10,9 @@ sim18: $(OBJS)
 	$(CC) $(LDFLAGS) -o $@ $(OBJS)
 	ls -l $@
 
+#
+# GLL-MAG ROM
+#
 rom.xxd: rom.txt
 	awk -f cvt.awk rom.txt > rom.xxd
 
@@ -19,13 +22,22 @@ rom.bin: rom.xxd
 rom.dis: rom.bin
 	d18 -b0000 -e0200 -rrom.bin -2 > rom.dis
 
+#
+# microFORTH nucleus
+#
 nucleus.bin: nucleus.asm
 	a18 nucleus.asm -L nucleus.lst -b $@
 	ls -l $@
 
+#
+# fig-FORTH
+#
 fforth.idi: fforth.sr
 	a18 fforth.sr -r -m $@
 
+#
+# UT20 ROM
+#
 ut20p_1.bin: ut20p_1.sr
 	a18 ut20p_1.sr -r -f 0C4H -L ut20p_1.lst -b ut20p_1.bin
 

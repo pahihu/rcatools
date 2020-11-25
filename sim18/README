@@ -33,5 +33,20 @@ To run the original UT20 monitor
         ./ut20
 
 
+pahihu 25 / 11 / 2020
 
-pahihu 24 / 11 / 2020
+
+
+Files
+=====
+memtst.sr       memory tester source
+CHKOUT.HEX      CDS II checkout program
+MEMTST.HEX      Elf/OS-style memory tester
+FFORTH.HEX      fig-FORTH M-record fmt
+UT20.HEX        UT20 ROM M-record fmt
+MEMCLR.HEX      Program 2.1 in SCIP
+MEMSEQ.HEX      Program 2.2 in SCIP
+SLOBLINK.HEX    Program 2.3 in SCIP
+CONDBR.HEX      Program 3.10 in SCIP
+
+SCIP: A Short Course In Programming by Tom Pittman

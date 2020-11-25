@@ -1,0 +1,116 @@
+..
+..  ELF/OS STYLE MEMORY TESTER.
+..
+..  R4 CONTAINS '600D' IF ALL TESTS PASSED
+..  ELSE 'DEAD' WHEN A TEST WENT WRONG
+..
+PTR=#02         .. MEMORY LOCATION
+PC=#03
+TST=#07         .. TEST#
+VAL=#08         .. VALUE WRITTEN
+
+        ORG#0000
+
+        DIS,#33                 .. X=P=3
+        SEX PTR                 .. X=PTR
+        LDI #01 ;PLO TST        .. TST=#01
+        GHI PC ;PHI PTR
+..
+..  WRITE 00 TO ALL LOCATIONS AND CHECK
+..
+TST1:   LDI A.0(START) ;PLO PTR .. PTR=START
+        GHI PC ;PLO VAL         .. VAL=#00
+WILE1:  GLO PTR                 .. PTR=0 ?
+        BNZ BODY1
+        GHI PTR
+        BZ TST2
+BODY1:  GLO VAL ;STR PTR        .. M[PTR]=VAL
+        ADD                     .. D=D+M[PTR]
+        BNZ FAIL                .. FAIL IF NE
+        INC PTR
+        BR WILE1
+..
+..  WRITE FF TO ALL LOCATIONS AND CHECK
+..
+TST2:   INC TST                 .. TST=#02
+        LDI A.0(START) ;PLO PTR
+        LDI #FF ;PLO VAL        .. VAL=#FF
+WILE2:  GLO PTR
+        BNZ BODY2
+        GHI PTR
+        BZ TST3
+BODY2:  GLO VAL ;STR PTR
+        XOR
+        BNZ FAIL
+        INC PTR
+        BR WILE2
+..
+..  WRITE PAGE NUMBER TO ALL CELLS
+..
+TST3:   INC TST                 .. TST=#03
+        LDI A.0(START) ;PLO PTR .. PTR=START
+WILE3:  GLO PTR
+        BNZ BODY3
+        GHI PTR
+        BZ TST4
+BODY3:  GHI PTR ;STR PTR        .. SAVE PAGE#
+        XOR
+        BNZ FAIL
+        INC PTR
+        BR WILE3
+..
+..  WRITE INVERSE PAGE NUMBER TO ALL CELLS
+..
+
+TST4:   INC TST                 .. TST=#04
+        LDI A.0(START) ;PLO PTR .. PTR=START
+WILE4:  GLO PTR
+        BNZ BODY4
+        GHI PTR
+        BZ TST5
+BODY4:  GHI PTR ;XRI #FF ;STR PTR.. SAVE INVERSE PAGE#
+        XOR
+        BNZ FAIL
+        INC PTR
+        BR WILE4
+..
+..  WRITE SEQ NUMBER TO ALL CELLS
+..
+TST5:   INC TST                 .. TST=#05
+        LDI A.0(START) ;PLO PTR .. PTR=START
+        GHI PC ;PLO VAL         .. VAL=#00
+WILE5:  GLO PTR
+        BNZ BODY5
+        GHI PTR
+        BZ TST6
+BODY5:  GLO VAL ;STR PTR         .. SAVE SEQ NUMBER
+        XOR
+        BNZ FAIL
+        INC PTR ;INC VAL
+        BR WILE5
+..
+.. WRITE ALL VALUES TO ALL CELLS
+..
+TST6:   INC TST                 .. TST=#06
+        LDI A.0(START) ;PLO PTR .. PTR=START
+WILE6:  GLO PTR
+        BNZ BODY6
+        GHI PTR
+        BZ OK
+BODY6:  GHI PC ;PLO VAL         .. VAL=#00
+LOOP:   STR PTR                 .. SAVE VAL
+        XOR
+        BNZ FAIL
+        INC VAL                 .. VAL=VAL+1
+        GLO VAL
+        BNZ LOOP                .. BACK TO LOOP IF VAL#0
+        INC PTR
+        BR WILE6
+FAIL:   LDI #DE ;PHI 4          .. #4=#DEAD
+        LDI #AD ;PLO 4
+        IDL
+OK:     LDI #60 ;PHI 4          .. #4=#600D
+        LDI #0D ;PLO 4
+        IDL                     .. STOP
+START:  NOP
+        END
