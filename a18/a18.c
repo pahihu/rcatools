@@ -112,9 +112,10 @@ parse the source line convert it into the object bytes that it represents.
 /* Turbo C has "line" as graphic function HRJ */
 
 char errcode, lline[MAXLINE + 1], title[MAXLINE];
-int pass = 0;
+int pass = 0, newpass;
 int eject, filesp, forwd, listhex, caphex = 1, lineno;
-int comment = ';', multisep = '!', ut4mon = 0;
+int comment = ';', multisep = '!', ut4mon = 0, autobr = 0;
+unsigned cvtlo = 0;
 unsigned address, bytes, errors, listleft, pagelen, pc;
 unsigned line_bytes, line_obj[MAXLINE], *obj;
 unsigned filler;
@@ -149,9 +150,10 @@ static int done, extend, ifsp, off;
 static
 void usage(void)
 {
-  fprintf(stderr,"usage: a18 <file.asm> [-f number] [-i] [-r] [-l|-L|-m file.lst] [-o file.hex] [-b file.bin] [-x file.exp]\n");
+  fprintf(stderr,"usage: a18 <file.asm> [-f number] [-air] [-l|-L|-m file.lst] [-o file.hex] [-b file.bin] [-x file.exp]\n");
   fprintf(stderr,"       -f <number>    use low byte of number as filler\n");
   fprintf(stderr,"       -h             usage\n");
+  fprintf(stderr,"       -a             convert SBR/LBR\n");
   fprintf(stderr,"       -i             ignore case in labels\n");
   fprintf(stderr,"       -r             define register names R1..RF\n");
   fprintf(stderr,"       -m file.idi    listing file in IDIOT/UT4 format\n");
@@ -175,6 +177,7 @@ int do_line(int prn, int oldcont)
     obj = &line_obj[line_bytes];
     for (i = 0; i < 2*BIGINST; obj[i++] = NOP);
 
+    newpass = pass;
     cont = asm_line(oldcont);
     pc = word(pc + bytes);
     line_bytes += bytes;
@@ -186,6 +189,7 @@ int do_line(int prn, int oldcont)
             }
 	}
     }
+    pass = newpass;
     return cont;
 }
 
@@ -217,6 +221,9 @@ char **argv;
 		case 'h':
 		case 'H':   usage();
 			    break;
+                case 'a':
+                case 'A':   autobr = 1;
+                            break;
 		case 'i':
 		case 'I':   symcmp = strcasecmp;
 			    break;
@@ -438,8 +445,8 @@ static void normal_op(void)
     SCRATCH unsigned attrib, *objp, operand;
     unsigned expr(void);
     TOKEN *lex(void);
-    void do_label(void), unlex(void);
-    SCRATCH int cvt;
+    void do_label(void), unlex(void), clear_symbols(unsigned);
+    SCRATCH int cvt, done;
     SCRATCH unsigned c0de; 
 
     do_label();
@@ -454,6 +461,7 @@ static void normal_op(void)
         *objp++ = opcod -> valu;  objp[0] = objp[1] = 0;
     }
 
+    cvt = done = 0;
     while (attrib & (REGTYP + NUMTYP)) {
 	operand = expr();
         DIAG(printf(" attrib=%d operand=%d",attrib,operand));
@@ -468,33 +476,55 @@ static void normal_op(void)
 			    break;
 
 	    case NONE:	    switch (attrib & NUMTYP) { /*none was null HRJ */
-				case SIXTN:	
-LSIXTN:
-						if (pass != 1) {
-						    *objp++ = high(operand);
+				case SIXTN:	if (high(operand) == high(pc + 1)) {
+						    c0de = opcod -> valu;
+						    cvt = autobr &&
+                                                          ((0xC0 <= c0de && c0de < 0xC4) ||
+						    	   (0xC8 <= c0de && c0de < 0xCC));
+						    if (cvt) {
+							if (pass != 1) {
+						            bytes--;
+						            objp[-1] -= 0x90; /* convert to SBR */
+                                                            *objp++   = low(operand);
+                                                            if (cvtlo < pc + 1) {
+							        printf("%04X converted to SBR\n",pc);
+                                                                clear_symbols(pc + 1); cvtlo = pc + 1;
+                                                                newpass = 1;
+                                                            }
+                                                            done = 1;
+                                                        }
+                                                    }
+                                                }
+                                                if (!done && pass != 1) {
+LSIXTN:                                             *objp++ = high(operand);
 						    *objp = low(operand);
 						}
 						break;
 
-				case BRANCH:    if (high(operand) !=
-						    high(pc + bytes - 1)) {
+				case BRANCH:    if (high(operand) != high(pc + bytes - 1)) {
 						    c0de = opcod -> valu;
-						    cvt = ((0x30 <= c0de && c0de < 0x34)) ||
-						    	  ((0x38 <= c0de && c0de < 0x3C));
-						    if (0/*cvt*/) {
-							if (pass == 1)
-							    printf("converted to long branch at %04X\n",pc);
-						        bytes++;
-						        if (pass != 1) {
+						    cvt = autobr &&
+                                                          ((0x30 <= c0de && c0de < 0x34) ||
+						    	   (0x38 <= c0de && c0de < 0x3C));
+						    if (cvt) {
+							if (pass != 1) {
+						            bytes++;
 						            objp[-1] += 0x90; /* convert to LBR */
-							    goto LSIXTN;
+                                                            *objp++   = high(operand);
+						            *objp     = low(operand);
+                                                            if (cvtlo < pc + 2) {
+							        printf("%04X converted to LBR\n",pc);
+                                                                clear_symbols(pc + 2); cvtlo = pc + 2;
+                                                                newpass = 1;
+                                                            }
+                                                            done = 1;
 						        }
 						    }
 						    else {
 						        error('B');  return;
 						    }
 						}
-						if (pass != 1)
+						if (!done && pass != 1)
 						    *objp = low(operand);
 						break;
 
@@ -605,7 +635,9 @@ static void pseudo_op(void)
 
 	case EQU:   if (label[0]) {
 			if (pass == 1) {
-			    if (!((l = new_symbol(label)) -> attr)) {
+			    if ((l = find_symbol(label))) /* AP autobr */
+                                ;
+			    else if (!((l = new_symbol(label)) -> attr)) {
 				l -> attr = FORWD + VAL;
 				address = expr();
 				if (!forwd) l -> valu = address;

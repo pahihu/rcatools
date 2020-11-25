@@ -112,6 +112,7 @@ static void binrecord(unsigned);
 void bseek(unsigned);
 void bputc(unsigned);
 char *backsub(char *str);
+static void resetout(void);
 
 /*  Get access to global mailboxes defined in A18.C:			*/
 
@@ -163,6 +164,27 @@ char *nam;
         ;
     DIAG(printf(" found=%p",p));
     return p;
+}
+
+static void clear_symbols_(sp, adr)
+SYMBOL *sp;
+unsigned adr;
+{
+    if (sp) {
+	clear_symbols_(sp -> left, adr);
+        if (sp -> valu > adr) {
+            sp -> sname[0] = '\0';
+        }
+	clear_symbols_(sp -> right, adr);
+    }
+    return;
+}
+
+/* Clear all symbols after given address */
+void clear_symbols(adr)
+int adr;
+{
+    clear_symbols_(sroot, adr);
 }
 
 /*  Opcode table search routine.  This routine pats down the opcode	*/
@@ -487,13 +509,15 @@ SYMBOL *sp;
 
     if (sp) {
 	list_sym(sp -> left);
-	fprintf(list,(caphex ? "%04X  " : "%04x  "),sp -> valu);
-	fprintf(list,"%-10s",sp -> sname);
-	if ((col = ++col % SYMCOLS)) fprintf(list,"    ");
-	else {
-	    fprintf(list,"\n");
-	    if (sp -> right) check_page();
-	}
+        if (sp -> sname[0]) {
+	    fprintf(list,(caphex ? "%04X  " : "%04x  "),sp -> valu);
+	    fprintf(list,"%-10s",sp -> sname);
+	    if ((col = ++col % SYMCOLS)) fprintf(list,"    ");
+	    else {
+	        fprintf(list,"\n");
+	        if (sp -> right) check_page();
+	    }
+        }
 	list_sym(sp -> right);
     }
     return;
@@ -522,7 +546,7 @@ SYMBOL *sp;
 
     if (sp) {
 	exp_sym(sp -> left);
-	if (sp -> attr & EXPO) {
+	if (sp -> sname[0] && sp -> attr & EXPO) {
 	    fprintf(expsym, "%-10s EQU ",sp -> sname);
 	    sprintf(buf,(caphex ? "%XH" : "%xH"),sp -> valu);
 	    fprintf(expsym, isalph(buf[0]) ? "0%s" : "%s", buf);
@@ -566,7 +590,7 @@ static void check_page()
 
 static FILE *bin = NULL;
 static unsigned bincnt = 0;
-static unsigned binaddr = 0;
+static unsigned binaddr = 0, binstart = 0;
 static unsigned binbuf[BINSIZE+1];
 
 /*  binary file open routine.  If file is already open, a warning	*/
@@ -612,11 +636,18 @@ unsigned a;
     if (bin) {
         if (bincnt) binrecord(0);
         if (a < binaddr) { /* can't run binary backwards ! */
-            printf("binary file address change from %4X to %4X, cant fix this!\n",binaddr, a);
-            fatal_error(BINNEG);
+            if (a == binstart)
+                resetout();
+            else {
+                printf("binary file address change from %4X to %4X, cant fix this!\n",binaddr, a);
+                fatal_error(BINNEG);
+            }
         }
         if ((binaddr == 0) && (a != 0)){
-            printf("binary file address starts at %4X\n",a);
+            if (a != binstart) {
+                printf("binary file address starts at %4X\n",a);
+                binstart = a;
+            }
             binaddr = a;
         }
         else if (a != binaddr) {
@@ -760,6 +791,20 @@ unsigned b;
     sum += b;  return;
 }
 
+/*  Reset output files. */
+static void resetout(void)
+{
+    if (bin) {
+        fseek(bin, 0, SEEK_SET);
+        binaddr = 0;
+    }
+    if (list) fseek(list, 0, SEEK_SET);
+    if (hex) {
+        fseek(hex, 0, SEEK_SET);
+        cnt = 0;
+    }
+}
+
 /*  Error handler routine.  If the current error code is non-blank,	*/
 /*  the error code is filled in and the	number of lines with errors	*/
 /*  is adjusted.							*/
@@ -767,7 +812,7 @@ unsigned b;
 void error_(char code,char *path,int line)
 {
     if (errcode == ' ') { errcode = code;  ++errors; }
-    DIAG(printf("%s:%d: error '%c' at line %d\n",code));
+    DIAG(printf("%s:%d: error '%c' at line %d\n",path,line,code,lineno));
     return;
 }
 

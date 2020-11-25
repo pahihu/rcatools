@@ -1,4 +1,4 @@
-CFLAGS = -g #-O2 #-DDIAGNOSTICS=1
+CFLAGS = -g #-DDIAGNOSTICS=1
 OBJS = a18.o a18eval.o a18util.o
 
 a18: $(OBJS)
