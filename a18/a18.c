@@ -123,7 +123,7 @@ int (*symcmp)(const char*,const char*);
 FILE *filestk[FILES], *source;
 TOKEN token;
 
-SYMBOL *find_symbol(char *), *new_symbol(char *);
+SYMBOL *find_symbol(char *);
 
 static
 void rcaregs(void)
@@ -411,7 +411,7 @@ static void flush(void)
 static void do_label(void)
 {
     SCRATCH SYMBOL *l;
-    SYMBOL *find_symbol(char *), *new_symbol(char *);
+    SYMBOL *find_symbol(char *);
 
     if (label[0]) {
 	DIAG(printf(" do_label>>%s<<",label)); /* HRJ diagnostic */
@@ -548,7 +548,7 @@ static void pseudo_op(void)
     SCRATCH SYMBOL *l;
     unsigned expr(void);
     unsigned evals(void);
-    SYMBOL *find_symbol(char *), *new_symbol(char *);
+    SYMBOL *find_symbol(char *);
     TOKEN *lex(void);
     int isnum(char), isnumprefix(char);
 
@@ -635,9 +635,7 @@ static void pseudo_op(void)
 
 	case EQU:   if (label[0]) {
 			if (pass == 1) {
-			    if ((l = find_symbol(label))) /* AP autobr */
-                                ;
-			    else if (!((l = new_symbol(label)) -> attr)) {
+			    if (!((l = new_symbol(label)) -> attr)) {
 				l -> attr = FORWD + VAL;
 				address = expr();
 				if (!forwd) l -> valu = address;

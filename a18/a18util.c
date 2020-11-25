@@ -130,20 +130,27 @@ static SYMBOL *sroot = NULL;
 /*  the symbol already exists.  If there's not enough memory to store	*/
 /*  the new symbol, a fatal error occurs.				*/
 
-SYMBOL *new_symbol(nam)
+SYMBOL *new_symbol_(nam,path,line)
 char *nam;
+char *path;
+int line;
 {
     SCRATCH int i;
     SCRATCH SYMBOL **p, *q;
     extern int (*symcmp)(const char*,const char*);
 
-    DIAG(printf(" new_symbol>>%s<<",nam));  /* HRJ diagnostic*/
-    for (p = &sroot; (q = *p) && (i = symcmp(nam,q -> sname)); )
+    DIAG(printf(" %s:%d new_symbol>>%s<<",path,line,nam));  /* HRJ diagnostic*/
+    for (p = &sroot; (q = *p) && (i = symcmp(nam,q -> sname)); ) {
 	p = i < 0 ? &(q -> left) : &(q -> right);
+    }
     if (!q) {
 	if (!(*p = q = (SYMBOL *)calloc(1,sizeof(SYMBOL) + strlen(nam))))
 	    fatal_error(SYMBOLS);
 	strcpy(q -> sname,nam);  /* copy nam to sname HRJ*/
+    }
+    if (q -> del) {
+        q -> del  = 0;
+        q -> attr = 0;
     }
     return q;
 }
@@ -163,6 +170,8 @@ char *nam;
 	p = i < 0 ? p -> left : p -> right)
         ;
     DIAG(printf(" found=%p",p));
+    if (p && p -> del)
+        p = NULL;
     return p;
 }
 
@@ -173,7 +182,7 @@ unsigned adr;
     if (sp) {
 	clear_symbols_(sp -> left, adr);
         if (sp -> valu > adr) {
-            sp -> sname[0] = '\0';
+            sp -> del = 1;
         }
 	clear_symbols_(sp -> right, adr);
     }
@@ -509,7 +518,7 @@ SYMBOL *sp;
 
     if (sp) {
 	list_sym(sp -> left);
-        if (sp -> sname[0]) {
+        if (0 == sp -> del) {
 	    fprintf(list,(caphex ? "%04X  " : "%04x  "),sp -> valu);
 	    fprintf(list,"%-10s",sp -> sname);
 	    if ((col = ++col % SYMCOLS)) fprintf(list,"    ");
@@ -546,7 +555,7 @@ SYMBOL *sp;
 
     if (sp) {
 	exp_sym(sp -> left);
-	if (sp -> sname[0] && sp -> attr & EXPO) {
+	if (0 == sp -> del && sp -> attr & EXPO) {
 	    fprintf(expsym, "%-10s EQU ",sp -> sname);
 	    sprintf(buf,(caphex ? "%XH" : "%xH"),sp -> valu);
 	    fprintf(expsym, isalph(buf[0]) ? "0%s" : "%s", buf);

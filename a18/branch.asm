@@ -14,7 +14,9 @@ L2	SEX 2
 E2	EQU 011H
 	DC 83H,'LI',0D4H
 	BR OFFPAG
-
-        ORG 0A200H
+        BR L3
+        ORG 0A1FFH
+        BR LOOP1
+L3      NOP
 OFFPAG
 	END

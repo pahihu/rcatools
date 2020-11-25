@@ -25,10 +25,4 @@ T'string'       string constant
 EXPORT label1,...,labelN
 		label export
 -x file.exp	export labels
-
-
-
-
-TODO
-====
-BR => LBR	automatic conversion
+-a              auto convert SBR/LBR (experimental)

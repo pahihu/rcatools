@@ -411,6 +411,7 @@ struct _symbol {
     unsigned attr;
     unsigned valu;
     struct _symbol *left, *right;
+    char del;
     char sname[1];
 };
 
@@ -438,4 +439,6 @@ typedef struct {
 
 static int zyzzy = 0;
 void error_(char,char*,int);
+SYMBOL* new_symbol_(char*,char*,int);
 #define error(x)        error_(x,__FILE__,__LINE__)
+#define new_symbol(x)   new_symbol_(x,__FILE__,__LINE__)
