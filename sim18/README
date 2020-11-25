@@ -10,9 +10,8 @@ The included `.sr' ASM source files can be assembled
 with the included A18 assembler.
 
 The fforth.sr and fforth.img disk file is from DW Schultz' 
-MicroDOS package (http://web.archive.org/web/20191012004706/http://home.earthlink.net/~schultdw/1802/microdos/index.html). I have replaced
-the UT71 monitor calls with the original UT20 calls found in
-http://www.forth.org/fig-forth/fig-forth_1802.pdf.
+MicroDOS package (http://davesrocketworks.com/electronics/1802/microdos/index.html). I have replaced the UT71 monitor calls with the original
+UT20 calls found in http://www.forth.org/fig-forth/fig-forth_1802.pdf.
 
 The original fig-FORTH uses the CD1854 UART on Group 1.
 The CDP18S005 by default uses the UART on Group 2, although
