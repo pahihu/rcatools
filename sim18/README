@@ -47,5 +47,8 @@ MEMCLR.HEX      Program 2.1 in SCIP
 MEMSEQ.HEX      Program 2.2 in SCIP
 SLOBLINK.HEX    Program 2.3 in SCIP
 CONDBR.HEX      Program 3.10 in SCIP
+etops256.idi    Elf ETOPS-256 monitor
+ehops256.idi    Elf EHOPS-256 monitor
+deveaux.sr      E.Deveaux, Pixie Animation Program
 
 SCIP: A Short Course In Programming by Tom Pittman

@@ -1,0 +1,124 @@
+.. AN 1802 ANIMATION PROGRAM by E. DEVEAUX
+.
+BEGSFT=#78  .. ADDRESS OF FIRST LINE SHIFTED.
+..
+.. THIS PROGRAM PROVIDES VARIABLE SPEED
+.. ANIMATION OF THE IMAGE LOCATED AT #78 to
+.. #F7 IN MEMORY.
+.. SPEED CONTROL IS PROVIDED BY INPUT SWITCHES.
+            GHI R0      ..ZERO HIGH ORDER OF
+            PHI R1      ..R1 R2 R3.
+            PHI R2
+            PHI R3
+            PHI R4      ..R4 POINTS TO REFRESH
+            PLO R4      ..ADDRESS
+            LDI A.0(INTRPT)
+            PLO R1
+            LDI A.0(STACK)
+            PLO R2
+            LDI A.0(MAIN)
+            PLO R3
+            SEP R3      ..GO TO MAIN_LINE
+            DC#01020300 ..STACK AREA
+STACK =*-1
+..
+..THIS PROGRAM USES A MODIFIED VERSION
+..OF THE INTERRUPT ROUTINE THAT APPEARED
+..IN COSMAC ELF PART 4.
+..
+..A SHIFT ROUTINE HAS BEEN ADDED THAT MOVES THE
+.. STARSHIP FROM LEFT TO RIGHT ACROSS THE CRT.
+..
+  RETURN:LDXA
+         RET            ..CYCLES
+  INTRPT:DEC   R2       .. 2
+         SAV            ..4 R5 COUNTS REFRESH
+         DEC   R2       ..6 CYCLES, USED TO
+         STR   R2       ..8 DETERMINE WHEN TO
+         INC   R5       ..10 SHIFT /ROLL.
+         NOP            ..13
+         GHI   R4       ..15 R4 TO R0
+         PHI  R0       ..17 REFRESH ADDRESS
+         GLO  R4       ..19
+         PLO  R0       ..21
+
+         GLO  R0       ..23
+         GLO  R0       ..25
+  REFRESH:GLO  R0      .. 27
+          SEX  R2      .. 29  8 DMA CYCLES
+                       ..
+          SEX  R2      ..
+          DEC  R0
+          PLO  R0      ..     8 DMA CYCLES
+                       ..
+          SEX  R2
+          DEC  R0
+          PLO  R0      ..     8 DMA CYCLES
+                       ..
+          SEX  R2
+          DEC  R0
+          PLO  R0      ..
+                       .. 
+          BN1  REFRESH .. ON EF1 REFRESH
+          BR  RETURN   .. IS OVER.
+  MAIN:SEX    R2       .. RX=2
+          INP  1       .. TELL 1861 TO
+                       .. TURN ON CRT.
+..SFREAD READS INPUT SWITCHESTO CONTROL
+..SPEED OF SHIFTS/ROLLS.
+..INPUT SWITCH IS STORED AT STACK M(R2).
+..
+..INITIAL VALUE OF STACK IS ZERO AND THERE IS
+..NO MOVEMENT OF STAR SHIP UNTIL A NON ZERO BIT
+..IS INPUT.
+      SPREAD:BN4   CKSHIF   .. IF NO INPUT GO SEE
+      WTREAD:B4    WTREAD   .. IF TIME TO SHIFT.
+             INP   4        .. READ INTO STACK.
+..                          ..
+      CKSHIF GLO  R5        .. GHI R5 VARY/SPEED
+              AND           .. OF STAR SHIP.
+              BZ   SPREAD   .. SHIFT/ROLL BIT MATCH.
+              LDI  A.1(BEGSFT)   ..BR ROLL 3061
+              PHI  R9            ..ROLL NO SHIFT
+              LDI   A.0(BEGSFT)
+              PLO   R9            ..R9=FIRST LINE
+              LDI   16            ..TO SHIFT.   
+              PLO   R6            ..SHIFT 16 LINES.
+       NXTLNE:GHI   R9
+              PHI   RA       ..SAVE ADDRESS OF 1st
+              GLO   R9       ..ON LINE IN RA
+              PLO   RA
+              LDI   7        ..R7=BYTES TO SHIFT-1.
+              PLO   R7
+              LDN   R9
+              PHI   R8       ..SAVE 1ST BYTE ON
+              SHRC           ..LINE IN R8.1
+     MXTBYT:INC  R9          ..POINT R9 TO NEXT BYTE.
+            LDN  R9          ..LOAD NEXT BYTE.
+            SHRC             ..SHIFT RIGHT.
+            STR  R9          ..STORE BYTE
+            DEC  R7
+            GLO  R7          ..CHECK IF ALL BYTES
+            BNZ  MXTBYT      ..SHIFTED.
+            GHI  R8          ..PUT BIT 0 of 8TH
+            SHRC             ..BYT ON BIT 7 OF
+            STR  RA          ..1ST BYT ON LINE.
+            INC  R9          ..R9=BYTE 0 NXT LINE.
+            DEC  R6
+            GLO  R6          ..CHECK IF 16 LINES
+            BNZ  NXTLNE      ..SHIFTED.
+            BR   SPREAD      ..SKP 38 ROLL AND SHIFT.
+     ROLL:GLO    R4          ..INCREMENT R4 ONE LINE       
+            ADI  8           ..ROLL SCREEN UP.
+            PLO  R4
+            GHI  R4          ..CHANGE LNNO 116 TO
+            LDI  00          ..ADCI 0 7C00 IF MORE
+            PHI  R4          ..THAN 256 BYTES.
+            BZ   SPREAD
+            GLO  R4
+            PHI  R4
+            BR   SPREAD
+            DC   #00
+..ENTER IMAGE TO BE SHIFTED IN LOCATIONS
+..X'78' - x'F7'.
+          END

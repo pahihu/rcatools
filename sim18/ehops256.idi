@@ -1,0 +1,40 @@
+!M
+0000   F8  FF  A2;   R2.0 = work
+  03   F8  23  A5;   R5.0 = BSUB
+  06   F8  33  A6;   R6.0 = HSUB
+  09   F8  0D  A3;   R3.0 = M(0D)
+  0C   D3;           P=3
+  0D   D5  A1;       BSUB, R1.0=D
+  0F   6C;           D, M2 = toggles
+  10   3A  14;       M(14) if D != 00 (Note: != means 'not equal')
+  12   81  A3;       R3.0 = R1.0
+  14   F6  3B  1C;   M(1C) if D=02
+  17   D5  E1;       BSUB, X=1
+  19   64;           Show M1, R1+1
+  1A   30  17;       Repeat M(17)
+  1C   D5  E1;       BSUB, X=1
+  1E   51  64;       M1=D, show M1, R1+1
+  20   30  1C;       Repeat M(1C)
+  22   D3;           P=3 (return)
+  23   ;  BSUB
+  23   D6;           HSUB
+  24   FE  FE;       D left x 2
+  26   FE  FE;       D left x 2
+  28   A0  D6;       R1=D, HSUB
+  2A   80  F1  52;   M2=R1 or M2
+  2D   64  22;       Show M2
+  2F   30  22;       Go to M(22)
+  31   F0  D5;       D=M2, P=5
+  33   ;  HSUB
+  33   E2  FC  01;   X=2, D+1
+  36   FA  0F  52;   M2=D and 0F
+  39   62  22;       Select key M2
+  3B   3D  33;       M(33) if key off
+  3D   7B  F8  09;   Q=1, D=09
+  40   B4;           R4.1=09
+  41   24  94;       R4-1
+  43   3A  41;       M(41) if R4.1 != 00
+  45   7A;           Q=0
+  46   35  46;       Wait for key off
+  48   30  31;       Go to M(31)
+  00
