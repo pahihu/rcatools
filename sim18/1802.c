@@ -42,6 +42,7 @@
  *          fig-FORTH disk read works
  *          fig-FORTH disk write works
  * 201125AP BUT40 brkptr $Badr 
+ * 201126AP bytes read in hex
  *
  */
 
@@ -1552,7 +1553,7 @@ int main(int argc, char *argv[])
          storage();
          printf("load %s at %04X\n", argv[i], begin);
          bytes = readdat(argv[i], begin);
-         printf("read %d bytes\n", bytes);
+         printf("read %d (#%02X) bytes\n", bytes, bytes);
          begin = 0; readdat = readbin;
       }
    }

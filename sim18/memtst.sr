@@ -17,32 +17,29 @@ SUB=#09         .. SUBR. ADDRESS
         GHI PC ;PLO TST         .. CLEAR TST,PTR,SUB
         PHI PTR ;PHI SUB
 ..
-..  WRITE 00 TO ALL LOCATIONS AND CHECK
+..  1. WRITE 00 TO ALL LOCATIONS AND CHECK
 ..
         LDI A.0(WRALL) ;PLO SUB .. SUB=WRALL
         GHI PC ;SHR ;SEP SUB    .. D=#00, DF=0, CALL WRALL
 ..
-..  WRITE FF TO ALL LOCATIONS AND CHECK
+..  2. WRITE FF TO ALL LOCATIONS AND CHECK
 ..
-        LDI A.0(WRALL) ;PLO SUB .. SUB=WRALL
         LDI #FF ;SEP SUB        .. D=#FF, CALL WRALL
 ..
-..  WRITE PAGE NUMBER TO ALL CELLS
+..  3. WRITE SEQ NUMBER TO ALL CELLS
+..
+        SMI #00 ;SEP SUB        .. DF=1, CALL WRALL
+..
+..  4. WRITE PAGE NUMBER TO ALL CELLS
 ..
         LDI A.0(WRPAG); PLO SUB .. SUB=WRPAG
         SEP SUB                 .. DF STILL 0, CALL WRPAG
 ..
-..  WRITE INVERSE PAGE NUMBER TO ALL CELLS
+..  5. WRITE INVERSE PAGE NUMBER TO ALL CELLS
 ..
-        LDI A.0(WRPAG) ;PLO SUB .. SUB=WRPAG
         SMI #00 ;SEP SUB        .. DF=1, CALL WRPAG
 ..
-..  WRITE SEQ NUMBER TO ALL CELLS
-..
-        LDI A.0(WRALL) ;PLO SUB .. SUB=WRALL
-        SEP SUB                 .. DF STILL 1, CALL WRALL
-..
-.. WRITE ALL VALUES TO ALL CELLS
+..  6. WRITE ALL VALUES TO ALL CELLS
 ..
 TST6:   INC TST                 .. TST=#06
         LDI A.0(START) ;PLO PTR .. PTR=START
@@ -59,6 +56,7 @@ LOOP:   STR PTR                 .. SAVE VAL
         BNZ LOOP                .. BACK TO LOOP IF VAL#0
         INC PTR
         BR WILE6
+        ..
 FAIL:   LDI #DE ;PHI 4          .. #4=#DEAD
         LDI #AD ;PLO 4
         IDL
@@ -69,6 +67,7 @@ OK:     LDI #60 ;PHI 4          .. #4=#600D
 ..  WRALL - WRITE D TO ALL LOCS AND CHK
 ..  IF DF=1 INCREMENT VAL
 ..
+RET1:   SEP PC                  .. RETURN
 WRALL:  INC TST                 .. BUMP TEST#
         PLO VAL                 .. SAVE D
         LDI A.0(START) ;PLO PTR .. PTR=START
@@ -83,11 +82,11 @@ BODY1:  GLO VAL ;STR PTR        .. SAVE VAL
         BNF WILE1               .. IF DF=1
         INC VAL                 ..   INCR.VAL
         BR WILE1
-RET1:   SEP PC                  .. RETURN
 ..
 ..  WRPAG - WRITE PAGE# TO ALL LOCS AND CHK
 ..  IF DF=1 INVERT PAGE NUMBER
 ..
+RET2:   SEP PC                  .. RETURN
 WRPAG:  INC TST                 .. BUMP TEST#
         LDI A.0(START) ;PLO PTR .. PTR=START
 WILE2:  GLO PTR
@@ -101,7 +100,6 @@ BODY2:  GHI PTR                 .. GET PAGE#
         BNZ FAIL                .. FAIL IF NEQU
         INC PTR                 .. INCREMENT PTR
         BR WILE2
-RET2:   SEP PC                  .. RETURN
 
 START:  NOP                     .. MEMTEST STARTS HERE
         END
