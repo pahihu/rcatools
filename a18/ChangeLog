@@ -22,6 +22,7 @@ label=expr      same as EQU
 ,expr[,expr]    same as CONST
 T'string'       string constant
 L'string'       length of string constant
+
 label.1         high byte of label
 label.0         low byte of label
                 @,#,%,:,* terminates a token
