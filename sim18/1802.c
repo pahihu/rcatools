@@ -43,6 +43,8 @@
  *          fig-FORTH disk write works
  * 201125AP BUT40 brkptr $Badr 
  * 201126AP bytes read in hex
+ * 201127AP $L reads track# in decimal
+ *          handle/emit DC3 EOF
  *
  */
 
@@ -98,7 +100,7 @@ Word r[16];
 Byte *M = NULL;
 int DMA_IN, DMA_OUT, INT;
 Byte BUS, NLINES;
-int MCLK;  // machine-cycle
+unsigned MCLK;  // machine-cycle
 int  TLIO; // Two-level I/O
 Byte SEL;
 int RC;    // Mark Riley, port extender
@@ -737,7 +739,7 @@ void fini(void);
 void xecute(Word p)
 {  
    Word W;
-   int i, cond, done;
+   int cond, done;
 
    r[P] = p; done = 0;
    while (!done) {
@@ -1032,12 +1034,19 @@ void xecute(Word p)
    fflush(stdout);
 }
 
-static int issep(int c)
+#define DC3 0x13
+
+int issep(int c)
 {
    return c == ' ' || c == ',' || c == ';' || c == '\n';
 }
 
 static int utc;
+
+int uteof(FILE *inp)
+{
+   return feof(inp) || DC3 == utc;
+}
 
 int utget(FILE *inp)
 {
@@ -1052,6 +1061,12 @@ int utget(FILE *inp)
 void uteat(FILE *inp)
 {
    while (utc != EOF && utc != '\n')
+      utc = utget(inp);
+}
+
+void utskip(FILE *inp, int nl)
+{
+   while (utc == ' ' || (nl && utc == '\n'))
       utc = utget(inp);
 }
 
@@ -1174,10 +1189,11 @@ int ut20mon(FILE *inp)
    int bytes, cmd;
    char *fn;
    FILE *out;
+   int savutc = utc;
 
    err = 0; utc = 0; bytes = 0;
    H("*");
-   while (!feof(inp)) {
+   while (!uteof(inp)) {
       if (utc == '\n') {
          H("*");
          utc = utget(inp);
@@ -1230,32 +1246,22 @@ int ut20mon(FILE *inp)
          utc = utget(inp);
          if (utc == 'M') {
             utc = utget(inp);
-            while (utc == ' ' || utc == '\n')
-               utc = utget(inp);
+            utskip(inp,1);
             adr = utadr(inp);
-            while (utc == ' ' || utc == '\n')
-               utc = utget(inp);
+            utskip(inp,1);
             while (utc != EOF && utc != '\n') {
-               while (utc == ' ')
-                  utc = utget(inp);
+               utskip(inp,0);
 
-               if (utc == ',') {
+               if (utc == ',' || utc == ';') {
+                  byt = utc;
                   uteat(inp);
                   if (utc == EOF)
                      break;
                   if (utc != '\n')
                      goto LError;
                   utc = utget(inp);
-                  continue;
-               }
-               else if (utc == ';') {
-                  uteat(inp);
-                  if (utc == EOF)
-                     break;
-                  if (utc != '\n')
-                     goto LError;
-                  utc = utget(inp);
-                  adr = utadr(inp);
+                  if (';' == byt)
+                     adr = utadr(inp);
                   continue;
                }
                
@@ -1267,12 +1273,10 @@ int ut20mon(FILE *inp)
          }
          else if (utc == 'A') {
             utc = utget(inp);
-            while (utc == ' ' || utc == '\n')
-               utc = utget(inp);
+            utskip(inp,1);
             adr = utadr(inp);
             while (utc != EOF && utc != '\n') {
-               while (utc == ' ')
-                  utc = utget(inp);
+               utskip(inp,0);
 
                if (utc == ',') {
                   uteat(inp);
@@ -1324,7 +1328,8 @@ int ut20mon(FILE *inp)
             adr = utadr(inp);
             err = 1;
             if (adr) {
-               unit = HI(adr); track = LO(adr);
+               unit = HI(adr);
+               track = LO(adr); track = 10*Hi(track) + Lo(track); // decimal!
                err = unit>3 || track>(DSK_TRKS-1) || !fdd[unit];
                if (!err) {
                   H("loading (%X,%2X)...\n", unit, track);
@@ -1362,8 +1367,10 @@ int ut20mon(FILE *inp)
                O(out,"%02X", memrd(adr + i));
             }
             O(out,"\n");
-            if (out != stdout)
+            if (out != stdout) {
+               O(out,"%c",DC3); // write DC3
                fclose(out);
+            }
          }
          else if (utc == 'Q')
             exit(0);
@@ -1378,6 +1385,7 @@ LError:  uteat(inp);
       }
    }
 
+   utc = savutc;
    return bytes;
 }
 
@@ -1386,7 +1394,6 @@ int readbin(char *fn, int offs)
 {
    FILE *fin;
    int bytes;
-   char buf[128];
 
    fin = fopen(fn, "rb");
    bytes = 0;
@@ -1421,7 +1428,7 @@ void fini(void)
    if (lpr)
       fclose(lpr);
    if (MCLK)
-      printf("MCLK = %d\n", MCLK);
+      printf("MCLK = %u\n", MCLK);
    for (i = 0; i < NFDD; i++)
       if (fdd[i])
          fclose(fdd[i]);

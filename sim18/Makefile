@@ -1,4 +1,4 @@
-CC = cc
+CC = cc -Wall
 CFLAGS = -O2
 LDFLAGS = #-g
 SRCS = 1802.c curterm.c

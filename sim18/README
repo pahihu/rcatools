@@ -50,5 +50,9 @@ CONDBR.HEX      Program 3.10 in SCIP
 etops256.idi    Elf ETOPS-256 monitor
 ehops256.idi    Elf EHOPS-256 monitor
 deveaux.sr      E.Deveaux, Pixie Animation Program
+pixie1.idi      Pixie test program
+pixie.sr        Pixie test program source
+etops_256.sr    ETOPS-256 source
+ehops_256.sr    EHOPS-256 source
 
 SCIP: A Short Course In Programming by Tom Pittman
