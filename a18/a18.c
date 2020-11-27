@@ -778,8 +778,8 @@ static void pseudo_op(void)
                                     else
                                         ulen = 1;
 				}
-				else
-				    ulen = 2;
+				else if (!high(token.valu)) /* AP: trim VAL */
+				    ulen = 1;
 			    }
 			}
                         if (ulen > 2) {

@@ -1,0 +1,37 @@
+..
+.. PIXIE TEST PROGRAM, POPULAR ELECTRONICS JULY, 1977
+..
+STACK=#3F
+        ORG#0000
+START   GHI R0 ;PHI R1 ;PHI R2  ..R1,1,R2,1=00
+        PHI R3 ;PHI R4          ..R3.0,R4.0=00
+        LDI A.0(MAIN) ;PLO R3   ..R3.0=(MAIN)
+        LDI STACK ;PLO R2       ..R2.0=(STACK)
+        LDI A.0(INTRPT) ;PLO R1 ..R1.0=(INTRPT)
+        SEP R3                  ..P=3 (GO TO MAIN)
+RETURN  LDXA                    ..RESTORE D,R2+1
+        RET                     ..RESTORE XP,R2+1
+INTRPT  DEC R2 ;SAV             ..R2-1,SAVE XP @ M2
+        DEC R2 ;STR R2          ..R2-1,SAVE D @ M2
+        NOP ;NOP ;NOP           ..NO-OP (9 CYCLES)
+        LDI #00 ;PHI R0
+        LDI #00 ;PLO R0         ..R0=0000(REFRESH PTR)
+REFRESH GLO R0 ;SEX R2          ..D=R0.0
+                                ..8 DMA CYCLES (R0+8)
+        SEX R2 ;DEC R0 ;PLO R0  ..R0-1,R0.0=D 
+                                ..8 DMA CYCLES (R0+8)
+        SEX R2 ;DEC R0 ;PLO R0  ..R0-1,R0,0=D
+                                ..8 DMA CYCLES (R0+8)
+        SEX R2 ;DEC R0 ;PLO R0  ..R0-1,R0,0=D
+                                ..8 DMA CYCLES (R0+8)
+        BN1 REFRESH             ..GO TO REFRESH (EF1=0)
+        BR RETURN               ..GO TO RETURN (EF1=1)
+MAIN    SEX R2 ;INP 1           ..X=2,TURN TV ON
+        BN4 *                   ..WAIT FOR IN PRESSED
+        INP 4 ;PLO R4           ..SET MX,D,R4.0=TOGGLES
+M33     B4 *                    ..WAIT FOR IN RELEASED
+        BN4 *                   ..WAIT FOR IN PRESSED
+        INP 4                   ..SET MX,D=TOGGLES
+        STR R4 ;INC R4          ..SET M4=D,R4+1
+        BR M33                  ..GO TO M33
+        END

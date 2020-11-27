@@ -268,19 +268,24 @@ TOKEN *lex(void) /* function lex() */
     SCRATCH OPCODE *o;
     SCRATCH SYMBOL *s;
     unsigned make_number2(char *str,unsigned base);
+    SCRATCH int orgc, dolen;
+    SCRATCH char *hasdot;
 
 
+    dolen = 0; hasdot = NULL;
     if (oldt) { oldt = FALSE;  return &token; }
     trash();
 LAGAIN:
     if (isalph(c = popc())) {
-        if ('T' == c) {
+        if ('T' == c || 'L' == c) {
+            orgc = c;
             c = popc();
             if (c == '\'') {
+                dolen = 'L' == orgc;
                 pushc(c); goto LAGAIN;
             }
             else {
-                pushc(c); c = 'T';
+                pushc(c); c = orgc;
             }
         }
 	pushc(c);  pops(token.sval);
@@ -292,12 +297,25 @@ LAGAIN:
 	else {
 	    token.attr = VAL;  token.valu = 0;
             first = token.sval[0];
+            if ('.' != first)
+                hasdot = strchr(token.sval,'.');
+            /* 201127AP: LABEL.0, LABEL.1 */
+            if (NULL != hasdot &&                           /* dot found     */
+                (!hasdot[1]                                 /* no more chars */
+                 || (hasdot[1] != '0' && hasdot[1] != '1')  /* not zero/one  */
+                 || hasdot[2]))                             /* more chars    */
+                hasdot = NULL;
+            if (hasdot) *hasdot = '\0';
 	    if (isnumprefix(token.sval[0])) {
 		DIAG(printf(" H%c",first)); /* hrj */
                 make_number(0);
 	    }
 	    else if ((s = find_symbol(token.sval))) {
 		token.valu = s -> valu;
+                if (hasdot) {
+                    if ('0' == hasdot[1]) token.valu = low(token.valu);
+                    else token.valu = high(token.valu);
+                }
 		if (pass == 2 && s -> attr & FORWD) forwd = TRUE;
 	    }
 	    else {
@@ -384,6 +402,11 @@ opr2:		    token.attr = BINARY + RELAT + OPR;
 				quote = FALSE;
 				if ((token.valu = token.sval[0]) && token.sval[1])
 					token.valu = (token.valu << 8) + token.sval[1];
+                                if (dolen) {
+                                        token.attr = VAL;
+                                        token.valu = strlen(token.sval);
+                                        token.sval[0] = '\0';
+                                }
 				break;
 			}
 	case ',':   token.attr = SEP;

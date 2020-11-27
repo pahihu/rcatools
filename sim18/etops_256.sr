@@ -1,0 +1,26 @@
+..
+..  ETOPS-256, POPULAR ELECTRONICS MARCH, 1977
+..
+WORK=#20
+        LDI WORK ;PLO R1        ..R1.0 = WORK
+        SEX R1                  ..X=1
+        INP 4 ;OUT 4 ;DEC R1    ..D = TOGGLES
+        BN4 *                   ..WAIT FOR IN ON
+        B4 *                    ..WAIT FOR IN OFF
+        BZ M1D                  ..M(1D) IF D=00
+        SHR ;BDF M11            ..M(11) IF D=01
+        SEQ                     ..Q=1
+M11     INP 4 ;PLO R1           ..R1.0 = TOGGLES
+M13     BN4 *                   ..WAIT FOR IN ON
+        B4 *                    ..WAIT FOR IN OFF
+        BNQ M1A                 ..M(1A) IF Q=0
+        INP 4                   ..M1 = TOGGLES
+M1A     OUT 4                   ..SHOW M1, R1+1
+        BR M13                  ..REPEAT M(13)
+M1D     INP 4 ;PLO R3           ..R3.0 = TOGGLES
+        SEP R3                  ..P=3
+        IDL                     ..WORK AREA
+        ..
+        .. USER PROGRAMS FROM M(21) TO M(FF)
+        ..
+        END

@@ -1,0 +1,44 @@
+..
+..  EHOPS-256 MONITOR
+..
+WORK=#FF
+
+        ORG#0000
+        LDI WORK ;PLO R2        ..R2.0 = WORK
+        LDI A.0(BSUB) ;PLO R5   ..R5.0 = BSUB
+        LDI A.0(HSUB) ;PLO R6   ..R6.0 = HSUB
+        LDI #0D ;PLO R3         ..R3.0 = M(0D)
+        SEP R3                  ..P=3
+        SEP R5 ;PLO R1          ..BSUB, R1.0=D
+        INP 4                   ..D, M2 = TOGGLES
+        BNZ M14                 ..M(14) IF D != 00 (NOTE: != MEANS 'NOT EQUAL')
+        GLO R1 ;PLO R3          ..R2.0 = R1.0
+M14     SHR ;BNF M1C            ..M(1C) IF D=2
+M17     SEP R5 ;SEX R1          ..BSUB, X=1
+        OUT 4                   ..SHOW M1, R1+1
+        BR M17                  ..REPEAT M(17)
+M1C     SEP R5 ;SEX R1          ..BSUB, X=1
+        STR R1 ;OUT 4           ..M1=D, SHOW M1, R1+1
+        BR M1C                  ..REPEAT M(1C)
+M22     SEP R3                  ..P=3 (RETURN)
+BSUB    SEP R6                  ..HSUB
+        SHL ;SHL                ..D LEFT X 2
+        SHL ;SHL                ..D LEFT X 2
+        PLO R0 ;SEP R6          ..R1=D, HSUB
+        GLO R0 ;OR ;STR R2      ..M2=R1 OR M2
+        OUT 4 ;DEC R2           ..SHOW M2
+        BR M22                  ..GO TO M(22)
+M31     LDX ;SEP R5             ..D=M2, P=5
+HSUB    SEX R2 ;ADI #01         ..X=2, D+1
+        ANI #0F ;STR R2         ..M2=D AND 0F
+        OUT 2 ;DEC R2           ..SELECT KEY M2
+        BN2 HSUB                ..M(33) IF KEY OFF
+        SEQ ;LDI #09            ..Q=1, D=09
+        PHI R4                  ..R4.1=09
+M41     DEC R4; GHI R4          ..R4-1
+        BNZ M41                 ..M(41) IF R4.1 != 00
+        REQ                     ..Q=0
+        B2 *                    ..WAIT FOR KEY OFF
+        BR M31                  ..GO TO M(31)
+
+        END
