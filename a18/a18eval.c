@@ -173,6 +173,7 @@ unsigned pre;
 			if (MULTI == (token.attr & TYPE))
 			    return u;
 
+            case CVAL:
 	    case VAL:
 	    case STR:	for (;;) {
 			    op = lex() -> valu;
@@ -184,6 +185,7 @@ unsigned pre;
 					    return u;
 
 				case STR:
+                                case CVAL:
 				case VAL:   exp_error('E');  break;
 
 				case OPR:   if (!(token.attr & BINARY)) {
@@ -403,7 +405,7 @@ opr2:		    token.attr = BINARY + RELAT + OPR;
 				if ((token.valu = token.sval[0]) && token.sval[1])
 					token.valu = (token.valu << 8) + token.sval[1];
                                 if (dolen) {
-                                        token.attr = VAL;
+                                        token.attr = CVAL;
                                         token.valu = strlen(token.sval);
                                         token.sval[0] = '\0';
                                 }

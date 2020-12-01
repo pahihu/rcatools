@@ -544,7 +544,7 @@ LSIXTN:                                             *objp++ = high(operand);
 static void pseudo_op(void)
 {
     SCRATCH char *s;
-    SCRATCH unsigned *o, u, ulen, i;
+    SCRATCH unsigned *o, u, ulen, i, oldattr;
     SCRATCH SYMBOL *l;
     unsigned expr(void);
     unsigned evals(void);
@@ -764,6 +764,7 @@ static void pseudo_op(void)
 			}
 			else { /* expression */
 			    DIAG(printf(" <EXPR>"));
+                            oldattr = token.attr & TYPE;
 			    unlex();
 			    u = expr();
 			    if (1 == evals()) { /* value? */
@@ -778,8 +779,8 @@ static void pseudo_op(void)
                                     else
                                         ulen = 1;
 				}
-				else if (!high(token.valu)) /* AP: trim VAL */
-				    ulen = 1;
+                                else if (CVAL == oldattr)
+                                    ulen = 1;
 			    }
 			}
                         if (ulen > 2) {

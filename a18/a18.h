@@ -361,6 +361,7 @@ typedef struct {
 #define	STR		3	/*  character string			*/
 #define	VAL		4	/*  value				*/
 #define MULTI		5	/*  opcode/argument separator		*/
+#define CVAL            6       /*  8bit value                          */
 
 /*  Lexical analyzer (A18EVAL.C) token attribute word flag masks:	*/
 
