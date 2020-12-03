@@ -1,0 +1,15 @@
+#
+# compile prg to bin
+#
+if [ $# -ne 1 ];
+then
+   echo "usage: prg2bin file.prg"
+   exit 1
+fi
+nm=`basename $1 .prg`
+../calc18 <$1 >out.$$
+cat prolog out.$$ epilog >$nm.sr
+a18 $nm.sr -r -L $nm.lst -b $nm.bin
+
+ls -l $nm.bin
+rm -f out.$$

@@ -45,6 +45,7 @@
  * 201126AP bytes read in hex
  * 201127AP $L reads track# in decimal
  *          handle/emit DC3 EOF
+ * 201202AP register name definitions with -r
  *
  */
 
@@ -109,13 +110,6 @@ int GRP_UART = 2; // default UART group
 
 char *m, *ma[16], *a, *aa[16];
 
-static char *gllregs[16] = {
-   "DMA", "INT", "R  ", "P  ",
-   "R4 ", "R5 ", "R6 ", "R7 ",
-   "R8 ", "W  ", "A  ", "B  ",
-   "U  ", "I  ", "S  ", "F  "
-};
-
 static char *cdpregs[16] = {
    "R0 ", "R1 ", "R2 ", "R3 ",
    "R4 ", "R5 ", "R6 ", "R7 ",
@@ -123,12 +117,7 @@ static char *cdpregs[16] = {
    "RC ", "RD ", "RE ", "RF "
 };
 
-static char *figregs[16] = {
-   "R0 ", "R1 ", "RP ", "PPC",
-   "R4 ", "R5 ", "R6 ", "TMP",
-   "AUX", "SP ", "IP ", "WP ",
-   "IPC", "UP ", "RE ", "DSK"
-};
+static char *custregs[16];
 
 int trace = 0, brkadr = 0;
 int ut20 = 0;
@@ -1389,6 +1378,26 @@ LError:  uteat(inp);
    return bytes;
 }
 
+int readregs(char *fn)
+{
+   FILE *fin;
+   char buf[128];
+   int i, n;
+
+   fin = fopen(fn, "r");
+   if (!fin) return 1;
+   for (i = 0; i < 16; i++) {
+      fscanf(fin, "%s", buf);
+      strcat(buf, "   ");
+      n = strlen(buf);
+      if (n > 3)
+         buf[3] = '\0';
+      custregs[i] = strdup(buf);
+   }
+   fclose(fin);
+   return 0;
+}
+
 
 int readbin(char *fn, int offs)
 {
@@ -1448,18 +1457,19 @@ void storage(void)
 
 void usage(void)
 {
-   fprintf(stderr,"usage: sim18 [-24gimputx] [-bxxxx] [-d -exxxx] [-f<fdd.img>] -s<kbytes> <file>...\n");
+   fprintf(stderr,"usage: sim18 [-24imprutx] [-bxxxx] [-d -exxxx] [-f<fdd.img>] -s<kbytes> <file>...\n");
    fprintf(stderr,"options:\n");
    fprintf(stderr,"   -2         enable TLIO\n");
-   fprintf(stderr,"   -4         fig-FORTH reg names, UART on Grp 1\n");
+   fprintf(stderr,"   -4         fig-Forth compat, UART on Grp 1\n");
    fprintf(stderr,"   -bxxxx     disasm/load/start 'begin' address\n");
+   fprintf(stderr,"   -c         calc18 register names\n");
    fprintf(stderr,"   -d         disassemble only\n");
    fprintf(stderr,"   -exxxx     end address\n");
    fprintf(stderr,"   -f<fdd>    use disk file (max. 4)\n");
-   fprintf(stderr,"   -g         GLL-MAG register names\n");
    fprintf(stderr,"   -i         enable IDL processing\n");
    fprintf(stderr,"   -m         set M-rec fmt\n");
    fprintf(stderr,"   -p<file>   lpr file name, default \"lpr.out\"\n");
+   fprintf(stderr,"   -r<regdef> read register names from <regdef>\n");
    fprintf(stderr,"   -s<kbytes> memory size (default 64KB)\n");
    fprintf(stderr,"   -t         trace\n");
    fprintf(stderr,"   -u         start BUT20 (?DMR,!AM,$BLPQUXY)\n");
@@ -1479,6 +1489,10 @@ void usage(void)
    fprintf(stderr,"   $Uadr                     xecute, TLIO enabled\n");
    fprintf(stderr,"   $X file adr len           xmit comma sep\n");
    fprintf(stderr,"   $Y file adr len           xmit semicolon sep\n");
+   fprintf(stderr,"\n");
+   fprintf(stderr,"Trace commands:\n");
+   fprintf(stderr,"   C                         continue\n");
+   fprintf(stderr,"   Q                         stop execution\n");
    exit(1);
 }
 
@@ -1520,7 +1534,7 @@ int main(int argc, char *argv[])
       if (*argv[i] == '-') {
          switch (argv[i][1]) {
          case '2': TLIO = 1; break;
-         case '4': regs = figregs; GRP_UART = 1; break;
+         case '4': GRP_UART = 1; break;
          case 'd': onlydasm = 1; break;
          case 'b': begin = strtol(argv[i] + 2, &endptr, 16); break;
          case 'e': end   = strtol(argv[i] + 2, &endptr, 16); break;
@@ -1541,10 +1555,14 @@ int main(int argc, char *argv[])
             else
                fprintf(stderr,"max. 4 FDDs\n");
             break;
-         case 'g': regs = gllregs; break;
          case 'i': noidle = 0; break;
          case 'm': readdat = readidi; break;
          case 'p': strcpy(lprnm, argv[i]+2);
+                   break;
+         case 'r': if (readregs(argv[i]+2))
+                      fprintf(stderr,"no reg defs %s",argv[i]+2);
+                   else
+                      regs = custregs;
                    break;
          case 'u': ut20 = 1; break;
          case 's': MAX_MEM = atoi(argv[i] + 2);

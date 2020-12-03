@@ -5,6 +5,7 @@ a18/            assembler, tweaked to compile RCA ASM sources
 disasm/         disassembler, tweaked to read binary data
 sim18/          simulator, microFORTH nucleus reconstruction, figFORTH,
                 UT20 monitor, work in-progress
+calc18/         B-like language, compiles dumb native code
 
 
 NOTE: For the excellent 'Emma 02 Emulator' see 

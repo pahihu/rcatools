@@ -1,0 +1,96 @@
+..
+..  PROLOG
+..
+SP=#02
+PC=#03
+AC=#07
+AUX=#08
+MD=#09
+VAR=#0A
+SUB=#0B
+STVAR=#0C
+SSEG=#7EFF
+DSEG=#7F00
+..
+ ORG#0000
+
+ DIS,#00                        ..X=P=0
+ OUT 1,#01                      ..TWO-LEVEL I/O
+ LDI A.1(SSEG); PHI SP          ..SP=SSEG
+ LDI A.0(SSEG); PLO SP
+ SEX SP                         ..X=SP
+ GHI R0 ;PHI SUB                ..SUB.1=#00
+ PHI STVAR                      ..STVAR=STVAR0
+ LDI A.0(STVAR0) ;PLO STVAR
+ LDI A.1(DSEG); PHI VAR         ..VAR.1=DSEG.1
+ LDI A.1(MAIN) ;PHI PC          ..PC=MAIN
+ LDI A.0(MAIN) ;PLO PC
+ SEP PC
+ ..
+ ..  PUTC
+ ..
+RPUTC:
+ SEP PC
+PUTC:
+ GLO AC ;STR SP
+ OUT 2 ;DEC SP
+ BR RPUTC
+..
+..  MULT AC BY AUX.0
+..
+RUMULT:
+ SEP PC
+UMULT:
+ GHI AC ;STXD            .. *SP=AC
+ GLO AC ;STR SP
+ INC SP
+ GLO AUX ;PLO AC         .. AC.0=AUX.0
+ LDI #00 ;PLO MD ;PHI AC .. MD.0=AC.1=0
+ LDI #08 ;PLO AUX        .. AUX.0=8
+M1:
+ GLO AC ;SHR             .. IF AC.0 & 1 = 0 GOTO DIV2
+ BNF DIV2
+ DEC SP                  .. --SP
+ GHI AC       ;ADD ;PHI AC
+ GLO MD ;IRX  ;ADC ;PLO MD  .. (MD.0,AC.1) += *SP
+DIV2:
+ GLO MD ;SHR  ;PLO MD    .. (MD.0,AC.1,AC.0) >> 1
+ GHI AC ;SHRC ;PHI AC
+ GLO AC ;SHRC ;PLO AC
+ DEC AUX                 .. IF --AUX != 0 GOTO LOOP
+ GLO AUX ;BNZ M1
+ BR RUMULT
+..
+..  DIVIDE AC BY AUX.0
+..
+RUDIV:
+ SEP PC
+UDIV:
+ GLO AUX ;STR SP         .. *SP = AUX.0
+ LDI #00 ;PLO MD
+ LDI #10 ;PLO AUX        .. AUX.0 = 16
+M2:
+ GLO AC ;SHL ;PLO AC     .. (MD.0,AC) << 1
+ GHI AC ;SHLC ;PHI AC
+ GLO MD ;SHLC ;PLO MD
+ SM                      .. IF MD - *SP < 0 GOTO NEG
+ BNF NEG
+ PLO MD                  .. MD = MD - *SP
+ GLO AC ;ADI #01 ;PLO AC .. AC = AC + 1
+NEG:
+ DEC AUX
+ GLO AUX ;BNZ M2
+ GLO MD ;PLO AUX         .. AUX.0 = REM
+ BR RUDIV
+..
+..  ST [VAR],AC
+..
+RSTVAR0: SEP PC
+STVAR0:
+ GLO AC ;STR VAR ;INC VAR
+ GHI AC ;STR VAR
+ BR RSTVAR0
+..
+..  PROGRAM
+..
+MAIN:
