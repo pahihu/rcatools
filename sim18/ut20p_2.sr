@@ -413,4 +413,4 @@ EXITDF: LDI #01;SHR     ..SET DFLAG
         SEP R5          ..AND RETURN
 EXITEF: SHR             ..RESET DFLAG
         SEP R5          ..AND RETURN
-        END
+        END #8400

@@ -114,7 +114,7 @@ parse the source line convert it into the object bytes that it represents.
 char errcode, lline[MAXLINE + 1], title[MAXLINE];
 int pass = 0, newpass;
 int eject, filesp, forwd, listhex, caphex = 1, lineno;
-int comment = ';', multisep = '!', ut4mon = 0, autobr = 0;
+int comment = ';', multisep = '!', ut4mon = 0, autobr = 0, binout = 0;
 unsigned cvtlo = 0;
 unsigned address, bytes, errors, listleft, pagelen, pc;
 unsigned line_bytes, line_obj[MAXLINE], *obj;
@@ -255,7 +255,7 @@ dolst:			    if (!*++*argv) {
 				if (!--argc) { warning(NOBIN);  break; }
 				else ++argv;
 			    }
-			    bopen(*argv);
+			    bopen(*argv); binout = 1;
 			    break;
 		case 'x':
 		case 'X':   if (!*++*argv) {
@@ -622,7 +622,8 @@ static void pseudo_op(void)
 			done = eject = TRUE;
 			if (ut4mon) eject = FALSE;
 			if (pass == 2 && (lex() -> attr & TYPE) != EOL) {
-			    unlex();  hseek(address = expr());
+			    unlex();  address = expr();
+                            if (!binout) hseek(address);
 			}
 			if (ifsp) error('I');
 		    }

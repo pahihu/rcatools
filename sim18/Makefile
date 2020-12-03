@@ -40,9 +40,11 @@ fforth.idi: fforth.sr
 #
 ut20p_1.bin: ut20p_1.sr
 	a18 ut20p_1.sr -r -f 0C4H -L ut20p_1.lst -b ut20p_1.bin
+	a18 ut20p_1.sr -r -f 0C4H -L ut20p_1.lst -o ut20p_1.hex
 
 ut20p_2.bin: ut20p_2.sr
 	a18 ut20p_2.sr -r -f 0C4H -L ut20p_2.lst -b ut20p_2.bin
+	a18 ut20p_2.sr -r -f 0C4H -L ut20p_2.lst -o ut20p_2.hex
 
 ut20.rom: ut20p_1.bin ut20p_2.bin
 	touch ut20.rom
@@ -53,5 +55,5 @@ clean:
 	$(RM) nucleus.lst nucleus.bin
 	$(RM) fforth.idi
 	$(RM) ut20.rom
-	$(RM) ut20p_1.lst ut20p_1.bin
-	$(RM) ut20p_2.lst ut20p_2.bin
+	$(RM) ut20p_1.lst ut20p_1.bin ut20p_1.hex
+	$(RM) ut20p_2.lst ut20p_2.bin ut20p_2.hex

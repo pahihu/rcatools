@@ -46,6 +46,7 @@
  * 201127AP $L reads track# in decimal
  *          handle/emit DC3 EOF
  * 201202AP register name definitions with -r
+ * 201203AP load Intel Hex fmt
  *
  */
 
@@ -1398,12 +1399,104 @@ int readregs(char *fn)
    return 0;
 }
 
+static int ihex_start;
+
+char *ihex(char *p, int *ret)
+{
+   int byt, c;
+
+   if (!p)
+      return p;
+
+   byt = 0;
+   if (!ishex(c = *p++))
+      return NULL;
+   byt = 16 * digit(c);
+
+   if (!ishex(c = *p++))
+      return NULL;
+   byt += digit(c);
+
+   *ret = *ret + byt;
+
+   return p;
+}
+
+int readihex(char *fn, int offs)
+{
+   FILE *fin;
+   char *p, buf[128];
+   int i, n, bytes;
+   int cnt, typ, adr, byt, cksum, sum;
+
+   printf("load %s\n",fn);
+   fin = fopen(fn, "r");
+   if (!fin)
+      return -1;
+
+   bytes = 0;
+   p = fgets(buf, 127, fin);
+   while (!feof(fin)) {
+      if (!p) {
+         bytes = 2;
+         break;
+      }
+      n = strlen(buf);
+      if (n && buf[n-1] == '\n')
+         buf[n-1] = '\0';
+      if (':' != *p++) {
+         bytes = -3;
+         break;
+      }
+      cnt = adr = typ = cksum = 0;
+      p = ihex(p, &cnt);
+      p = ihex(p, &adr); adr *= 256;
+      p = ihex(p, &adr);
+      p = ihex(p, &typ);
+      if (!p) {
+         bytes = -4;
+         break;
+      }
+
+      sum = cnt + HI(adr) + LO(adr) + typ;
+      if (0x01 == typ)
+         ihex_start = adr;
+      for (i = 0; i < cnt; i++) {
+         byt = 0;
+         p = ihex(p, &byt);
+         if (p) {
+            memwr(adr, byt); adr = (adr + 1) & 0x0FFFF;
+            sum += byt;
+            bytes++;
+         }
+      }
+      if (!p) {
+         bytes = -5;
+         break;
+      }
+
+      p = ihex(p, &cksum);
+      sum = LO(256 - LO(sum));
+      if (!p || sum != cksum) {
+         bytes = -6;
+         break;
+      }
+      p = fgets(buf, 127, fin);
+   }
+   fclose(fin);
+
+   if (bytes > 0)
+      printf("start at %04X\n",ihex_start);
+
+   return bytes;
+}
 
 int readbin(char *fn, int offs)
 {
    FILE *fin;
    int bytes;
 
+   printf("load %s at %04X\n",fn,offs);
    fin = fopen(fn, "rb");
    bytes = 0;
    while (!feof(fin)) {
@@ -1422,6 +1515,7 @@ int readidi(char *fn, int offs)
    FILE *fin;
    int bytes;
 
+   printf("load %s\n",fn);
    fin = fopen(fn, "rt");
    bytes = ut20mon(fin);
    fclose(fin);
@@ -1466,6 +1560,7 @@ void usage(void)
    fprintf(stderr,"   -d         disassemble only\n");
    fprintf(stderr,"   -exxxx     end address\n");
    fprintf(stderr,"   -f<fdd>    use disk file (max. 4)\n");
+   fprintf(stderr,"   -h         set Intel Hex fmt\n");
    fprintf(stderr,"   -i         enable IDL processing\n");
    fprintf(stderr,"   -m         set M-rec fmt\n");
    fprintf(stderr,"   -p<file>   lpr file name, default \"lpr.out\"\n");
@@ -1474,7 +1569,7 @@ void usage(void)
    fprintf(stderr,"   -t         trace\n");
    fprintf(stderr,"   -u         start BUT20 (?DMR,!AM,$BLPQUXY)\n");
    fprintf(stderr,"   -x         Mark Riley's port extender+mapper\n");
-   fprintf(stderr,"   file       load bin/M-rec fmt at 'begin' adr\n");
+   fprintf(stderr,"   file       load bin/M-rec/IHex fmt at 'begin' adr\n");
    fprintf(stderr,"\n");
    fprintf(stderr,"BUT20 commands:\n");
    fprintf(stderr,"   ?Dadr len                 disassemble\n");
@@ -1555,6 +1650,7 @@ int main(int argc, char *argv[])
             else
                fprintf(stderr,"max. 4 FDDs\n");
             break;
+         case 'h': ihex_start = 0; readdat = readihex; break;
          case 'i': noidle = 0; break;
          case 'm': readdat = readidi; break;
          case 'p': strcpy(lprnm, argv[i]+2);
@@ -1576,10 +1672,13 @@ int main(int argc, char *argv[])
       }
       else {
          storage();
-         printf("load %s at %04X\n", argv[i], begin);
          bytes = readdat(argv[i], begin);
          printf("read %d (#%02X) bytes\n", bytes, bytes);
-         begin = 0; readdat = readbin;
+         if (readihex == readdat && bytes > 0)
+            begin = ihex_start;
+         else
+            begin = 0;
+         readdat = readbin;
       }
    }
 
