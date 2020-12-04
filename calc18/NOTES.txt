@@ -1,0 +1,115 @@
+Register allocation:
+====================
+0  DMA
+1  INT
+2  INTSP
+3  PC
+4  SCALL
+5  SRET
+6  ARGPTR
+7  SP
+8  RETVAL/AC
+9  AUX
+A  ---
+B  ---
+C  ---
+D  TMP
+E  VARPTR/MQ
+F  FP
+
+
+Stack is descending, caller increments stack by number of bytes pushed.
+
+Caller:
+        PUSH arg1
+        ...
+        PUSH argN
+        SEP  SCALL,A(SUB)
+        ADD  SP,2*#ARGS
+        ...
+
+
+Callee:
+SUB:    PUSH FP
+        MOV  FP,SP
+        ...
+        MOV  RETVAL,XXXX        ..RETURN (RVAL)
+        LBR  ESUB
+
+        LBR  ESUB               ..RETURN
+ESUB:   MOV  SP,FP
+        POP  FP
+        SEP  SRET
+
+
+
+        ARG1.1
+        ARG1.0
+        ...
+        ARGN.1          4
+        ARGN.0          3
+        OLDFP.1         2
+        OLDFP.0         1
+FP===>  LOC1.1          0
+        LOC1.0          1
+        ...
+        LOCN.1
+        LOCN.0
+
+extrn   LDI A.0(EXTRN) ;PLO VARPTR
+        LDI A.1(EXTRN) ;PHI VARPTR
+
+par     GLO FP ;ADD #ARG ;PLO VARPTR            ..MAX 256BYTES  3,5,...
+        GHI FP ;ADC #00  ;PHI VARPTR
+
+auto    GLO FP ; SMI #AUT.0 ;PLO VARPTR         ..1,3,5...
+        GHI FP ; SMBI #AUT.1 ;PHI VARPTR
+
+
+opr(VARDEF,id(symidx),con(size));
+opr(VECDEF,id(symidx),con(size));
+opr(FUNDEF,id(symidx),opr(INT,id_list,stmt));
+opr(ILST,id_list,id(symidx));
+
+opr(FUNCALL,lval,expr_list);
+opr(XLST,expr_list,expr);
+
+opr(RETURN,expr|NULL,NULL);
+
+C_EXTRN  by name (Xname)
+C_AUTO   FP+offs (1,3,5...)
+C_LABEL  by name (Lname)
+C_PARAM  FP-offs (1,3,5...)
+
+opr(EXTDEF,id_list,NULL);       spec id_list: a[0] is the storage size
+opr(AUTODEF,id_list,NULL);
+
+
+Subroutine techniques:
+=====================
+
+a)
+MAIN:   SEP SUB1
+
+
+RSUB1:  SEP PC
+SUB1:   ...
+        BR RSUB1
+
+
+b)
+MAIN:   MARK
+        SEP SUB1,<inline data>
+        DEC SP
+
+
+RSUB1:  RET
+SUB1:   <use LDXA to get inline data>
+        ...
+        SEX SP; IRX
+        BR RSUB1
+        
+
+c) SCRT (Standard CALL/RET Technique)
+   parameter passing: inline after the call, in registers, memory area pointed
+   by a register, a reserved area of memory, DF, Q

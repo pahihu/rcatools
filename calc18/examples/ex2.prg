@@ -1,5 +1,8 @@
-for (x = 65; x < 91; x = x + 1) {
-  print x;
+main() {
+   auto x;
+   for (x = 'A'; x < 91; x = x + 1) {
+     print x;
+   }
+   print 13;
+   print 10;
 }
-print 13;
-print 10;

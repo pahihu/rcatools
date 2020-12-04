@@ -79,7 +79,7 @@ extdef:
 
 id_list:
           /* NULL */            { $$ = NULL; }
-        | id                    { $$ = opr(ILST, $1, NULL); }
+        | id                    { $$ = opr(ILST, NULL, $1); }
         | id_list ',' id        { $$ = opr(ILST, $1, $3); }
         ;
 
@@ -123,7 +123,7 @@ stmt_list:
 
 expr_list:
           /* NULL */            { $$ = NULL; }
-        | expr                  { $$ = $1; }
+        | expr                  { $$ = opr(XLST, NULL, $1); }
         | expr_list ',' expr    { $$ = opr(XLST, $1, $3); }
         ;
 

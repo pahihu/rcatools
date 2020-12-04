@@ -409,6 +409,55 @@ static void gldvar(void) {
    H(" LDN VARPTR ;PHI AC\n");
 }
 
+static int idlist(int t,NODE *p, int offs) {
+   int n;
+   NODE *q;
+
+   if (!p)
+      return offs;
+
+   assert(OPR == p->t && ILST == p->x);
+   offs = idlist(t,p->a[0],offs);
+   q = p->a[1];
+   assert(isvar(q));
+   n = q->x;
+   switch (t) {
+   case ILST:
+      fprintf(stderr,"defpar%d: %s\n",offs,getsym(n));
+      defcls(n, C_PARAM, offs);
+      offs += 2;
+      break;
+   case EXTDEF:
+      fprintf(stderr,"defext: %s\n",getsym(n));
+      defcls(n, C_EXTRN, 0);
+      break;
+   case AUTODEF:
+      q = q->a[0]; // storage size
+      assert(CON == q->t);
+      fprintf(stderr,"defauto: %s %d\n",getsym(n), offs);
+      defcls(n, C_AUTO, offs);
+      offs += q->x;
+      break;
+   }
+   return offs;
+}
+
+static int exprlist(NODE *p, int offs) {
+   int n;
+   NODE *q;
+
+   if (!p)
+      return offs;
+
+   assert(OPR == p->t && XLST == p->x);
+   offs = exprlist(p->a[0],offs);
+   H(" ..PUSH ARG%d\n",++offs);
+   ex(p->a[1]);
+   gpushac(2);
+
+   return offs;
+}
+
 
 int ex(NODE *p) {
    int lbl1, lbl2, lbl3;
@@ -449,40 +498,13 @@ int ex(NODE *p) {
          H(" ORG*+%d\n",p->a[1]->x);
          break;
       case ILST:
-         offs = 1;
-         while (p) {
-            assert(isvar(p->a[0]));
-            n = p->a[0]->x;
-fprintf(stderr,"defpar%d: %s\n",offs,getsym(n));
-            defcls(n, C_PARAM, offs);
-            p = p->a[1]; offs += 2;
-         }
+         idlist(ILST, p, 1);
          break;
       case EXTDEF:
-         p = p->a[0]; // id_list
-         assert(OPR == p->t && ILST == p->x);
-         while (p) {
-            assert(isvar(p->a[0]));
-            n = p->a[0]->x;
-fprintf(stderr,"defext: %s\n",getsym(n));
-            defcls(n, C_EXTRN, 0);
-            p = p->a[1];
-         }
+         idlist(EXTDEF, p->a[0], 0);
          break;
       case AUTODEF:
-         p = p->a[0]; // id_list
-         assert(OPR == p->t && ILST == p->x);
-         offs = 1;
-         while (p) {
-            assert(isvar(p->a[0]));
-            n = p->a[0]->x;
-            q = p->a[0]->a[0]; // storage size
-            assert(CON == q->t);
-fprintf(stderr,"defauto: %s %d\n",getsym(n), offs);
-            defcls(n, C_AUTO, offs);
-            offs += q->x;
-            p = p->a[1];
-         }
+         offs = idlist(AUTODEF, p->a[0], 1);
          H(" ..AUTO SIZE %d,ADJUST SP\n",offs);
          H(" GLO SP ;SMI #%02X; PLO SP\n",LO(offs));
          H(" GHI SP ;SMBI #%02X; PHI SP\n",HI(offs));
@@ -504,14 +526,7 @@ fprintf(stderr,"defauto: %s %d\n",getsym(n), offs);
          dropsyms(oframe);
          break;
       case XLST: // expr list
-         offs = 1; argcnt = 0;
-         while (p) {
-            H(" ..PUSH ARG%d\n",offs++);
-            argcnt++;
-            ex(p->a[0]);
-            gpushac(2);
-            p = p->a[1];
-         }
+         argcnt = exprlist(p, 0);
          break;
       case FUNCALL:
          sym = getsym(p->a[0]->x);
