@@ -11,17 +11,20 @@ typedef struct _NODE {
    struct _NODE *a[2];  // args
 } NODE;
 
-#define UNARY   128
 #define INT     -1
 
-#define PREINC  512+0
-#define PREDEC  512+1
-#define POSTINC 512+2
-#define POSTDEC 512+3
+#define C_UNDEF   0
+#define C_EXTRN   1
+#define C_AUTO    2
+#define C_LABEL   3
+#define C_PARAM   4
 
-#define LABEL   65536
-void deflbl(int n);
+void defcls(int n, int cls, int offs);
 char *getsym(int n);
 int getoffs(int n);
+int getcls(int n);
+int getnsyms(void);
+void dropsyms(int n);
+extern char *fn; // current fn
 
 #endif

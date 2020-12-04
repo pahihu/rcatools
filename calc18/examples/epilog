@@ -1,6 +1,8 @@
 ..
 ..  EPILOG
 ..
+Lexit:
  IDL     ..STOP
-
+DIE:
+ LBR DIE,#DEAD
  END

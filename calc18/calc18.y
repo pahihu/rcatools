@@ -25,6 +25,7 @@ int vars[26];
  * 201202AP initial revision
  * 201203AP resolved yacc conflicts
  *          labels, goto lbl, logical AND/OR/NOT
+ * 201204AP function call, return
  *
  */
 %}
@@ -37,7 +38,7 @@ int vars[26];
 
 %token <con> CONST
 %token <sym> VAR
-%token WHILE IF PRINT FOR INC DEC GOTO
+%token WHILE IF PRINT FOR INC DEC GOTO RETURN EXTRN AUTO FUNCALL UNARY PREINC PREDEC POSTINC POSTDEC ILST XLST FUNDEF VARDEF VECDEF EXTDEF AUTODEF
 %nonassoc IFX
 %nonassoc ELSE
 
@@ -56,17 +57,35 @@ int vars[26];
 %nonassoc UNOP
 %nonassoc GRP
 
-%type <ptr> stmt expr stmt_list simplestmt lvalue base
+%type <ptr> stmt stmt_list expr expr_list id id_list simplestmt lvalue base extdef
 
 %%
 
 program:
-        function        { exit(0); }
+          definition            { exit(0); }
         ;
 
-function:
-        function stmt   { ex($2); freenod($2); }
+definition:
+          definition extdef     { ex($2); freenod($2); }
         | /* NULL */
+        ;
+
+
+extdef:
+          VAR ';'               { $$ = opr(VARDEF, id($1), con(2)); }
+        | VAR '[' CONST ']' ';' { $$ = opr(VECDEF, id($1), con(2*$3)); }
+        | VAR '(' id_list ')' stmt { $$ = opr(FUNDEF, id($1), opr(INT, $3, $5)); }
+        ;
+
+id_list:
+          /* NULL */            { $$ = NULL; }
+        | id                    { $$ = opr(ILST, $1, NULL); }
+        | id_list ',' id        { $$ = opr(ILST, $1, $3); }
+        ;
+
+id:
+          VAR                   { $$ = id($1); $$->a[0] = con(2);  }
+        | VAR CONST             { $$ = id($1); $$->a[0] = con(2*$2); }
         ;
 
 simplestmt:                     { $$ = opr(';', NULL, NULL); }
@@ -75,6 +94,8 @@ simplestmt:                     { $$ = opr(';', NULL, NULL); }
 
 stmt:
           ';'                   { $$ = opr(';', NULL, NULL); }
+        | EXTRN id_list ';'     { $$ = opr(EXTDEF, $2, NULL); }
+        | AUTO id_list ';'      { $$ = opr(AUTODEF, $2, NULL); }
         | expr ';'              { $$ = $1; }
         | PRINT expr ';'        { $$ = opr(PRINT, $2, NULL); }
         | WHILE '(' expr ')' stmt
@@ -87,15 +108,23 @@ stmt:
         | IF '(' expr ')' stmt ELSE stmt
                                 { $$ = opr3(IF, $3, $5, $7); }
         | '{' stmt_list '}'     { $$ = $2; }
-        | VAR ':' stmt          { deflbl($1); $$ = opr(':', id($1), $3); }
-        | GOTO VAR ';'          { deflbl($2);
+        | VAR ':' stmt          { defcls($1,C_LABEL,0); $$ = opr(':', id($1), $3); }
+        | GOTO VAR ';'          { defcls($2,C_LABEL,0);
                                   $$ = opr(GOTO, id($2), NULL);
                                 }
+        | RETURN ';'            { $$ = opr(RETURN, NULL, NULL); }
+        | RETURN '(' expr ')' ';' { $$ = opr(RETURN, $3, NULL); }
         ;
 
 stmt_list:
           stmt                  { $$ = $1; }
         | stmt_list stmt        { $$ = opr(';', $1, $2); }
+        ;
+
+expr_list:
+          /* NULL */            { $$ = NULL; }
+        | expr                  { $$ = $1; }
+        | expr_list ',' expr    { $$ = opr(XLST, $1, $3); }
         ;
 
 expr:
@@ -107,6 +136,7 @@ expr:
         | DEC lvalue %prec UNOP { $$ = opr(PREDEC, $2, NULL); }
         | lvalue INC %prec GRP  { $$ = opr(POSTINC, $1, NULL); }
         | lvalue DEC %prec GRP  { $$ = opr(POSTDEC, $1, NULL); }
+        | VAR '(' expr_list ')' %prec GRP { $$ = opr(FUNCALL, id($1), $3); }
         | '-' expr %prec UNOP   { $$ = opr(UNARY + '-', $2, NULL); }
         | '!' expr %prec UNOP   { $$ = opr('!', $2, NULL); }
         | '~' expr %prec UNOP   { $$ = opr('~', $2, NULL); }

@@ -7,11 +7,13 @@ void yyerror(char*);
 #define MAXSYM 128
 int nsyms = 0, dseg = 0;
 struct {
-   char *sym;
-   int offs;
+   char *sym;   // name
+   int cls;     // storage cls
+   int offs;    // addr/offset
 } syms[MAXSYM];
 
 int findsym(char*);
+int defsym(char*);
 int findid(char*);
 
 /*
@@ -19,7 +21,8 @@ int findid(char*);
  * =======
  * 201202AP     initial revision, single char vars
  * 201203AP     keywords, symbols, char const
- *              logical AND/OR/NOT
+ *              goto, logical AND/OR/NOT
+ * 201204AP     return, symbol table mgmt, extrn, auto
  *
  */
 %}
@@ -30,16 +33,8 @@ int findid(char*);
                    int s;
                    if ((s = findid(yytext)))
                       return s;
-                   if ((s = findsym(yytext)) < 0) {
-                      if (nsyms == MAXSYM) {
-                         fprintf(stderr,"symbol table full");
-                         exit(1);
-                      }
-                      s = nsyms++;
-                      syms[s].sym = strdup(yytext);
-                      syms[s].offs = -1;
-                      fprintf(stderr,"sym %s\n", yytext);
-                   }
+                   if ((s = findsym(yytext)) < 0)
+                      s = defsym(yytext);
                    yylval.sym = s;
                    return VAR;
                 }
@@ -48,7 +43,7 @@ int findid(char*);
                    return CONST;
                 }
 
-[-()<>=+*/;{}&|^~\[\]%:\?\!.] {
+[-()<>=+*/;{}&|^~\[\]%:\?\!,.] {
                    return *yytext;
                 }
 "'"[^']+"'"     {
@@ -88,11 +83,28 @@ int yywrap(void) {
 
 int findsym(char *s) {
    int i;
-   for (i = 0; i < nsyms; i++) {
-      if (0 == strcmp(syms[i].sym, s))
-         return i;
-   }
+
+   // search backwards
+   for (i = nsyms; i; i--)
+      if (0 == strcmp(syms[i-1].sym, s))
+         return i-1;
    return -1;
+}
+
+int defsym(char *s) {
+   int n;
+
+   if (nsyms == MAXSYM) {
+      fprintf(stderr,"symbol table full");
+      exit(1);
+   }
+   n = nsyms++;
+   syms[n].sym  = strdup(s);
+   syms[n].offs = -1;
+   syms[n].cls  = C_UNDEF;
+   fprintf(stderr,"sym %s\n", yytext);
+
+   return n;
 }
 
 int findid(char *s) {
@@ -100,11 +112,14 @@ int findid(char *s) {
       char *id;
       int tok;
    } ids[] = {
+      {"auto",  AUTO},
       {"else" , ELSE},
+      {"extrn", EXTRN},
       {"for"  , FOR},
       {"goto" , GOTO},
       {"if"   , IF},
       {"print", PRINT},
+      {"return",RETURN},
       {"while", WHILE},
       {0      , 0}
    };
@@ -116,11 +131,21 @@ int findid(char *s) {
    return 0;
 }
 
-void deflbl(int n) {
-   if (LABEL != syms[n].offs) {
-      fprintf(stderr,"lbl %s\n",syms[n].sym);
-      syms[n].offs = LABEL;
+static char* clsnm[] = { "undef", "extrn", "auto", "label", "param" };
+
+void redeferr(int n) {
+   fprintf(stderr,"%s redefined, was %s\n",syms[n].sym,clsnm[syms[n].cls]);
+   exit(1);
+}
+
+void defcls(int n, int cls, int offs) {
+   if (C_UNDEF == syms[n].cls) {
+      fprintf(stderr,"%s %s %d\n",clsnm[cls],syms[n].sym,offs);
+      syms[n].cls = cls;
+      syms[n].offs = offs;
+      return;
    }
+   redeferr(n);
 }
 
 char *getsym(int n) {
@@ -134,3 +159,19 @@ int getoffs(int n) {
    }
    return syms[n].offs;
 }
+
+int getcls(int n) {
+   return syms[n].cls;
+}
+
+int getnsyms(void) {
+   return nsyms;
+}
+
+void dropsyms(int n) {
+   int i;
+   for (i = n; i < nsyms; i++)
+      free(syms[i].sym);
+   nsyms = n;
+}
+
