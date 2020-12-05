@@ -1,13 +1,13 @@
 sub(n) {
-   auto a, c;
+   auto a, buf 16, c;
 
-   a = 0777;
-   *(a--) = 0;
+   a = &buf[16];
+   *--a = 0;
    while (n) {
-      *(a--) = '0' + n % 10;
+      *--a = '0' + n % 10;
       n = n / 10;
    }
-   while (c = *(++a)) {
+   while (c = *a++) {
       print c;
    }
 }

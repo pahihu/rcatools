@@ -46,10 +46,14 @@ static int isvar(NODE *p) {
    return ID == p->t;
 }
 
-static int isimm8(NODE *p) {
+static int isimm(NODE *p) {
    if (!p)
       return 0;
-   return (CON == p->t) && !HI(p->x);
+   return CON == p->t;
+}
+
+static int isimm8(NODE *p) {
+   return isimm(p) && !HI(p->x); 
 }
 
 static int isbyte(NODE *p) {
@@ -66,6 +70,12 @@ static void gpush(int n, char *reg) {
       H(" GHI %s ;STXD\n",reg);
       H(" GLO %s ;STXD\n",reg);
    }
+}
+
+static void gpushi(int x) {
+   H(" ..PUSHI %02X%02X\n",HI(x),LO(x));
+   H(" LDI #%02X ;STXD\n",HI(x));
+   H(" LDI #%02X ;STXD\n",LO(x));
 }
 
 static void gpushac(int n) {
@@ -219,8 +229,8 @@ static void glog(NODE *p, char *xop, char *imop) {
 
       ex(p->a[0]);
       H(" ..AC=AC %s %04X\n",xop,con->x);
-      H(" GLO AC ;%s %02X ;PLO AC\n", imop, LO(con->x));
-      H(" GHI AC ;%s %02X ;PHI AC\n", imop, HI(con->x));
+      H(" GLO AC ;%s #%02X ;PLO AC\n", imop, LO(con->x));
+      H(" GHI AC ;%s #%02X ;PHI AC\n", imop, HI(con->x));
    }
    else {
       gbinary(p);
@@ -244,6 +254,16 @@ static void gwhile(NODE *cond, NODE *body, NODE *end) {
       ex(end);
    H(" LBR L%04d\n",lbl1);
    H("L%04d: ..END\n",lbl3);
+}
+
+static void gldi(int x) {
+   H(" ..AC=%02X%02X\n",HI(x),LO(x));
+   if (HI(x) == LO(x))
+      H(" LDI #%02X ;PHI AC ;PLO AC\n",HI(x));
+   else {
+      H(" LDI #%02X ;PHI AC\n",HI(x));
+      H(" LDI #%02X ;PLO AC\n", LO(x));
+   }
 }
 
 static void glvalu(NODE *p) { // addr in MA
@@ -288,11 +308,26 @@ static void glvalu(NODE *p) { // addr in MA
          return;
       }
       else if ('[' == p->x) {
-         ex(p->a[0]); // base
-         gmul2();
-         gpushac(2);
-         ex(p->a[1]); // index
-         gmul2();
+         // base
+         switch (p->a[0]->t) {
+         case ID:
+            glvalu(p->a[0]);    // id[x]
+            gpush(2,"MA");
+            break;
+         case CON:              // const[x]
+            gpushi(2*p->a[0]->x);
+            break;
+         default:               // (expr)[x]
+            ex(p->a[0]);
+            gmul2();
+            gpushac(2);
+         }
+         if (isimm(p->a[1]))
+            gldi(2*p->a[1]->x);
+         else {
+            ex(p->a[1]); // index
+           gmul2();
+         }
          H(" ..MA=AC+*SP++\n");
          H(" IRX ;GLO AC ;ADD ;PLO MA\n");
          H(" IRX ;GHI AC ;ADC ;PHI MA\n");
@@ -481,13 +516,7 @@ int ex(NODE *p) {
    }
    switch (p->t) {
    case CON:
-      H(" ..AC=%04X\n",p->x);
-      if (HI(p->x) == LO(p->x))
-        H(" LDI #%02X ;PHI AC ;PLO AC\n",HI(p->x));
-      else {
-        H(" LDI #%02X ;PHI AC\n",HI(p->x));
-        H(" LDI #%02X ;PLO AC\n", LO(p->x));
-      }
+      gldi(p->x);
       break;
    case ID: glvalu(p); gldvar(); break;
    case OPR:
@@ -652,10 +681,17 @@ int ex(NODE *p) {
       case POSTDEC: gpredec(p); H(" INC AC\n"); break;
       case '[': H(" ..AREF\n"); glvalu(p); gldvar(); break;
       case UNARY + '-':
-         ex(p->a[0]);
-         H(" ..NEG AC\n");
-         H(" GLO AC ;XRI #FF ;ADI #01 ;PLO AC\n");
-         H(" GHI AC ;XRI #FF ;ADCI #00 ;PHI AC\n");
+         if (isimm(p->a[0])) {
+            i = -(p->a[0]->x);
+            H(" ..AC=-%d\n",p->a[0]->x);
+            H(" LDI #%02X ;PLO AC\n",LO(i));
+            H(" LDI #%02X ;PHI AC\n",HI(i));
+         } else {
+            ex(p->a[0]);
+            H(" ..NEG AC\n");
+            H(" GLO AC ;SDI #00 ;PLO AC\n");
+            H(" GHI AC ;SDBI #00 ;PHI AC\n");
+         }
          break;
       case '~': ex(p->a[0]); gcom(); break;
       case '!': ex(p->a[0]); geq0(); break;
@@ -678,8 +714,8 @@ int ex(NODE *p) {
          H("L%04d: ..SKIP\n", lbl1);
          break;
       case UNARY + '&':
-         H(" ..AC=WADDR(%s)\n", getsym(p->a[0]->x));
          glvalu(p->a[0]);
+         H(" ..AC=WADDR(MA)\n");
          H(" GHI MA ;SHR  ;PHI AC\n");
          H(" GLO MA ;SHRC ;PLO AC\n");
          break;

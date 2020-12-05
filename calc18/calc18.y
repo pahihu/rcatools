@@ -15,7 +15,7 @@ void yyerror(char*);
 int vars[26];
 
 #define opr(x,l,r)      nod(OPR,x,l,r)
-#define opr3(x,a0,a1,a2)  nod(OPR,x,a0,nod(OPR,x,a1,a2))
+#define opr3(x,a0,a1,a2)  nod(OPR,x,a0,nod(INT,x,a1,a2))
 #define id(x)           nod(ID,x,NULL,NULL)
 #define con(x)          nod(CON,x,NULL,NULL)
 
@@ -104,7 +104,7 @@ stmt:
         | FOR '(' stmt stmt simplestmt ')' stmt
                                 { $$ = opr(FOR, $7, opr(INT, $3, opr(INT, $4, $5))); }
         | IF '(' expr ')' stmt %prec IFX
-                                { $$ = opr(IF, $3, $5); }
+                                { $$ = opr3(IF, $3, $5, NULL); }
         | IF '(' expr ')' stmt ELSE stmt
                                 { $$ = opr3(IF, $3, $5, $7); }
         | '{' stmt_list '}'     { $$ = $2; }
@@ -165,7 +165,7 @@ expr:
 
 lvalue:
           VAR                   { $$ = id($1); }
-        | '*' base %prec UNOP   { $$ = opr(UNARY + '*', $2, NULL); }
+        | '*' expr %prec UNOP   { $$ = opr(UNARY + '*', $2, NULL); }
         | base '[' expr ']'     { $$ = opr('[', $1, $3); }
         ;
 
