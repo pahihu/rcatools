@@ -1,4 +1,5 @@
 %{
+/* Code based on Niemann: "Lex & Yacc" */
 #include <stdlib.h>
 #include "calc18.h"
 #include "y.tab.h"
@@ -67,6 +68,22 @@ int findid(char*);
 ">>"            return SHR;
 "&&"            return LAND;
 "||"            return LOR;
+
+"/\*"           { /* paxdiablo 25jan2010 */
+                  int c;
+                  while(1) {
+                     while ('*' != (c = input()) && EOF != c);
+                     if ('*' == c) {
+                        while ('*' == (c = input()));
+                        if ('/' == c)
+                           break;
+                     }
+                     if (EOF == c) {
+                        yyerror("unterminated comment");
+                        break;
+                     }
+                  }
+                }
 
 [ \t\n]+        { /*ignore whitespace */
                   char *p = yytext;

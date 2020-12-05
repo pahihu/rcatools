@@ -1,4 +1,5 @@
 %{
+/* Code based on Niemann: "Lex & Yacc" */
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
