@@ -43,13 +43,13 @@ ESUB:   MOV  SP,FP
 
 
 
-        ARGN.1
-        ARGN.0
+        ARG1.1
+        ARG1.0
         ...
-        ARG1.1          6
-        ARG1.0          5
-        SCALL
-        SCALL
+        ARGN.1          6
+        ARGN.0          5
+        SCAL
+        SCAL
         OLDFP.1         2
         OLDFP.0         1
 FP===>  LOC1.1          0

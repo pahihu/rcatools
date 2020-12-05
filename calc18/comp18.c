@@ -452,20 +452,19 @@ static void gldvar(void) {
 }
 
 static int idlist(int t,NODE *p, int offs) {
-   int n;
+   int n, newoffs;
    NODE *q;
 
    if (!p)
       return offs;
 
    assert(OPR == p->t && ILST == p->x);
-   offs = idlist(t,p->a[0],offs);
+   newoffs = idlist(t,p->a[0],ILST==t? 2+offs : offs);
    q = p->a[1];
    assert(isvar(q));
    n = q->x;
    switch (t) {
    case ILST:
-      offs += 2;
       // fprintf(stderr,"defpar%d: %s\n",offs,getsym(n));
       defcls(n, C_PARAM, offs);
       break;
@@ -476,12 +475,12 @@ static int idlist(int t,NODE *p, int offs) {
    case AUTODEF:
       q = q->a[0]; // storage size
       assert(CON == q->t);
-      offs += q->x;
-      // fprintf(stderr,"defauto: %s %d\n",getsym(n), offs);
-      defcls(n, C_AUTO, offs);
+      newoffs += q->x;
+      // fprintf(stderr,"defauto: %s %d\n",getsym(n), newoffs);
+      defcls(n, C_AUTO, newoffs);
       break;
    }
-   return offs;
+   return newoffs;
 }
 
 static int exprlist(NODE *p, int offs) {
@@ -536,7 +535,7 @@ int ex(NODE *p) {
          H(" ORG*+%d\n",p->a[1]->x);
          break;
       case ILST: // params
-         idlist(ILST, p, 3);
+         idlist(ILST, p, 5);
          break;
       case EXTDEF:
          idlist(EXTDEF, p->a[0], 0);

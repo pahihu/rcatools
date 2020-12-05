@@ -2,13 +2,13 @@ g;
 v[10];
 buf[16];
 
-nl() {
-   print 13;
-   print 10;
+putchar(c) {
+   print c;
 }
 
-putc(c) {
-   print c;
+nl() {
+   putchar(13);
+   putchar(10);
 }
 
 itoa(n) {
@@ -33,7 +33,16 @@ itoa(n) {
 puts(s) {
    auto c;
    while (c = *s++)
-      print c;
+      putchar(c);
+}
+
+/* Thompson: B Manual */
+printn(n,b) {
+   auto a;
+
+   if (a=n/b) /* assignment, not test for equality */
+      printn(a,b); /* recursive */
+   putchar(n%b + '0');
 }
 
 main() {
@@ -41,11 +50,13 @@ main() {
 
    g = 'G'; v[0] = 'V'; v[9] = '9';
    nl();
-   c = putc('E'); nl();
-   putc(c); nl();
-   putc(g); nl();
-   putc(v[0]); nl();
-   putc(v[9]); nl();
-   a = itoa(-42);
-   puts(a);
+   c = putchar('E'); nl();
+   putchar(c); nl();
+   putchar(g); nl();
+   putchar(v[0]); nl();
+   putchar(v[9]); nl();
+   a = itoa(42); puts(a);
+   printn(42,10); nl();
+   printn(42,8); nl();
+   printn(42,2); nl();
 }
