@@ -1,8 +1,8 @@
 main() {
    auto X;
    for (X = 65; X < 91; ++X) {
-      print X;
+      putc(X);
    }
-   print 13;
-   print 10;
+   putc(13);
+   putc(10);
 }

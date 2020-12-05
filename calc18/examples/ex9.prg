@@ -8,7 +8,7 @@ sub(n) {
       n = n / 10;
    }
    while (c = *a++) {
-      print c;
+      putc(c);
    }
 }
 
@@ -17,19 +17,19 @@ main() {
 
    *0777 = 077;
    x = y = 3;
-   print '@' + 2*3;
-   print '@' + 30 / 5;
-   print 13;
-   print 10;
+   putc('@' + 2*3);
+   putc('@' + 30 / 5);
+   putc(13);
+   putc(10);
    z = '@' + 6 % 7;
    while (z) {
-      print '0' + z % 10;
+      putc('0' + z % 10);
       z = z / 10;
    }
-   print 13;
-   print 10;
+   putc(13);
+   putc(10);
    z = '@' + 6 % 7;
    sub(z);
-   print 'D'; print 13; print 10;
+   putc('D'); putc(13); putc(10);
    end: ;
 }

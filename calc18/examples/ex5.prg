@@ -1,7 +1,7 @@
 main() {
    auto x;
 
-   print 'B';
+   putc('B');
    x = 0; while (++x);
-   print 'E';
+   putc('E');
 }

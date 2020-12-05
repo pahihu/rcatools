@@ -698,7 +698,7 @@ int ex(NODE *p) {
          ex(p->a[0]);
          gtobool();
          H(" ..LAND: IF AC==0 SKIP\n");
-         H(" LBZ L%0d\n", lbl1=lbl++);
+         H(" LBZ L%04d\n", lbl1=lbl++);
          ex(p->a[1]);
          gtobool();
          H("L%04d: ..SKIP\n", lbl1);
@@ -757,7 +757,7 @@ int ex(NODE *p) {
          case '|': glog(p, "OR", "ORI"); break;
          case '^': glog(p, "XOR", "XRI"); break;
          case SHR: gshr(p); break;
-         case SHL: gshr(p); break;
+         case SHL: gshl(p); break;
          default:
             fprintf(stderr,"unknown node (%d,%d)!\n",p->t,p->x);
             exit(1);

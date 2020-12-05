@@ -1,10 +1,6 @@
-putchar(c) {
-   print c;
-}
-
 nl() {
-   putchar(13);
-   putchar(10);
+   putc(13);
+   putc(10);
 }
 
 /* Thompson: B Manual */
@@ -13,7 +9,7 @@ printn(n,b) {
 
    if (a=n/b) /* assignment, not test for equality */
       printn(a,b); /* recursive */
-   putchar(n%b + '0');
+   putc(n%b + '0');
 }
 
 main() {

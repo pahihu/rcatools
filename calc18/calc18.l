@@ -51,8 +51,26 @@ int findid(char*);
                    unsigned int c;
                    char *p = yytext + 1;
                    yylval.con = 0;
-                   while ('\'' != (c = *p++))
+                   while ('\'' != (c = *p++) && c) {
+                      if ('*' == c) {
+                         c = *p++;
+                         switch (c) {
+                         case '0': c = 0; break;
+                         case 'e': c = 13; break;
+                         case '(': c = '{'; break;
+                         case ')': c = '}'; break;
+                         case 't': c = '\t'; break;
+                         case '*':
+                         case '\'': 
+                         case '"': break;
+                         case 'n': c = '\n'; break;
+                         default:
+                            break;
+                         }
+                      }
                       yylval.con = 256 * yylval.con + c;
+                   }
+                   if (!c) yyerror("unbalanced char const");
                    yylval.con &= 65535;
                    // fprintf(stderr,"%s = %d\n",yytext,yylval.con);
                    return CONST;

@@ -1,26 +1,30 @@
-x = y = 3;
-*0777 = 077;
-print '@' + 2*3;
-print '@' + 30 / 5;
-print 13;
-print 10;
-z = '@' + 6 % 7;
-while (z) {
-   print '0' + z % 10;
-   z = z / 10 + fn1();
-   return;
+main() {
+   auto x, y, z, a, c;
+
+   x = y = 3;
+   *0777 = 077;
+   putc('@' + 2*3);
+   putc('@' + 30 / 5);
+   putc(13);
+   putc(10);
+   z = '@' + 6 % 7;
+   while (z) {
+      putc('0' + z % 10);
+      z = z / 10;
+      return;
+   }
+   putc(13);
+   putc(10);
+   z = '@' + 6 % 7;
+   a = 0777;
+   *(a--) = 0;
+   while (z) {
+      *(a--) = '0' + z % 10;
+      z = z / 10;
+   }
+   while (c = *(++a)) {
+      putc(c);
+   }
+   return (3 + z);
+   end: ;
 }
-print 13;
-print 10;
-z = '@' + 6 % 7;
-a = 0777;
-*(a--) = 0;
-while (z) {
-   *(a--) = '0' + z % 10;
-   z = z / 10 + fn2(1, 2+3, a+2);
-}
-while (c = *(++a)) {
-   print c;
-}
-return (3 + z);
-end: ;

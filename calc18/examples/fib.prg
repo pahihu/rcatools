@@ -2,12 +2,7 @@
 buf[16];
 
 nl() {
-   print 13;
-   print 10;
-}
-
-putc(c) {
-   print c;
+   putc(13); putc(10);
 }
 
 itoa(n) {
@@ -25,7 +20,7 @@ itoa(n) {
 puts(s) {
    auto c;
    while (c = *s++)
-      print c;
+      putc(c);
 }
 
 puti(n) {

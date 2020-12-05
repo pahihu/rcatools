@@ -16,8 +16,8 @@ main() {
    if (sign) {
       *(a--) = '-';
    }
-   print 13; print 10;
+   putc(13); putc(10);
    while (c = *(++a)) {
-      print c;
+      putc(c);
    }
 }

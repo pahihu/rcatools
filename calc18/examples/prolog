@@ -32,14 +32,21 @@ SSEG=#7FFF
  SEP SCALL,A(Lmain)             ..main()
  SEP SCALL,A(Lexit)             ..exit()
  ..
- ..  PUTC
+ ..  putc(c)
  ..
-RPUTC:
- SEP PC
-PUTC:
- GLO AC ;STR SP
- OUT 2 ;DEC SP
- BR RPUTC
+Lputc:
+ GLO SP ;ADI #03 ;PLO MA        ..MA=ADDR(c)
+ GHI SP ;ADCI #00 ;PHI MA
+ LDN MA ;STR SP                 ..LOAD C.0
+ OUT 2  ;DEC SP                 ..EMIT
+ SEP SRET
+ ..
+ ..  getc()
+ ..
+Lgetc:
+ INP 2  ;PLO AC                 ..AC.0=KEY
+ LDI #00 ;PHI AC
+ SEP SRET
 ..
 ..  MULT AC BY AUX.0
 ..

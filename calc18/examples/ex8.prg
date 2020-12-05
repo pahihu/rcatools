@@ -8,8 +8,8 @@ main() {
       *--a = '0' + z % 10;
       z = z / 10;
    }
-   print 13; print 10;
+   putc(13); putc(10);
    while (c = *a++) {
-      print c;
+      putc(c);
    }
 }

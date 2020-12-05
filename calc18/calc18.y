@@ -44,7 +44,7 @@ int vars[26];
 %nonassoc ELSE
 
 %nonassoc LVALUE
-%left '='
+%right '='
 %left '?' ':'
 %left LOR
 %left LAND
@@ -115,6 +115,8 @@ stmt:
                                 }
         | RETURN ';'            { $$ = opr(RETURN, NULL, NULL); }
         | RETURN '(' expr ')' ';' { $$ = opr(RETURN, $3, NULL); }
+        | error ';'             { $$ = NULL; }
+        | error '}'             { $$ = NULL; }
         ;
 
 stmt_list:

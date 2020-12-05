@@ -3,12 +3,9 @@ v[10];
 buf[16];
 
 putchar(c) {
-   print c;
-}
-
-nl() {
-   putchar(13);
-   putchar(10);
+   if (c == '*n')
+      putc(13);
+   putc(c);
 }
 
 itoa(n) {
@@ -49,14 +46,14 @@ main() {
    auto c, a;
 
    g = 'G'; v[0] = 'V'; v[9] = '9';
-   nl();
-   c = putchar('E'); nl();
-   putchar(c); nl();
-   putchar(g); nl();
-   putchar(v[0]); nl();
-   putchar(v[9]); nl();
+   putchar('*n');
+   c = putchar('E'); putchar('*n');
+   putchar(c); putchar('*n');
+   putchar(g); putchar('*n');
+   putchar(v[0]); putchar('*n');
+   putchar(v[9]); putchar('*n');
    a = itoa(42); puts(a);
-   printn(42,10); nl();
-   printn(42,8); nl();
-   printn(42,2); nl();
+   printn(42,10); putchar('*n');
+   printn(42,8); putchar('*n');
+   printn(42,2); putchar('*n');
 }
