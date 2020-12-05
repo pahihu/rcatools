@@ -3,13 +3,12 @@
 #
 if [ $# -ne 1 ];
 then
-   echo "usage: prg2bin file.prg"
+   echo "usage: prg2bin file"
    exit 1
 fi
-nm=`basename $1 .prg`
-../calc18 <$1 >out.$$
-cat prolog out.$$ epilog >$nm.sr
-a18 $nm.sr -r -L $nm.lst -b $nm.bin
+../calc18 <$1.prg >out.$$
+cat prolog out.$$ epilog >$1.sr
+a18 $1.sr -r -L $1.lst -b $1.bin
 
-ls -l $nm.bin
+ls -l $1.bin
 rm -f out.$$

@@ -23,8 +23,7 @@ void defcls(int n, int cls, int offs);
 char *getsym(int n);
 int getoffs(int n);
 int getcls(int n);
-int getnsyms(void);
-void dropsyms(int n);
+void dropsyms(void);
 extern char *fn; // current fn
 
 #endif

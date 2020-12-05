@@ -1,0 +1,78 @@
+  | 0    1    2    3    4    5    6    7
+  | 8    9    A    B    C    D    E    F
+--+--------------------------------------
+00| IDL  LDN  LDN  LDN  LDN  LDN  LDN  LDN
+10| INC  
+20| DEC  
+30| BR   BQ   BZ   BDF  B1   B2   B3   B4
+38| SKP  BNQ  BNZ  BNF  BN1  BN2  BN3  BN4
+40| LDA  
+50| STR  
+60| IRX  OUT  OUT  OUT  OUT  OUT  OUT  OUT
+68| ---  INP  INP  INP  INP  INP  INP  INP
+70| RET  DIS  LDXA STXD ADC  SDB  SHRC SMB
+78| SAV  MARK REQ  SEQ  ADCI SDBI SHLC SMBI
+80| GLO  
+90| GHI  
+A0| PLO  
+B0| PHI  
+C0| LBR  LBQ  LBZ  LBDF NOP  LSNQ LSNZ LSNF
+C8| LSKP LBNQ LBNZ LBNF LSIE LSQ  LSZ  LSDF
+D0| SEP  
+E0| SEX  
+F0| LDX  OR   AND  XOR  ADD  SD   SHR  SM
+F8| LDI  ORI  ANI  XRI  ADI  SDI  SHL  SMI
+
+
+         BDF BNF
+signed   BPZ BM
+unsigned BGE BL
+   
+
+   LDA  R       ..D=*A++
+   LDN  R       ..D=*A
+   LDX          ..D=*X
+   LDXA         ..D=*X++, POP
+   LDI  #IM     ..D=#IM
+   STR  R       ..*A=D
+   STXD         ..*X--=D, PUSH
+
+   INC  R       ..A=A+1
+   DEC  R       ..A=A-1
+   IRX          ..X=X+1
+   GLO  R       ..D=R.0
+   PLO  R       ..R.0=D
+   GHI  R       ..D=R.1
+   PHI  R       ..R.1=D
+
+   OR           ..D=D | *X      XOR AND ADD ADC  SD  SDB  SM  SMB
+   ORI  #IM     ..D=D | #IM     XRI ANI ADI ADCI SDI SDBI SMI SMBI
+
+   SHR, SHRC    ..D=D/2
+   SHL, SHLC    ..D=D*2
+
+   BR  SKP      ..BRANCH
+   BZ  BNZ      ..IF D=0
+   BDF BNF      ..IF DF=1
+   BQ  BNQ      ..IF Q=1
+   B1  BN1      ..IF EF1=1
+   ...
+   B4  BN4      ..IF EF4=1
+  
+   LBR  LSKP    ..LBRANCH
+   LBZ  LBNZ    ..IF D=0
+   LBDF LBNF    ..IF DF=1
+   LBQ  LBNQ    ..IF Q=1
+   LSZ  LSNZ    ..IF D#0 THEN XX XX END
+   LSDF LSNF    ..IF DF=0 THEN XX XX END
+   LSQ  LSNQ    ..IF Q=0 THEN XX XX END
+   LSIE         ..IF IE=0 THEN XX XX END
+
+   IDL
+   NOP
+   SEP  R       ..P=R
+   SEX  R       ..X=R
+   SEQ, REQ     ..Q=1/Q=0
+   SAV
+   MARK
+   RET,DIS

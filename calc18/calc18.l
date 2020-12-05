@@ -164,14 +164,10 @@ int getcls(int n) {
    return syms[n].cls;
 }
 
-int getnsyms(void) {
-   return nsyms;
-}
-
-void dropsyms(int n) {
+void dropsyms(void) {
    int i;
-   for (i = n; i < nsyms; i++)
-      free(syms[i].sym);
-   nsyms = n;
+   for (i = 0; i < nsyms; i++)
+      if (syms[i].cls != C_EXTRN)
+         syms[i].cls = C_UNDEF;
 }
 

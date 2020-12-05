@@ -1,3 +1,17 @@
+sub(n) {
+   auto a, c;
+
+   a = 0777;
+   *(a--) = 0;
+   while (n) {
+      *(a--) = '0' + n % 10;
+      n = n / 10;
+   }
+   while (c = *(++a)) {
+      print c;
+   }
+}
+
 main() {
    auto x, y, z, a, c;
 
@@ -15,14 +29,7 @@ main() {
    print 13;
    print 10;
    z = '@' + 6 % 7;
-   a = 0777;
-   *(a--) = 0;
-   while (z) {
-      *(a--) = '0' + z % 10;
-      z = z / 10;
-   }
-   while (c = *(++a)) {
-      print c;
-   }
+   sub(z);
+   print 'D'; print 13; print 10;
    end: ;
 }
