@@ -34,6 +34,7 @@ SSEG=#7FFF
  ..
  ..  putc(c)
  ..
+ ORG*+(* AND 1)
 Lputc:
  GLO SP ;ADI #03 ;PLO MA        ..MA=ADDR(c)
  GHI SP ;ADCI #00 ;PHI MA
@@ -43,56 +44,99 @@ Lputc:
  ..
  ..  getc()
  ..
+ ORG*+(* AND 1)
 Lgetc:
  INP 2  ;PLO AC                 ..AC.0=KEY
  LDI #00 ;PHI AC
  SEP SRET
 ..
-..  MULT AC BY AUX.0
+..  UNSIGNED MULT AC BY AUX
 ..
 RUMULT:
  SEP PC
 UMULT:
- GHI AC ;STXD            .. *SP=AC
- GLO AC ;STR SP
+ GHI AUX ;STXD           .. PUSH AUX
+ GLO AUX ;STR SP
  INC SP
- GLO AUX ;PLO AC         .. AC.0=AUX.0
- LDI #00 ;PLO MQ ;PHI AC .. MQ.0=AC.1=0
- LDI #08 ;PLO AUX        .. AUX.0=8
+ GHI AC ;BZ UMULT8
+ LDI #00 ;PHI MQ ;PLO MQ .. MQ=#0000
+ LDI #10 ;PLO AUX        .. AUX.0=#10
 M1:
  GLO AC ;SHR             .. IF AC.0 & 1 = 0 GOTO DIV2
  BNF DIV2
- DEC SP                  .. --SP
- GHI AC       ;ADD ;PHI AC
- GLO MQ ;IRX  ;ADC ;PLO MQ  .. (MQ.0,AC.1) += *SP
+ DEC SP                    .. --SP
+ GLO MQ       ;ADD ;PLO MQ .. MQ += *SP
+ GHI MQ ;IRX  ;ADC ;PHI MQ
 DIV2:
- GLO MQ ;SHR  ;PLO MQ    .. (MQ.0,AC.1,AC.0) >> 1
+ GHI MQ ;SHR  ;PHI MQ    .. (MQ,AC) >> 1
+ GLO MQ ;SHRC ;PLO MQ
  GHI AC ;SHRC ;PHI AC
  GLO AC ;SHRC ;PLO AC
  DEC AUX                 .. IF --AUX != 0 GOTO LOOP
  GLO AUX ;BNZ M1
- BR RUMULT
+ BR RUMULT               .. RESULT IS HIGH/LOW OF PROD?
+UMULT8:
+ PLO MQ                  .. MQ.0=#00
+ LDI #08 ;PLO AUX        .. AUX.0=#10
+M18:
+ GLO AC ;SHR             .. IF AC.0 & 1 = 0 GOTO DIV2
+ BNF DIV28
+ DEC SP                    .. --SP
+ GHI AC       ;ADD ;PHI AC .. (MQ.0,AC.1) += *SP
+ GLO MQ ;IRX  ;ADC ;PLO MQ
+DIV28:
+ GLO MQ ;SHR  ;PLO MQ    .. (MQ.0,AC) >> 1
+ GHI AC ;SHRC ;PHI AC
+ GLO AC ;SHRC ;PLO AC
+ DEC AUX                 .. IF --AUX != 0 GOTO LOOP
+ GLO AUX ;BNZ M18
+ BR RUMULT               .. RESULT IS HIGH/LOW OF PROD?
 ..
-..  DIVIDE AC BY AUX.0
+..  UNSIGNED DIVIDE AC BY AUX
 ..
 RUDIV:
  SEP PC
 UDIV:
- GLO AUX ;STR SP         .. *SP = AUX.0
- LDI #00 ;PLO MQ
- LDI #10 ;PLO AUX        .. AUX.0 = 16
+ ..GHI AUX ;BZ UDIV8       .. AUX.1=0? GOTO UDIV8
+ GHI AUX
+ STXD                    .. *SP = AUX
+ GLO AUX ;STR SP
+ INC SP
+ LDI #00 ;PHI MQ ;PLO MQ .. MQ=#0000
+ LDI #10 ;PLO AUX        .. AUX.0=#10
 M2:
- GLO AC ;SHL ;PLO AC     .. (MQ.0,AC) << 1
+ GLO AC ;SHL  ;PLO AC    .. (MQ,AC) << 1
  GHI AC ;SHLC ;PHI AC
  GLO MQ ;SHLC ;PLO MQ
- SM                      .. IF MQ - *SP < 0 GOTO NEG
+ GHI MQ ;SHLC ;PHI MQ
+ DEC SP
+ GLO MQ      ;SM  ;PHI AUX .. IF MQ - *SP < 0 GOTO NEG
+ GHI MQ ;IRX ;SMB
  BNF NEG
- PLO MQ                  .. MQ = MQ - *SP
- GLO AC ;ADI #01 ;PLO AC .. AC = AC + 1
+ PHI MQ ;GHI AUX ;PLO MQ .. MQ = MQ - *SP
+ INC AC                  .. AC=AC+1
 NEG:
  DEC AUX
  GLO AUX ;BNZ M2
- GLO MQ ;PLO AUX         .. AUX.0 = REM
+ GHI MQ ;PHI AUX         .. AUX=MQ
+ GLO MQ ;PLO AUX
+ BR RUDIV
+UDIV8:
+ PLO MQ;                 .. MQ.0=#00
+ GLO AUX ;STR SP         .. *SP=AUX.0
+ LDI #10 ;PLO AUX        .. AUX.0=#10
+M28:
+ GLO AC ;SHL  ;PLO AC
+ GHI AC ;SHLC ;PHI AC    .. (MQ.0,AC) << 1
+ GLO MQ ;SHLC ;PLO MQ
+ SM ;BNF NEG8            .. IF MQ - *SP < 0 GOTO NEG8
+ PLO MQ                  .. MQ = MQ - *SP
+ INC AC                  .. AC = AC + 1
+NEG8:
+ DEC AUX
+ GLO AUX ;BNZ M28
+ LDI #00 ;PHI AUX        .. AUX = MQ (REM)
+ GLO MQ ;PLO AUX
  BR RUDIV
 ..
 ..  STANDARD CALL ROUTINE
@@ -119,7 +163,6 @@ RET:
  LDX  ;PHI ARGPTR
  GHI RETVAL
  BR RRET
- IDL
 ..
 ..  PROGRAM
 ..

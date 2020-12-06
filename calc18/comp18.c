@@ -438,9 +438,9 @@ static void gpredec(NODE *p) {
 static void gdiv(NODE *p) {
    H(" ..DIV\n");
    ex(p->a[1]);
-   gpushac(1);
+   gpushac(2);
    ex(p->a[0]);
-   gpop(1, "AUX");
+   gpop(2, "AUX");
    H(" LDI A.1(UDIV) ;PHI SUB\n");
    H(" LDI A.0(UDIV) ;PLO SUB\n");
    H(" SEP SUB\n");
@@ -499,6 +499,98 @@ static int exprlist(NODE *p, int offs) {
    return offs;
 }
 
+static void galign(void) {
+   H(" ..ALIGN\n");
+   H(" ORG*+(* AND 1)\n");
+}
+
+static void gmod(NODE *p) {
+   gdiv(p);
+   H(" ..MOV AC,AUX\n");
+   H(" GLO AUX ;PLO AC\n");
+   H(" GHI AUX ;PHI AC\n");
+}
+
+int ilog2(int x)
+{
+   int i, m;
+
+   m = 1;
+   for (m = 1, i = 0; i < 8; m *= 2, i++) {
+      if (x == m)
+         return i;
+   }
+   return -1;
+}
+
+static int gspecmul(NODE *p) {
+   NODE *con, r;
+   int i;
+
+   if (isimm(p->a[1])) {
+      con = p->a[0]; p->a[0] = p->a[1]; p->a[1] = con;
+   }
+   if (isimm(p->a[0])) {
+      con = p->a[0];
+      i = ilog2(con->x);
+      if (i < 0)
+         return 0;
+      if (i == 0)
+         return 1;
+
+      r = *p;
+      r.a[0] = p->a[1];
+      r.a[1] = id(i);
+      gshl(&r);
+      freenod(r.a[1]);
+      return 1;
+   }
+   return 0;
+}
+
+static int gspecdiv(NODE *p) {
+   NODE r, *con; 
+   int i;
+
+   if (isimm(p->a[1])) {
+      con = p->a[1];
+      i = ilog2(con->x);
+      if (i < 0)
+         return 0;
+      if (i == 0)
+         return 1;
+
+      r = *p;
+      r.a[1] = id(i);
+      gshr(&r);
+      freenod(r.a[1]);
+      return 1;
+   }
+   return 0;
+}
+
+static void gand(NODE *p) {
+   glog(p, "AND", "ANI");
+}
+
+static int gspecmod(NODE *p) {
+   NODE *con; 
+   int i;
+
+   if (isimm(p->a[1])) {
+      con = p->a[1];
+      i = ilog2(con->x);
+      if (i < 0)
+         return 0;
+      if (i == 0)
+         return 1;
+
+      con->x--;
+      gand(con);
+      return 1;
+   }
+   return 0;
+}
 
 int ex(NODE *p) {
    int lbl1, lbl2, lbl3;
@@ -524,6 +616,7 @@ int ex(NODE *p) {
          sym = getsym(p->a[0]->x);
          defcls(p->a[0]->x,C_EXTRN,0);
          H(" ..EXTRN %s\n",sym);
+         galign();
          H("L%s:\n",sym);
          H(" ORG*+%d\n",p->a[1]->x);
          break;
@@ -531,6 +624,7 @@ int ex(NODE *p) {
          sym = getsym(p->a[0]->x);
          defcls(p->a[0]->x,C_EXTRN,0);
          H(" ..EXTRN %s[]\n",sym);
+         galign();
          H("L%s:\n",sym);
          H(" ORG*+%d\n",p->a[1]->x);
          break;
@@ -552,6 +646,7 @@ int ex(NODE *p) {
       case FUNDEF:
          sym = getsym(p->a[0]->x);
          H(" ..FN %s\n",fn = sym);
+         galign();
          H("L%s:\n",sym);
          gpush(2, "FP");
          gmov("FP", "SP");
@@ -731,21 +826,24 @@ int ex(NODE *p) {
          case '+': gadd(p); break;
          case '-': gsub(p,0); break;
          case '*':
-            ex(p->a[1]);
-            gpushac(1);
-            ex(p->a[0]);
-            gpop(1, "AUX");
-            H(" ..MUL AC,AUX.0\n");
-            H(" LDI A.1(UMULT) ;PHI SUB\n");
-            H(" LDI A.0(UMULT) ;PLO SUB\n");
-            H(" SEP SUB\n");
+            if (!gspecmul(p)) {
+               ex(p->a[1]);
+               gpushac(2);
+               ex(p->a[0]);
+               gpop(2, "AUX");
+               H(" ..MUL AC,AUX\n");
+               H(" LDI A.1(UMULT) ;PHI SUB\n");
+               H(" LDI A.0(UMULT) ;PLO SUB\n");
+               H(" SEP SUB\n");
+            }
             break;
-         case '/': gdiv(p); break;
+         case '/':
+            if (!gspecdiv(p))
+               gdiv(p);
+            break;
          case '%':
-            gdiv(p);
-            H(" ..MOV AC,AUX.0\n");
-            H(" GLO AUX ;PLO AC\n");
-            H(" LDI #00 ;PHI AC\n");
+            if (!gspecmod(p))
+               gmod(p);
             break;
          case '<': glt(p); break;
          case '>': ggt(p); break;

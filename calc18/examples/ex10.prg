@@ -1,7 +1,3 @@
-g;
-v[10];
-buf[16];
-
 putchar(c) {
    if (c == '*n')
       putc(13);
@@ -9,6 +5,7 @@ putchar(c) {
 }
 
 itoa(n) {
+   extrn buf;
    auto a, sign;
 
    sign = 0;
@@ -43,6 +40,7 @@ printn(n,b) {
 }
 
 main() {
+   extrn g, v;
    auto c, a;
 
    g = 'G'; v[0] = 'V'; v[9] = '9';
@@ -57,3 +55,8 @@ main() {
    printn(42,8); putchar('*n');
    printn(42,2); putchar('*n');
 }
+
+g;
+v[10];
+buf[16];
+

@@ -6,19 +6,9 @@
 #include "calc18.h"
 
 extern int yylineno;
-
-NODE *nod(int typ, int n, NODE *arg0, NODE *arg1);
-void freenod(NODE*);
-int ex(NODE*);
 int yylex(void);
 
 void yyerror(char*);
-int vars[26];
-
-#define opr(x,l,r)      nod(OPR,x,l,r)
-#define opr3(x,a0,a1,a2)  nod(OPR,x,a0,nod(INT,x,a1,a2))
-#define id(x)           nod(ID,x,NULL,NULL)
-#define con(x)          nod(CON,x,NULL,NULL)
 
 /*
  * History

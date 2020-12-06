@@ -6,9 +6,10 @@ then
    echo "usage: prg2bin file"
    exit 1
 fi
-../calc18 <$1.prg >out.$$
+cpp $1.prg | grep -v '^#' >pre.$$
+../calc18 <pre.$$ >out.$$
 cat prolog out.$$ epilog >$1.sr
 a18 $1.sr -r -L $1.lst -b $1.bin
 
 ls -l $1.bin
-rm -f out.$$
+rm -f out.$$ pre.$$

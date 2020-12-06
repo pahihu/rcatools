@@ -179,7 +179,8 @@ void defcls(int n, int cls, int offs) {
       syms[n].cls = cls;
       syms[n].offs = offs;
       return;
-   }
+   } else if (C_LABEL == syms[n].cls)
+      return;
    redeferr(n);
 }
 
@@ -202,7 +203,6 @@ int getcls(int n) {
 void dropsyms(void) {
    int i;
    for (i = 0; i < nsyms; i++)
-      if (syms[i].cls != C_EXTRN)
-         syms[i].cls = C_UNDEF;
+      syms[i].cls = C_UNDEF;
 }
 

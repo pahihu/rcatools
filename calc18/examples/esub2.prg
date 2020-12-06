@@ -1,6 +1,3 @@
-v[2000];
-n;
-
 putchar(c) {
    if (c == '*n')
       putc(13);
@@ -8,6 +5,7 @@ putchar(c) {
 }
 
 main() {
+   extrn v, n;
    auto i, c, col, a;
 
    n = 2000;
@@ -19,7 +17,7 @@ main() {
       a = n+1;
       c = i = 0;
       while (i<n) {
-         c = c + v[i] * 10;
+         c = c + 10 * v[i];
          v[i++] = c % a;
          c = c / a--;
       }
@@ -29,3 +27,7 @@ main() {
    }
    putchar('*n*n');
 }
+
+v[2000];
+n;
+

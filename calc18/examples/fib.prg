@@ -1,11 +1,11 @@
 /* calc18 Fibonacci example */
-buf[16];
 
 nl() {
    putc(13); putc(10);
 }
 
 itoa(n) {
+   extrn buf;
    auto a;
 
    a = &buf[16];
@@ -39,3 +39,5 @@ main() {
    n = fib(23); 
    puti(n); nl();
 }
+
+buf[16];
