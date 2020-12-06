@@ -40,6 +40,22 @@ static int lbl = 0;
 
 #define ADDR(p) (getoffs((p)->x))
 
+static void prinode1(char *msg,NODE *p) {
+   static char *typs[] = { "INT", "CON", "ID", "OPR" };
+
+   if (!p) {
+      fprintf(stderr,"NULL\n");
+      return;
+   }
+   fprintf(stderr,"%s: t:%s x:%d\n",msg,typs[1+p->t],p->x);
+   prinode1("A0",p->a[0]);
+   prinode1("A1",p->a[1]);
+}
+
+static void prinode(NODE *p) {
+   prinode1("HEAD",p);
+}
+
 static int isvar(NODE *p) {
    if (!p)
       return 0;
@@ -352,6 +368,7 @@ static void gshr(NODE *p) {
    if (CON == p->a[1]->t) {
       con = p->a[1];
       if (1 == con->x) {
+         ex(p->a[0]);
          gdiv2();
          return;
       }
@@ -390,6 +407,7 @@ static void gshl(NODE *p) {
    if (CON == p->a[1]->t) {
       con = p->a[1];
       if (1 == con->x) {
+         ex(p->a[0]);
          gmul2();
          return;
       }
@@ -527,9 +545,13 @@ static int gspecmul(NODE *p) {
    NODE *con, r;
    int i;
 
+// fprintf(stderr,"before swap\n");
+// prinode(p);
    if (isimm(p->a[1])) {
       con = p->a[0]; p->a[0] = p->a[1]; p->a[1] = con;
    }
+// fprintf(stderr,"after swap\n");
+// prinode(p);
    if (isimm(p->a[0])) {
       con = p->a[0];
       i = ilog2(con->x);
@@ -540,7 +562,9 @@ static int gspecmul(NODE *p) {
 
       r = *p;
       r.a[0] = p->a[1];
-      r.a[1] = id(i);
+      r.a[1] = con(i);
+// fprintf(stderr,"before gshl\n");
+// prinode(&r);
       gshl(&r);
       freenod(r.a[1]);
       return 1;
@@ -561,7 +585,7 @@ static int gspecdiv(NODE *p) {
          return 1;
 
       r = *p;
-      r.a[1] = id(i);
+      r.a[1] = con(i);
       gshr(&r);
       freenod(r.a[1]);
       return 1;

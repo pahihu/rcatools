@@ -20,7 +20,7 @@ SSEG=#7FFF
 ..
  ORG#0000
 
- DIS,#33                        ..X=P=0
+ DIS,#33                        ..X=P=3
  OUT 1,#01                      ..TWO-LEVEL I/O
  LDI A.1(SSEG) ;PHI SP          ..SP=SSEG
  LDI A.0(SSEG) ;PLO SP
@@ -97,9 +97,10 @@ DIV28:
 RUDIV:
  SEP PC
 UDIV:
- ..GHI AUX ;BZ UDIV8       .. AUX.1=0? GOTO UDIV8
- GHI AUX
- STXD                    .. *SP = AUX
+ GHI AUX ;BNZ PAUX       .. AUX.1#0? GOTO PAUX
+ GLO AUX ;SHL ;BNF UDIV8 .. MSB(AUX.0)=0? GOTO UDIV8
+PAUX:
+ GHI AUX ;STXD           .. *SP=AUX
  GLO AUX ;STR SP
  INC SP
  LDI #00 ;PHI MQ ;PLO MQ .. MQ=#0000
@@ -122,8 +123,8 @@ NEG:
  GLO MQ ;PLO AUX
  BR RUDIV
 UDIV8:
- PLO MQ;                 .. MQ.0=#00
  GLO AUX ;STR SP         .. *SP=AUX.0
+ LDI #00 ;PLO MQ         .. MQ.0=#00
  LDI #10 ;PLO AUX        .. AUX.0=#10
 M28:
  GLO AC ;SHL  ;PLO AC

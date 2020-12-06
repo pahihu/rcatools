@@ -47,6 +47,7 @@
  *          handle/emit DC3 EOF
  * 201202AP register name definitions with -r
  * 201203AP load Intel Hex fmt
+ * 201206AP 64bit MCLK
  *
  */
 
@@ -102,7 +103,7 @@ Word r[16];
 Byte *M = NULL;
 int DMA_IN, DMA_OUT, INT;
 Byte BUS, NLINES;
-unsigned MCLK;  // machine-cycle
+unsigned long MCLK;  // machine-cycle
 int  TLIO; // Two-level I/O
 Byte SEL;
 int RC;    // Mark Riley, port extender
@@ -1531,7 +1532,7 @@ void fini(void)
    if (lpr)
       fclose(lpr);
    if (MCLK)
-      printf("MCLK = %u\n", MCLK);
+      printf("MCLK = %lu\n", MCLK);
    for (i = 0; i < NFDD; i++)
       if (fdd[i])
          fclose(fdd[i]);
