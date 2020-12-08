@@ -458,8 +458,6 @@ static void gdiv(NODE *p) {
    ex(p->a[1]);
    gpushac(2);
    ex(p->a[0]);
-   gpop(2, "AUX");
-   H(" LDI A.1(UDIV) ;PHI SUB\n");
    H(" LDI A.0(UDIV) ;PLO SUB\n");
    H(" SEP SUB\n");
 }
@@ -524,9 +522,7 @@ static void galign(void) {
 
 static void gmod(NODE *p) {
    gdiv(p);
-   H(" ..MOV AC,AUX\n");
-   H(" GLO AUX ;PLO AC\n");
-   H(" GHI AUX ;PHI AC\n");
+   gmov("AC","MQ");
 }
 
 int ilog2(int x)
@@ -732,13 +728,6 @@ int ex(NODE *p) {
          else
             H("L%04d: ..END\n",lbl2);
          break;
-      case PRINT:
-         ex(p->a[0]);
-         H(" ..PUTC\n");
-         H(" LDI A.1(PUTC) ;PHI SUB\n");
-         H(" LDI A.0(PUTC) ;PLO SUB\n");
-         H(" SEP SUB\n");
-         break;
       case RETURN:
          if (p->a[0])
             ex(p->a[0]);
@@ -856,7 +845,6 @@ int ex(NODE *p) {
                ex(p->a[0]);
                gpop(2, "AUX");
                H(" ..MUL AC,AUX\n");
-               H(" LDI A.1(UMULT) ;PHI SUB\n");
                H(" LDI A.0(UMULT) ;PLO SUB\n");
                H(" SEP SUB\n");
             }

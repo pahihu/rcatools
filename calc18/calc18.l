@@ -153,7 +153,6 @@ int findid(char *s) {
       {"for"  , FOR},
       {"goto" , GOTO},
       {"if"   , IF},
-      {"print", PRINT},
       {"return",RETURN},
       {"while", WHILE},
       {0      , 0}

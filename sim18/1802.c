@@ -48,6 +48,8 @@
  * 201202AP register name definitions with -r
  * 201203AP load Intel Hex fmt
  * 201206AP 64bit MCLK
+ * 201208AP wrap-around memadr (MAX_MEM is the limit)
+ *          profile
  *
  */
 
@@ -124,6 +126,8 @@ static char *custregs[16];
 int trace = 0, brkadr = 0;
 int ut20 = 0;
 int noidle = 1; // no IDL processing
+int prof = 0;
+unsigned long *prodat = 0;
 char **regs = cdpregs;
 
 #define NFDD   4
@@ -150,15 +154,19 @@ static int digit(int c)
    return 10 + c - 'A';
 }
 
+static int memaddr; // last memory address
+
 Byte memrd(int addr)
 {
    int bank;
 
    if (RC) {
       bank = (addr & 0x0F000) >> 12;
-      addr = MAPPER[bank] | (addr & 0x0FFF);
+      memaddr = MAPPER[bank] | (addr & 0x0FFF);
    }
-   return M[addr];
+   else
+      memaddr = addr & (MAX_MEM-1);
+   return M[memaddr];
 }
 
 Byte memwr(int addr, Byte data)
@@ -169,7 +177,20 @@ Byte memwr(int addr, Byte data)
       bank = (addr & 0x0F000) >> 12;
       addr = MAPPER[bank] | (addr & 0x0FFF);
    }
+   else
+      addr &= MAX_MEM-1;
    M[addr] = data;
+   return data;
+}
+
+Byte fetch(int addr)
+{
+   Byte data;
+
+   data = memrd(addr);
+   if (prodat)
+      prodat[memaddr]++;
+
    return data;
 }
 
@@ -750,7 +771,7 @@ void xecute(Word p)
          else if ('Q' == cond)
             break;
       }
-      W = memrd(r[P]); r[P]++; cycle();
+      W = fetch(r[P]); r[P]++; cycle();
       I = Hi(W); N = Lo(W);
       switch (I) {
       case 0:
@@ -1527,12 +1548,23 @@ int readidi(char *fn, int offs)
 void fini(void)
 {
    int i;
+   FILE *fout;
 
    prepterm(0);
    if (lpr)
       fclose(lpr);
    if (MCLK)
       printf("MCLK = %lu\n", MCLK);
+   if (prodat) {
+      printf("writing profile data\n");
+      fout = fopen("profile.out", "w");
+      if (fout) {
+         for (i = 0; i < MAX_MEM; i++)
+            if (prodat[i])
+               fprintf(fout,"%05X %lu\n",i,prodat[i]);
+         fclose(fout);
+      }
+   }
    for (i = 0; i < NFDD; i++)
       if (fdd[i])
          fclose(fdd[i]);
@@ -1552,7 +1584,7 @@ void storage(void)
 
 void usage(void)
 {
-   fprintf(stderr,"usage: sim18 [-24imprutx] [-bxxxx] [-d -exxxx] [-f<fdd.img>] -s<kbytes> <file>...\n");
+   fprintf(stderr,"usage: sim18 [-24ilmprutx] [-bxxxx] [-d -exxxx] [-f<fdd.img>] -s<kbytes> <file>...\n");
    fprintf(stderr,"options:\n");
    fprintf(stderr,"   -2         enable TLIO\n");
    fprintf(stderr,"   -4         fig-Forth compat, UART on Grp 1\n");
@@ -1564,7 +1596,8 @@ void usage(void)
    fprintf(stderr,"   -h         set Intel Hex fmt\n");
    fprintf(stderr,"   -i         enable IDL processing\n");
    fprintf(stderr,"   -m         set M-rec fmt\n");
-   fprintf(stderr,"   -p<file>   lpr file name, default \"lpr.out\"\n");
+   fprintf(stderr,"   -l<file>   lpr file name, default \"lpr.out\"\n");
+   fprintf(stderr,"   -p         profiling (data in profile.out)\n");
    fprintf(stderr,"   -r<regdef> read register names from <regdef>\n");
    fprintf(stderr,"   -s<kbytes> memory size (default 64KB)\n");
    fprintf(stderr,"   -t         trace\n");
@@ -1653,9 +1686,9 @@ int main(int argc, char *argv[])
             break;
          case 'h': ihex_start = 0; readdat = readihex; break;
          case 'i': noidle = 0; break;
+         case 'l': strcpy(lprnm, argv[i]+2); break;
          case 'm': readdat = readidi; break;
-         case 'p': strcpy(lprnm, argv[i]+2);
-                   break;
+         case 'p': prof = 1; break;
          case 'r': if (readregs(argv[i]+2))
                       fprintf(stderr,"no reg defs %s",argv[i]+2);
                    else
@@ -1691,6 +1724,12 @@ int main(int argc, char *argv[])
    MCLK = 0;
 
    dasminit();
+
+   if (prof) {
+      prodat = (unsigned long *)calloc(MAX_MEM, sizeof(unsigned long));
+      if (!prodat)
+         fprintf(stderr,"not enough memory for profiling!\n");
+   }
 
    if (onlydasm) {
       if (!end) end = bytes;

@@ -29,7 +29,7 @@ void yyerror(char*);
 
 %token <con> CONST
 %token <sym> VAR
-%token WHILE IF PRINT FOR INC DEC GOTO RETURN EXTRN AUTO FUNCALL UNARY PREINC PREDEC POSTINC POSTDEC ILST XLST FUNDEF VARDEF VECDEF EXTDEF AUTODEF
+%token WHILE IF FOR INC DEC GOTO RETURN EXTRN AUTO FUNCALL UNARY PREINC PREDEC POSTINC POSTDEC ILST XLST FUNDEF VARDEF VECDEF EXTDEF AUTODEF
 %nonassoc IFX
 %nonassoc ELSE
 
@@ -88,7 +88,6 @@ stmt:
         | EXTRN id_list ';'     { $$ = opr(EXTDEF, $2, NULL); }
         | AUTO id_list ';'      { $$ = opr(AUTODEF, $2, NULL); }
         | expr ';'              { $$ = $1; }
-        | PRINT expr ';'        { $$ = opr(PRINT, $2, NULL); }
         | WHILE '(' expr ')' stmt
                                 { $$ = opr(WHILE, $3, $5); }
         /*  1   2    3    4          5   6    7 */

@@ -25,30 +25,38 @@ SSEG=#7FFF
  LDI A.1(SSEG) ;PHI SP          ..SP=SSEG
  LDI A.0(SSEG) ;PLO SP
  SEX SP                         ..X=SP
+ LDI A.1(UMULT) ;PHI SUB        ..SUB.1=UMULT.1
  LDI A.1(CALL) ;PHI SCALL       ..SCALL
  LDI A.0(CALL) ;PLO SCALL
  LDI A.1(RET) ;PHI SRET         ..SRET
  LDI A.0(RET) ;PLO SRET
  SEP SCALL,A(Lmain)             ..main()
  SEP SCALL,A(Lexit)             ..exit()
- ..
- ..  putc(c)
- ..
- ORG*+(* AND 1)
-Lputc:
- GLO SP ;ADI #03 ;PLO MA        ..MA=ADDR(c)
- GHI SP ;ADCI #00 ;PHI MA
- LDN MA ;STR SP                 ..LOAD C.0
- OUT 2  ;DEC SP                 ..EMIT
- SEP SRET
- ..
- ..  getc()
- ..
- ORG*+(* AND 1)
-Lgetc:
- INP 2  ;PLO AC                 ..AC.0=KEY
- LDI #00 ;PHI AC
- SEP SRET
+..
+..  STANDARD CALL ROUTINE
+..
+RCALL: SEP PC
+CALL:
+ GHI ARGPTR ;STXD        ..PUSH ARGPTR
+ GLO ARGPTR ;STXD
+ GHI PC ;PHI ARGPTR      ..ARGPTR=PC
+ GLO PC ;PLO ARGPTR
+ LDA ARGPTR ;PHI PC      ..PC=*ARGPTR
+ LDA ARGPTR ;PLO PC
+ BR RCALL                ..BRANCH TO ENTRY
+..
+..  STANDARD RETURN ROUTINE
+..
+RRET: SEP PC
+RET:
+ GHI ARGPTR ;PHI PC      ..PC=ARGPTR
+ GLO ARGPTR ;PLO PC
+ SEX SP                  ..X=SP
+ INC SP
+ LDXA ;PLO ARGPTR        ..POP ARGPTR
+ LDX  ;PHI ARGPTR
+ GHI RETVAL
+ BR RRET
 ..
 ..  UNSIGNED MULT AC BY AUX
 ..
@@ -97,12 +105,14 @@ DIV28:
 RUDIV:
  SEP PC
 UDIV:
- GHI AUX ;BNZ PAUX       .. AUX.1#0? GOTO PAUX
- GLO AUX ;SHL ;BNF UDIV8 .. MSB(AUX.0)=0? GOTO UDIV8
+ IRX ;LDXA ;PLO MQ       .. MQ=AUX.0, SP->AUX.1
+ LDX ;BNZ PAUX           .. AUX.1#0? CONTINUE
+ GLO MQ ;SHL ;BNF UDIV8  .. LO<128? GOTO UDIV8
 PAUX:
- GHI AUX ;STXD           .. *SP=AUX
- GLO AUX ;STR SP
- INC SP
+ DEC SP
+ GLO AC ;SM              .. AC<AUX? GOTO LT1
+ GHI AC ;IRX ;SMB        .. SP->AUX.1
+ BNF LT1
  LDI #00 ;PHI MQ ;PLO MQ .. MQ=#0000
  LDI #10 ;PLO AUX        .. AUX.0=#10
 M2:
@@ -119,12 +129,20 @@ M2:
 NEG:
  DEC AUX
  GLO AUX ;BNZ M2
- GHI MQ ;PHI AUX         .. AUX=MQ
- GLO MQ ;PLO AUX
+ BR RUDIV
+LT1:
+ GLO AC; PLO MQ          .. MQ=AC (REMAINDER)
+ GHI AC; PHI MQ
+ LDI #00 ;PLO AC ;PHI AC .. AC=0
  BR RUDIV
 UDIV8:
- GLO AUX ;STR SP         .. *SP=AUX.0
- LDI #00 ;PLO MQ         .. MQ.0=#00
+ SHR ;STR SP             .. *SP=AUX.0
+
+ GLO AC ;SM              .. AC<AUX? GOTO LT1
+ GHI AC ;SMBI #00        .. SP->AUX.1
+ BNF LT1
+
+ LDI #00 ;PHI MQ ;PLO MQ .. MQ=#00
  LDI #10 ;PLO AUX        .. AUX.0=#10
 M28:
  GLO AC ;SHL  ;PLO AC
@@ -136,34 +154,25 @@ M28:
 NEG8:
  DEC AUX
  GLO AUX ;BNZ M28
- LDI #00 ;PHI AUX        .. AUX = MQ (REM)
- GLO MQ ;PLO AUX
  BR RUDIV
-..
-..  STANDARD CALL ROUTINE
-..
-RCALL: SEP PC
-CALL:
- GHI ARGPTR ;STXD        ..PUSH ARGPTR
- GLO ARGPTR ;STXD
- GHI PC ;PHI ARGPTR      ..ARGPTR=PC
- GLO PC ;PLO ARGPTR
- LDA ARGPTR ;PHI PC      ..PC=*ARGPTR
- LDA ARGPTR ;PLO PC
- BR RCALL                ..BRANCH TO ENTRY
-..
-..  STANDARD RETURN ROUTINE
-..
-RRET: SEP PC
-RET:
- GHI ARGPTR ;PHI PC      ..PC=ARGPTR
- GLO ARGPTR ;PLO PC
- SEX SP                  ..X=SP
- INC SP
- LDXA ;PLO ARGPTR        ..POP ARGPTR
- LDX  ;PHI ARGPTR
- GHI RETVAL
- BR RRET
+ ..
+ ..  putc(c)
+ ..
+ ORG*+(* AND 1)
+Lputc:
+ GLO SP ;ADI #03 ;PLO MA        ..MA=ADDR(c)
+ GHI SP ;ADCI #00 ;PHI MA
+ LDN MA ;STR SP                 ..LOAD C.0
+ OUT 2  ;DEC SP                 ..EMIT
+ SEP SRET
+ ..
+ ..  getc()
+ ..
+ ORG*+(* AND 1)
+Lgetc:
+ INP 2  ;PLO AC                 ..AC.0=KEY
+ LDI #00 ;PHI AC
+ SEP SRET
 ..
 ..  PROGRAM
 ..
