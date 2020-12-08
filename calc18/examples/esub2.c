@@ -11,7 +11,7 @@ void putchar(u_char c) {
 }
 
 void main(void) {
-   u_int i, c, col, a;
+   u_int i, c, col, a, vi;
 
    n = 2000;
 
@@ -22,7 +22,8 @@ void main(void) {
       a = n+1;
       c = i = 0;
       while (i<n) {
-         c = c + v[i] * 10;
+         vi = 2 *v[i];
+         c = c + (vi + 4 * vi);
          v[i++] = c % a;
          c = c / a--;
       }

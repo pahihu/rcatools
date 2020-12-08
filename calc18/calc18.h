@@ -18,6 +18,7 @@ typedef struct _NODE {
 #define C_AUTO    2
 #define C_LABEL   3
 #define C_PARAM   4
+#define C_REG     5
 
 void defcls(int n, int cls, int offs);
 char *getsym(int n);

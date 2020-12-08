@@ -1,5 +1,5 @@
 main() {
-   auto x;
+   register x;
 
    putc('B');
    x = 0; while (++x);

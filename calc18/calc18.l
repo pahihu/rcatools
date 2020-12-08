@@ -153,6 +153,7 @@ int findid(char *s) {
       {"for"  , FOR},
       {"goto" , GOTO},
       {"if"   , IF},
+      {"register", REGISTER},
       {"return",RETURN},
       {"while", WHILE},
       {0      , 0}
@@ -165,7 +166,7 @@ int findid(char *s) {
    return 0;
 }
 
-static char* clsnm[] = { "undef", "extrn", "auto", "label", "param" };
+static char* clsnm[] = { "undef", "extrn", "auto", "label", "param", "reg" };
 
 void redeferr(int n) {
    fprintf(stderr,"%s redefined, was %s\n",syms[n].sym,clsnm[syms[n].cls]);

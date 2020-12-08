@@ -33,11 +33,13 @@ Callee:
 SUB:    PUSH FP
         MOV  FP,SP
         ...
+        [PUSH REG1..REGN]
         MOV  RETVAL,XXXX        ..RETURN (RVAL)
         LBR  ESUB
 
         LBR  ESUB               ..RETURN
-ESUB:   MOV  SP,FP
+ESUB:   [POP REGN..REG1]
+        MOV  SP,FP
         POP  FP
         SEP  SRET
 
@@ -57,6 +59,11 @@ FP===>  LOC1.1          0
         ...
         LOCN.1
         LOCN.0
+        REG1.1
+        REG1.0
+        ...
+        REGN.1
+        REGN.0
 
 extrn   LDI A.0(EXTRN) ;PLO VARPTR
         LDI A.1(EXTRN) ;PHI VARPTR

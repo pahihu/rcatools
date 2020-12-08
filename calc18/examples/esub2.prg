@@ -6,7 +6,8 @@ putchar(c) {
 
 main() {
    extrn v, n;
-   auto i, c, col, a;
+   auto col;
+   register i, c, a;
 
    n = 2000;
 
@@ -17,7 +18,7 @@ main() {
       a = n+1;
       c = i = 0;
       while (i<n) {
-         c = c + 10 * v[i];
+         c = c + v[i] * 10;
          v[i++] = c % a;
          c = c / a--;
       }
