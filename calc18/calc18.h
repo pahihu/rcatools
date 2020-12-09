@@ -4,10 +4,12 @@
 #define CON 0
 #define ID  1
 #define OPR 2
+#define STR 3
 
 typedef struct _NODE {
-   int t;               // type: CON, ID, OPR
+   int t;               // type: CON, ID, OPR, STR
    int x;               // value
+   char *s;             // string value
    struct _NODE *a[2];  // args
 } NODE;
 
@@ -27,13 +29,16 @@ int getcls(int n);
 void dropsyms(void);
 extern char *fn; // current fn
 
-NODE *nod(int typ, int n, NODE *arg0, NODE *arg1);
+NODE *nod(int typ, int n, char *s, NODE *arg0, NODE *arg1);
 void freenod(NODE*);
 int ex(NODE*);
 
-#define opr(x,l,r)      nod(OPR,x,l,r)
-#define opr3(x,a0,a1,a2)  nod(OPR,x,a0,nod(INT,x,a1,a2))
-#define id(x)           nod(ID,x,NULL,NULL)
-#define con(x)          nod(CON,x,NULL,NULL)
+#define opr(x,l,r)      nod(OPR,x,0,l,r)
+#define opr3(x,a0,a1,a2)  nod(OPR,x,0,a0,nod(INT,x,0,a1,a2))
+#define id(x)           nod(ID,x,0,NULL,NULL)
+#define con(x)          nod(CON,x,0,NULL,NULL)
+#define str(x)          nod(STR,0,x,NULL,NULL)
+
+#define H printf
 
 #endif

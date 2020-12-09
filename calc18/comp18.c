@@ -39,7 +39,6 @@ static int lbl = 0;
 
 #define LO(x)   ((x) & 0xFF)
 #define HI(x)   LO((x)>>8)
-#define H  printf
 
 #define ADDR(p) (getoffs((p)->x))
 
@@ -807,6 +806,11 @@ int ex(NODE *p) {
    case CON:
       gldi(p->x);
       break;
+   case STR:
+      H(" ..STR %s [%d]\n",p->s,p->x=lbl++);
+      H(" LDI A.1(L%d) ;SHR ;PHI AC\n",p->x);
+      H(" LDI A.0(L%d) ;SHRC ;PLO AC\n",p->x);
+      break;
    case ID: glvalu(p, 1); gldvar(p); break;
    case OPR:
       switch (p->x) {
@@ -1084,3 +1088,5 @@ int ex(NODE *p) {
 
    return argcnt;
 }
+
+/* vim: set ts=3 sw=3 et: */

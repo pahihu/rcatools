@@ -17,6 +17,12 @@ int findsym(char*);
 int defsym(char*);
 int findid(char*);
 
+#define MAX_STR   128
+void appendc(int c);
+char strcon[MAX_STR+1];
+int nstrcon;
+int unescape(int c);
+
 /*
  * History
  * =======
@@ -27,6 +33,8 @@ int findid(char*);
  *
  */
 %}
+
+%x CHARCON STRCON
 
 %%
 
@@ -47,33 +55,28 @@ int findid(char*);
 [-()<>=+*/;{}&|^~\[\]%:\?\!,.] {
                    return *yytext;
                 }
-"'"[^']+"'"     {
-                   unsigned int c;
-                   char *p = yytext + 1;
-                   yylval.con = 0;
-                   while ('\'' != (c = *p++) && c) {
-                      if ('*' == c) {
-                         c = *p++;
-                         switch (c) {
-                         case '0': c = 0; break;
-                         case 'e': c = 13; break;
-                         case '(': c = '{'; break;
-                         case ')': c = '}'; break;
-                         case 't': c = '\t'; break;
-                         case '*':
-                         case '\'': 
-                         case '"': break;
-                         case 'n': c = '\n'; break;
-                         default:
-                            break;
-                         }
-                      }
-                      yylval.con = 256 * yylval.con + c;
-                   }
-                   if (!c) yyerror("unbalanced char const");
-                   yylval.con &= 65535;
-                   // fprintf(stderr,"%s = %d\n",yytext,yylval.con);
-                   return CONST;
+
+\'              { yylval.con = 0; BEGIN(CHARCON); }
+<CHARCON>\'     { BEGIN(INITIAL); yylval.con &= 65535; return CONST; }
+<CHARCON>\*.    { yylval.con *= 256; yylval.con += unescape(yytext[1]); }
+<CHARCON>\n     { yyerror("unterminated char const"); }
+<CHARCON>[^\*\n\']+ {
+                  char *yptr = yytext;
+                  while (*yptr) {
+                     yylval.con *= 256;
+                     yylval.con += 255 & *yptr++;
+                  }
+                }
+\"              { nstrcon = 0; BEGIN(STRCON); }
+<STRCON>\"      { BEGIN(INITIAL); strcon[nstrcon] = 0;
+                  yylval.str = strdup(strcon);
+                  return STRING;
+                }
+<STRCON>\*.     { appendc(unescape(yytext[1])); }
+<STRCON>\n      { yyerror("unterminated string"); }
+<STRCON>[^\*\n\"] { char *yptr = yytext;
+                  while (*yptr)
+                     appendc(*yptr++);
                 }
 
 ">="            return GE;
@@ -87,7 +90,7 @@ int findid(char*);
 "&&"            return LAND;
 "||"            return LOR;
 
-"/\*"           { /* paxdiablo 25jan2010 */
+"/\*"           { /* flex man page */
                   int c;
                   while(1) {
                      while ('*' != (c = input()) && EOF != c);
@@ -206,3 +209,29 @@ void dropsyms(void) {
       syms[i].cls = C_UNDEF;
 }
 
+int unescape(int c) {
+   switch (c) {
+   case '0': c = 0; break;
+   case 'e': c = 0x13; break; // DC3
+   case '(': c = '{'; break;
+   case ')': c = '}'; break;
+   case 't': c = '\t'; break;
+   case '*':
+   case '\'': 
+   case '"': break;
+   case 'n': c = '\n'; break;
+   default:
+      break;
+   }
+   return c;
+}
+
+void appendc(int c) {
+   if (nstrcon == MAX_STR) {
+      yyerror("string too long");
+      return;
+   }
+   strcon[nstrcon++] = c;
+}
+
+/* vim: set ts=3 sw=3 et: */

@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <string.h>
 #include "calc18.h"
 
 extern int yylineno;
@@ -24,11 +25,13 @@ void yyerror(char*);
 %union {
    int con;
    char sym;
+   char *str;
    NODE *ptr;
 };
 
 %token <con> CONST
 %token <sym> VAR
+%token <str> STRING
 %token WHILE IF FOR INC DEC GOTO RETURN EXTRN AUTO REGISTER FUNCALL UNARY PREINC PREDEC POSTINC POSTDEC ILST XLST FUNDEF VARDEF VECDEF EXTDEF AUTODEF REGDEF
 %nonassoc IFX
 %nonassoc ELSE
@@ -124,6 +127,7 @@ expr:
           '(' expr ')'          { $$ = $2; }
         | lvalue %prec LVALUE   { $$ = $1; }
         | CONST                 { $$ = con($1); }
+        | STRING                { $$ = str($1); }
         | lvalue '=' expr       { $$ = opr('=', $1, $3); }
         | INC lvalue %prec UNOP { $$ = opr(PREINC, $2, NULL); }
         | DEC lvalue %prec UNOP { $$ = opr(PREDEC, $2, NULL); }
@@ -168,25 +172,39 @@ base:     VAR                   { $$ = id($1); }
         ;
 
 %%
-NODE *nod(int typ, int x, NODE *a0,NODE *a1) {
+NODE *nod(int typ, int x, char *s, NODE *a0,NODE *a1) {
    NODE *ret;
 
    ret = malloc(sizeof(NODE));
    ret->t = typ;
    ret->x = x;
+   ret->s = s;
    ret->a[0] = a0;
    ret->a[1] = a1;
    return ret;
 }
 
 void freenod(NODE *p) {
-   int i;
+   int i, n;
+   char *s;
 
    if (!p) return;
    if (OPR == p->t)
       for (i = 0; i < 2; i++)
          if (p->a[i])
             freenod(p->a[i]);
+   if (p->s) {
+      s = p->s;
+      H(" ..STR%d=%s\n",p->x,s);
+      H(" ORG*+(* AND 1)\n");
+      H("L%d: CONST #",p->x);
+      n = strlen(s);
+      for (i = 0; i < n; i++)
+         H("%02X",s[i]);
+      H("13"); // DC3
+      H("\n");
+      free(s);
+   }
    free(p);
 }
 
@@ -199,3 +217,4 @@ int main(void) {
    return 0;
 }
 
+/* vim: set ts=3 sw=3 et: */
