@@ -66,8 +66,8 @@ definition:
 
 
 extdef:
-          VAR ';'               { $$ = opr(VARDEF, id($1), con(2)); }
-        | VAR '[' CONST ']' ';' { $$ = opr(VECDEF, id($1), con(2*$3)); }
+          VAR id_list ';'          { $$ = opr(VARDEF, id($1), opr(INT,con(2),$2)); }
+        | VAR '[' CONST ']' id_list ';' { $$ = opr(VECDEF, id($1), opr(INT,con(2*$3),$5)); }
         | VAR '(' id_list ')' stmt { $$ = opr(FUNDEF, id($1), opr(INT, $3, $5)); }
         ;
 
@@ -80,6 +80,7 @@ id_list:
 id:
           VAR                   { $$ = id($1); $$->a[0] = con(2);  }
         | VAR CONST             { $$ = id($1); $$->a[0] = con(2*$2); }
+        | CONST                 { $$ = con($1); $$->a[0] = con($1); }
         ;
 
 simplestmt:                     { $$ = opr(';', NULL, NULL); }

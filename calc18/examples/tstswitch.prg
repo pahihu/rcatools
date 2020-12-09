@@ -1,5 +1,4 @@
 #include "stdlib.prg"
-#include "char.prg"
 
 main() {
    auto buf 16, s, n;

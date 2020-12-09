@@ -1,5 +1,8 @@
 /* stdlib functions */
+
 putchar(c) { /* put char to UART */
+   extrn putc;
+
    if (c == '*n')
       putc(13);
    putc(c);
@@ -10,27 +13,54 @@ nl() {
 }
 
 getchar() { /* get char from UART */
+   extrn getc;
    auto c;
+
    c = getc();
    if (c == 13)
       c = '*n';
    return (c);
 }
 
-gets(s) { /* get string */
-   auto c;
+char(s,i) { /* i-th char of string s */
+   auto n;
 
-   while ('*n' != (c = getchar()))
-      putchar(*s++ = c);
-   putchar(c);
-   *s++ = '*0';
+   n = *(s+(i>>1));
+   /* s[] contains "ABCD", accessed a 'BA' 'DC' */
+   if (i&01)
+      n=n>>8;
+   return (n&0377);
 }
 
-prints(s) { /* print string */
-   auto c;
+lchar(s,i,c) { /* store char c in the i-th pos of string s */
+   auto n, x;
 
-   while (c = *s++)
+   n = *(s + (x = i>>1));
+   if (i&1)
+      n = (n & 0377) + (c << 8);
+   else
+      n = (n & 0177400) + c;
+   *(s+x) = n;
+}
+
+puts(s) {
+   auto c,i;
+
+   i = 0;
+   while ((c = char(s,i++)) != '*e')
       putchar(c);
+}
+
+gets(s) { /* get string */
+   auto i, c;
+
+   i = 0;
+   while ('*n' != (c = getchar())) {
+      lchar(s,i++,c);
+      putchar(c);
+   }
+   putchar(c);
+   lchar(s,i,'*e');
 }
 
 printn(n,b) { /* print number in base b */
@@ -56,10 +86,10 @@ digit(c) {
 }
 
 ston(s,b) { /* convert string to number in base b */
-   auto c, n, d;
+   auto i, c, n, d;
 
-   n = 0;
-   while (isdigit(c = *s++)) {
+   n = i = 0;
+   while (isdigit(c = char(s,i++))) {
       d = digit(c);
       if (b - 1 < d)
          return (0177777);
@@ -68,3 +98,4 @@ ston(s,b) { /* convert string to number in base b */
    return (n);
 }
 
+/* vim: set ts=3 sw=3 et: */

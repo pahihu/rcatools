@@ -23,6 +23,8 @@ char strcon[MAX_STR+1];
 int nstrcon;
 int unescape(int c);
 
+int dbg = 0;
+
 /*
  * History
  * =======
@@ -140,7 +142,8 @@ int defsym(char *s) {
    syms[n].sym  = strdup(s);
    syms[n].offs = -1;
    syms[n].cls  = C_UNDEF;
-   fprintf(stderr,"sym %s\n", yytext);
+   if (dbg)
+      fprintf(stderr,"sym %s\n", yytext);
 
    return n;
 }
@@ -180,7 +183,8 @@ void redeferr(int n) {
 
 void defcls(int n, int cls, int offs) {
    if (C_UNDEF == syms[n].cls) {
-      fprintf(stderr,"%s %s %d\n",clsnm[cls],syms[n].sym,offs);
+      if (dbg)
+         fprintf(stderr,"%s %s %d\n",clsnm[cls],syms[n].sym,offs);
       syms[n].cls = cls;
       syms[n].offs = offs;
       return;

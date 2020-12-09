@@ -74,6 +74,34 @@ par     GLO FP ;ADD #ARG ;PLO VARPTR            ..MAX 256BYTES  5,7,...
 auto    GLO FP ; SMI #AUT.0 ;PLO VARPTR         ..1,3,5...
         GHI FP ; SMBI #AUT.1 ;PHI VARPTR
 
+switch / case (numeric case)
+============================
+
+        GLO AC; SMI LMAXCASE
+        LBDF LEND
+        LDI A.1(SWTAB) ;STXD
+        LDI A.0(SWTAB) ;STR SP
+        LDI A.1(SWITCH) ;PHI SUB
+        LDI A.0(SWITCH) ;PLO SUB
+        SEP SUB
+
+SWITCH: ..RUNS IN SUB, CALC OFFS
+        ..ADD TO SWTAB
+        GLO AC ;SHL ;ADD ;PLO MA
+        GHI AC ;IRX ;ADC PHI MA
+        ..GET ADDR
+        LDA MA ;PHI PC
+        LDN MA ;PLO PC
+        ..JUMP
+        SEP PC
+CASE1:
+CASE2:
+CASEX:
+LEND:
+
+MAXCASE EQU XXX
+SWTAB:  DW A(SWEND),A(CASE1),A(CASE2),A(SWEND)
+
 
 opr(VARDEF,id(symidx),con(size));
 opr(VECDEF,id(symidx),con(size));

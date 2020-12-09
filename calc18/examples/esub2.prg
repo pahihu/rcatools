@@ -9,8 +9,6 @@ main() {
    auto col;
    register i, c, a;
 
-   n = 2000;
-
    i = col = 0;
    while (i < n)
       v[i++] = 1;
@@ -30,5 +28,5 @@ main() {
 }
 
 v[2000];
-n;
+n 2000;
 

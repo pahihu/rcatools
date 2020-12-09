@@ -1,5 +1,4 @@
 #include "stdlib.prg"
-#include "char.prg"
 
 main() {
    puts("hello, world!*n");

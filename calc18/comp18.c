@@ -410,8 +410,8 @@ static void glvaluvar(NODE *p, int regena, int pushma) {
    H(" ..MA=ADDR(%s)\n",getsym(p->x));
    switch (cls) {
    case C_UNDEF:
-      fprintf(stderr,"glvalu(): %s undefined\n",sym);
-      exit(1);
+      fprintf(stderr,"%s undefined\n",sym);
+      defcls(p->x, C_EXTRN, 0);
       break;
    case C_EXTRN:
       if (pushma) {
@@ -705,18 +705,20 @@ static int idlist(int t,NODE *p, int offs) {
    assert(OPR == p->t && ILST == p->x);
    newoffs = idlist(t,p->a[0],ILST==t? 2+offs : offs);
    q = p->a[1];
-   assert(isvar(q));
    n = q->x;
    switch (t) {
    case ILST:
+      assert(isvar(q));
       // fprintf(stderr,"defpar%d: %s\n",offs,getsym(n));
       defcls(n, C_PARAM, offs);
       break;
    case EXTDEF:
+      assert(isvar(q));
       // fprintf(stderr,"defext: %s\n",getsym(n));
       defcls(n, C_EXTRN, 0);
       break;
    case AUTODEF:
+      assert(isvar(q));
       q = q->a[0]; // storage size
       assert(CON == q->t);
       newoffs += q->x;
@@ -724,6 +726,7 @@ static int idlist(int t,NODE *p, int offs) {
       defcls(n, C_AUTO, newoffs);
       break;
    case REGDEF:
+      assert(isvar(q));
       newoffs--;
       if (newoffs == 0x0B) {
          fprintf(stderr,"too many register variables\n");
@@ -731,6 +734,12 @@ static int idlist(int t,NODE *p, int offs) {
       }
       defcls(n, C_REG, newoffs);
       break;
+   case VARDEF:
+   case VECDEF:
+      assert(isvar(q) || isimm(q));
+      newoffs += 2;
+      if (isvar(q)) H(" DW A(L%s)\n",getsym(n));
+      else H(" DW #%02X%02X\n",LO(n),HI(n));
    }
    return newoffs;
 }
@@ -882,16 +891,27 @@ int ex(NODE *p) {
          defcls(p->a[0]->x,C_EXTRN,0);
          H(" ..EXTRN %s\n",sym);
          galign();
+         q = p->a[1];
          H("L%s:\n",sym);
-         H(" ORG*+%d\n",p->a[1]->x);
+         // either init list, or set to zero
+         // NB. init may be a list
+         if (q->a[1])
+            idlist(VARDEF,q->a[1],0);
+         else
+            H(" DW 0\n");
          break;
       case VECDEF:
          sym = getsym(p->a[0]->x);
          defcls(p->a[0]->x,C_EXTRN,0);
          H(" ..EXTRN %s[]\n",sym);
          galign();
+         q = p->a[1];
          H("L%s:\n",sym);
-         H(" ORG*+%d\n",p->a[1]->x);
+         offs = idlist(VECDEF,q->a[1],0);
+         // if init size is less than vector size
+         // bump org
+         if (offs < q->a[0]->x)
+            H(" ORG L%s+%d\n",sym,q->a[0]->x);
          break;
       case ILST: // params
          idlist(ILST, p, 5);
@@ -965,6 +985,10 @@ int ex(NODE *p) {
          break;
       case FUNCALL:
          sym = getsym(p->a[0]->x);
+         if (C_UNDEF == getcls(p->a[0]->x)) {
+            // fprintf(stderr,"%s undefined\n",sym);
+            defcls(p->a[0]->x,C_EXTRN,0);
+         }
          H(" ..CALL %s\n",sym);
          argcnt = ex(p->a[1]); // push args
          H(" SEP SCALL,A(L%s)\n",sym);
