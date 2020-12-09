@@ -922,7 +922,7 @@ int ex(NODE *p) {
          swpush();
          ex(p->a[0]);
          H(" GLO AC ;SMI L%04d\n",switches[currsw].lmaxcase);
-         H(" LBNF L%04d\n",switches[currsw].lend);
+         H(" LBDF L%04d\n",switches[currsw].lend);
          H(" LDI A.1(L%04d) ;STXD\n",switches[currsw].ltab);
          H(" LDI A.0(L%04d) ;STR SP\n",switches[currsw].ltab);
          gcall("SWITCH");
