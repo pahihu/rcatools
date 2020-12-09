@@ -703,14 +703,15 @@ static int idlist(int t,NODE *p, int offs) {
       return offs;
 
    assert(OPR == p->t && ILST == p->x);
-   newoffs = idlist(t,p->a[0],ILST==t? 2+offs : offs);
+   newoffs = idlist(t,p->a[0],offs);
    q = p->a[1];
    n = q->x;
    switch (t) {
    case ILST:
       assert(isvar(q));
+      newoffs += 2;
       // fprintf(stderr,"defpar%d: %s\n",offs,getsym(n));
-      defcls(n, C_PARAM, offs);
+      defcls(n, C_PARAM, newoffs);
       break;
    case EXTDEF:
       assert(isvar(q));
@@ -744,6 +745,21 @@ static int idlist(int t,NODE *p, int offs) {
    return newoffs;
 }
 
+static int revidlist(int t,NODE *p, int offs) {
+   int n, newoffs;
+   NODE *q;
+
+   if (!p)
+      return offs;
+
+   assert(OPR == p->t && ILST == p->x);
+   q = p->a[1];
+   n = q->x;
+   assert(isvar(q));
+   // fprintf(stderr,"defpar%d: %s\n",offs,getsym(n));
+   defcls(n, C_PARAM, offs);
+   return revidlist(t,p->a[0],2+offs);
+}
 static int exprlist(NODE *p, int offs) {
    int n;
    NODE *q;
@@ -752,16 +768,14 @@ static int exprlist(NODE *p, int offs) {
       return offs;
 
    assert(OPR == p->t && XLST == p->x);
-   offs = exprlist(p->a[0],offs);
    H(" ..PUSH ARG%d\n",++offs);
-   if (isvar(p->a[1]))
+   if (isvar(p->a[1])) /* push in reverse order */
       gpushvar(p->a[1]);
    else {
       ex(p->a[1]);
       gpushac(2);
    }
-
-   return offs;
+   return exprlist(p->a[0],offs);
 }
 
 static void galign(void) {
@@ -880,8 +894,8 @@ int ex(NODE *p) {
       break;
    case STR:
       H(" ..STR %s [%d]\n",p->s,p->x=lbl++);
-      H(" LDI A.1(L%d) ;SHR ;PHI AC\n",p->x);
-      H(" LDI A.0(L%d) ;SHRC ;PLO AC\n",p->x);
+      H(" LDI A.1(L%d SHR 1) ;PHI AC\n",p->x);
+      H(" LDI A.0(L%d SHR 1) ;PLO AC\n",p->x);
       break;
    case ID: glvalu(p, 1); gldvar(p); break;
    case OPR:
@@ -914,7 +928,7 @@ int ex(NODE *p) {
             H(" ORG L%s+%d\n",sym,q->a[0]->x);
          break;
       case ILST: // params
-         idlist(ILST, p, 5);
+         idlist(ILST, p, 3);
          break;
       case EXTDEF:
          idlist(EXTDEF, p->a[0], 0);
@@ -989,8 +1003,8 @@ int ex(NODE *p) {
             // fprintf(stderr,"%s undefined\n",sym);
             defcls(p->a[0]->x,C_EXTRN,0);
          }
-         H(" ..CALL %s\n",sym);
          argcnt = ex(p->a[1]); // push args
+         H(" ..CALL %s\n",sym);
          H(" SEP SCALL,A(L%s)\n",sym);
          argcnt *= 2; // 2byte args
          if (argcnt) {

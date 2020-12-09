@@ -21,9 +21,9 @@ F  FP
 Stack is descending, caller increments stack by number of bytes pushed.
 
 Caller:
-        PUSH arg1
-        ...
         PUSH argN
+        ...
+        PUSH arg1
         SEP  SCALL,A(SUB)
         ADD  SP,2*#ARGS
         ...
@@ -45,11 +45,11 @@ ESUB:   [POP REGN..REG1]
 
 
 
-        ARG1.1
-        ARG1.0
+        ARGN.1
+        ARGN.0
         ...
-        ARGN.1          6
-        ARGN.0          5
+        ARG1.1          6
+        ARG1.0          5
         SCAL
         SCAL
         OLDFP.1         2

@@ -12,7 +12,7 @@ loop:
          return;
       putchar(c);
    }
-   x = *adx--; /* descending stack */
+   x = *adx++;
    switch c = char(fmt,i++) {
    case 'd': /* decimal */
    case 'o': /* octal */
@@ -35,7 +35,7 @@ loop:
    }
    putchar('%');
    i--;
-   adx++;
+   adx--;
    goto loop;
 }
 

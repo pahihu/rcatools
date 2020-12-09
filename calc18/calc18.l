@@ -23,7 +23,7 @@ char strcon[MAX_STR+1];
 int nstrcon;
 int unescape(int c);
 
-int dbg = 0;
+int dbg = 1;
 
 /*
  * History
