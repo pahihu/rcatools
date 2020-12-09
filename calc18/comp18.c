@@ -35,7 +35,20 @@ int ex(NODE *p);
 static void gmul2(void);
 static void glvaluvar(NODE *p, int regena, int pushma);
 
-static int lbl = 0;
+typedef struct {
+   int prev; // prev switch
+   int lend; // end of switch
+   int ltab; // switch table
+   int lmaxcase; // max of cases
+   int tab[256];  // switch table labels (case branches)
+} swdesc;
+
+#define MAX_SWITCHES 4
+int nswitches;
+swdesc switches[MAX_SWITCHES];
+int currsw = -1;
+
+static int lbl = 0; // label generator
 
 #define LO(x)   ((x) & 0xFF)
 #define HI(x)   LO((x)>>8)
@@ -56,6 +69,50 @@ static void prinode1(char *msg,NODE *p) {
 
 static void prinode(NODE *p) {
    prinode1("HEAD",p);
+}
+
+static void swpush(void) {
+   assert(nswitches < MAX_SWITCHES + 1);
+
+   memset(&switches[nswitches],0,sizeof(swdesc));
+   switches[nswitches].lend = lbl++;
+   switches[nswitches].ltab = lbl++;
+   switches[nswitches].lmaxcase = lbl++;
+   switches[nswitches].prev = currsw;
+   currsw = nswitches;
+   nswitches++;
+}
+
+static void swpop(void) {
+   assert(-1 < currsw);
+   currsw = switches[currsw].prev;
+}
+
+static void swdef(void) {
+   int i, j, l;
+   int maxcase;
+   swdesc *sw;
+
+   for (i = 0; i < nswitches; i++) {
+      sw = &switches[i];
+      maxcase = 0;
+      for (j = 256; j; j--)
+         if (sw->tab[j-1]) {
+            maxcase = j;
+            break;
+         }
+      if (0 == maxcase) {
+         fprintf(stderr,"switch without cases\n");
+         exit(1);
+      }
+      H(" ..SWITCH%d\n",i);
+      H("L%04d EQU %d\n",sw->lmaxcase,maxcase);
+      H("L%04d:\n",sw->ltab);
+      for (j = 0; j < maxcase; j++) {
+         l = sw->tab[j]? sw->tab[j] : sw->lend;
+         H(" DW A(L%04d)\n",l);
+      }
+   }
 }
 
 static int isvar(NODE *p) {
@@ -609,6 +666,13 @@ static void gpostdec(NODE *p) {
    }
 }
 
+static void gcall(char *subr) {
+   H(" ..CALL %s\n",subr);
+   H(" LDI A.1(%s) ;PHI SUB\n",subr);
+   H(" LDI A.0(%s) ;PLO SUB\n",subr);
+   H(" SEP SUB\n");
+}
+
 static void gdiv(NODE *p) {
    H(" ..DIV\n");
    if (isvar(p->a[1]))
@@ -618,8 +682,7 @@ static void gdiv(NODE *p) {
       gpushac(2);
    }
    ex(p->a[0]);
-   H(" LDI A.0(UDIV) ;PLO SUB\n");
-   H(" SEP SUB\n");
+   gcall("UDIV");
 }
 
 static void gldvar(NODE *p) {
@@ -855,10 +918,31 @@ int ex(NODE *p) {
          for (i = lowreg; i < 0x0F; i++)
             gpush(2,regnm(lowreg));
          break;
+      case SWITCH:
+         swpush();
+         ex(p->a[0]);
+         H(" GLO AC ;SMI L%04d\n",switches[currsw].lmaxcase);
+         H(" LBNF L%04d\n",switches[currsw].lend);
+         H(" LDI A.1(L%04d) ;STXD\n",switches[currsw].ltab);
+         H(" LDI A.0(L%04d) ;STR SP\n",switches[currsw].ltab);
+         gcall("SWITCH");
+         ex(p->a[1]);
+         H("L%04d:\n",switches[currsw].lend);
+         swpop();
+         break;
+      case CASE:
+         if (currsw < 0) {
+            fprintf(stderr, "no switch\n");
+            exit(1);
+         }
+         i = LO(p->a[0]->x);
+         H("L%04d: ..CASE %d\n",lbl,i);
+         switches[currsw].tab[i] = lbl++;
+         break;
       case FUNDEF:
          sym = getsym(p->a[0]->x);
          H(" ..FN %s\n",fn = sym);
-         lowreg = 0x0F;
+         lowreg = 0x0F; nswitches = 0; currsw = -1;
          galign();
          H("L%s:\n",sym);
          gpush(2, "FP");
@@ -872,6 +956,7 @@ int ex(NODE *p) {
          gmov("SP", "FP");
          gpop(2, "FP");
          H(" SEP SRET\n");
+         swdef();
          dropsyms();
          fn = NULL;
          break;
@@ -944,7 +1029,9 @@ int ex(NODE *p) {
          break;
       case ':':
          H(" ..LABEL\n");
-         H("L%s:\n",getsym(p->a[0]->x));
+         if (!getoffs(p->a[0]->x))
+            setoffs(p->a[0]->x,lbl++);
+         H("L%04d:\n",getoffs(p->a[0]->x));
          ex(p->a[1]);
          break;
       case '?':
@@ -965,7 +1052,9 @@ int ex(NODE *p) {
             exit(1);
          }
          H(" ..GOTO\n");
-         H(" LBR L%s\n",getsym(p->a[0]->x));
+         if (!getoffs(p->a[0]->x))
+            setoffs(p->a[0]->x,lbl++);
+         H(" LBR L%04d\n",getoffs(p->a[0]->x));
          break;
       case '=':
          ex(p->a[1]);
@@ -1051,9 +1140,7 @@ int ex(NODE *p) {
                }
                ex(p->a[0]);
                // gpop(2, "AUX");
-               H(" ..MUL AC,AUX\n");
-               H(" LDI A.0(UMULT) ;PLO SUB\n");
-               H(" SEP SUB\n");
+               gcall("UMULT");
             }
             break;
          case '/':

@@ -151,6 +151,7 @@ int findid(char *s) {
       int tok;
    } ids[] = {
       {"auto",  AUTO},
+      {"case",  CASE},
       {"else" , ELSE},
       {"extrn", EXTRN},
       {"for"  , FOR},
@@ -158,6 +159,7 @@ int findid(char *s) {
       {"if"   , IF},
       {"register", REGISTER},
       {"return",RETURN},
+      {"switch",SWITCH},
       {"while", WHILE},
       {0      , 0}
    };
@@ -192,11 +194,11 @@ char *getsym(int n) {
 }
 
 int getoffs(int n) {
-   if (syms[n].offs < 0) {
-      syms[n].offs = dseg; dseg += 2;
-      fprintf(stderr,"var %02X %s\n",syms[n].offs,syms[n].sym);
-   }
    return syms[n].offs;
+}
+
+void setoffs(int n, int offs) {
+   syms[n].offs = offs;
 }
 
 int getcls(int n) {

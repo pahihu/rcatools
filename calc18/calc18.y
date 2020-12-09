@@ -32,7 +32,7 @@ void yyerror(char*);
 %token <con> CONST
 %token <sym> VAR
 %token <str> STRING
-%token WHILE IF FOR INC DEC GOTO RETURN EXTRN AUTO REGISTER FUNCALL UNARY PREINC PREDEC POSTINC POSTDEC ILST XLST FUNDEF VARDEF VECDEF EXTDEF AUTODEF REGDEF
+%token WHILE IF FOR INC DEC GOTO RETURN EXTRN AUTO REGISTER FUNCALL UNARY PREINC PREDEC POSTINC POSTDEC ILST XLST FUNDEF VARDEF VECDEF EXTDEF AUTODEF REGDEF SWITCH CASE
 %nonassoc IFX
 %nonassoc ELSE
 
@@ -51,7 +51,7 @@ void yyerror(char*);
 %nonassoc UNOP
 %nonassoc GRP
 
-%type <ptr> stmt stmt_list expr expr_list id id_list simplestmt lvalue base extdef
+%type <ptr> stmt compound_stmt stmt_list expr expr_list id id_list simplestmt lvalue base extdef
 
 %%
 
@@ -94,6 +94,9 @@ stmt:
         | expr ';'              { $$ = $1; }
         | WHILE '(' expr ')' stmt
                                 { $$ = opr(WHILE, $3, $5); }
+        | compound_stmt         { $$ = $1; }
+        | SWITCH expr compound_stmt { $$ = opr(SWITCH,$2,$3); }
+        | CASE CONST ':'        { $$ = opr(CASE, con($2), NULL); }
         /*  1   2    3    4          5   6    7 */
         | FOR '(' stmt stmt simplestmt ')' stmt
                                 { $$ = opr(FOR, $7, opr(INT, $3, opr(INT, $4, $5))); }
@@ -101,7 +104,6 @@ stmt:
                                 { $$ = opr3(IF, $3, $5, NULL); }
         | IF '(' expr ')' stmt ELSE stmt
                                 { $$ = opr3(IF, $3, $5, $7); }
-        | '{' stmt_list '}'     { $$ = $2; }
         | VAR ':' stmt          { defcls($1,C_LABEL,0); $$ = opr(':', id($1), $3); }
         | GOTO VAR ';'          { defcls($2,C_LABEL,0);
                                   $$ = opr(GOTO, id($2), NULL);
@@ -110,6 +112,10 @@ stmt:
         | RETURN '(' expr ')' ';' { $$ = opr(RETURN, $3, NULL); }
         | error ';'             { $$ = NULL; }
         | error '}'             { $$ = NULL; }
+        ;
+
+compound_stmt:
+        '{' stmt_list '}'       { $$ = $2; }
         ;
 
 stmt_list:

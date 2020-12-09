@@ -25,6 +25,7 @@ typedef struct _NODE {
 void defcls(int n, int cls, int offs);
 char *getsym(int n);
 int getoffs(int n);
+void setoffs(int n, int offs);
 int getcls(int n);
 void dropsyms(void);
 extern char *fn; // current fn

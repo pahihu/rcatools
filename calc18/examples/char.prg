@@ -1,5 +1,3 @@
-/* #include "stdlib.prg" */
-
 char(s,i) { /* i-th char of string s */
    auto n;
 
@@ -21,16 +19,12 @@ lchar(s,i,c) { /* store char c in the i-th pos of string s */
    *(s+x) = n;
 }
 
-prints(s) {
+puts(s) {
    auto c,i;
 
    i = 0;
    while ((c = char(s,i++)) != '*e')
-      putc(c);
-}
-
-main() {
-   prints("hello, world!*n");
+      putchar(c);
 }
 
 /* vim: set ts=3 sw=3 et: */
