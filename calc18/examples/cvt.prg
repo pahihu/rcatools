@@ -5,6 +5,6 @@ main() {
 
    gets(s = &buf[0]); nl();
    puts(s); nl();
-   n = ston(s, 16);
+   n = atoi(s, 16);
    printn(n, 10); nl();
 }

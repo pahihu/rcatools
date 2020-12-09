@@ -148,6 +148,12 @@ static int isimm(NODE *p) {
    return CON == p->t;
 }
 
+static int isstr(NODE *p) {
+   if (!p)
+      return 0;
+   return STR == p->t;
+}
+
 static int isimm8(NODE *p) {
    return isimm(p) && !HI(p->x); 
 }
@@ -737,10 +743,16 @@ static int idlist(int t,NODE *p, int offs) {
       break;
    case VARDEF:
    case VECDEF:
-      assert(isvar(q) || isimm(q));
+      assert(isvar(q) || isimm(q) || isstr(q));
       newoffs += 2;
-      if (isvar(q)) H(" DW A(L%s)\n",getsym(n));
-      else H(" DW #%02X%02X\n",LO(n),HI(n));
+      if (isvar(q))
+         H(" DW A(L%s)\n",getsym(n));
+      else if (isimm(q))
+         H(" DW #%02X%02X\n",LO(n),HI(n));
+      else if (isstr(q)) {
+         H(" ..STR %s [%d]\n",q->s,q->x=lbl++);
+         H(" DB A.0(L%d SHR 1),A.1(L%d SHR 1)\n",q->x,q->x);
+      }
    }
    return newoffs;
 }

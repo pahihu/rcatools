@@ -1,11 +1,19 @@
 /* stdlib functions */
 
-putchar(c) { /* put char to UART */
-   extrn putc;
-
+putci(c) {
+   if (!c || c == '*e')
+      return;
    if (c == '*n')
       putc(13);
    putc(c);
+}
+
+putchar(c) { /* put char to UART */
+   extrn putc;
+
+   putci(c & 0377);
+   putci(c >> 8);
+   return (c);
 }
 
 nl() {
@@ -68,7 +76,8 @@ printn(n,b) { /* print number in base b */
 
    if (a=n/b)
       printn(a,b);
-   putchar(n % b + '0');
+   /* putchar(n % b + '0'); */
+   putchar(char("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ",n%b));
 }
 
 isdigit(c) {
@@ -85,7 +94,7 @@ digit(c) {
    return (10 + c - 'A');
 }
 
-ston(s,b) { /* convert string to number in base b */
+atoi(s,b) { /* convert string to number in base b */
    auto i, c, n, d;
 
    n = i = 0;

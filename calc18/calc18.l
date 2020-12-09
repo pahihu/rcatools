@@ -23,7 +23,10 @@ char strcon[MAX_STR+1];
 int nstrcon;
 int unescape(int c);
 
-int dbg = 1;
+int dbg = 0;
+
+#define LO(x)  ((x) & 0377)
+#define HI(x)  LO((x) >> 8)
 
 /*
  * History
@@ -59,7 +62,12 @@ int dbg = 1;
                 }
 
 \'              { yylval.con = 0; BEGIN(CHARCON); }
-<CHARCON>\'     { BEGIN(INITIAL); yylval.con &= 65535; return CONST; }
+<CHARCON>\'     { BEGIN(INITIAL);
+                  yylval.con &= 65535;
+                  if (HI(yylval.con))
+                     yylval.con = 256 * LO(yylval.con) + HI(yylval.con);
+                  return CONST;
+                }
 <CHARCON>\*.    { yylval.con *= 256; yylval.con += unescape(yytext[1]); }
 <CHARCON>\n     { yyerror("unterminated char const"); }
 <CHARCON>[^\*\n\']+ {

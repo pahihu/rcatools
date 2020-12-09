@@ -81,6 +81,7 @@ id:
           VAR                   { $$ = id($1); $$->a[0] = con(2);  }
         | VAR CONST             { $$ = id($1); $$->a[0] = con(2*$2); }
         | CONST                 { $$ = con($1); $$->a[0] = con($1); }
+        | STRING                { $$ = str($1); }
         ;
 
 simplestmt:                     { $$ = opr(';', NULL, NULL); }

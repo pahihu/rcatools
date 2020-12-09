@@ -6,7 +6,7 @@ main() {
    while (1) {
       puts(" enter a number: ");
       gets(s = &buf[0]);
-      n = ston(s, 10);
+      n = atoi(s, 10);
       puts("got "); printn(n, 10); nl();
       if (!n) goto end;
       switch n {
