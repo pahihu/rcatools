@@ -57,7 +57,7 @@ int dbg = 0;
                    return CONST;
                 }
 
-[-()<>=+*/;{}&|^~\[\]%:\?\!,.] {
+[-()<>=+*/;{}&|^~\[\]%:\?\!,] {
                    return *yytext;
                 }
 
@@ -99,6 +99,22 @@ int dbg = 0;
 ">>"            return SHR;
 "&&"            return LAND;
 "||"            return LOR;
+
+"=|"            return AOR;
+"=&"            return AAND;
+"==="           return AEQ;
+"=!="           return ANE;
+"=<"            return ALT;
+"=<="           return ALE;
+"=>"            return AGT;
+"=>="           return AGE;
+"=<<"           return ASHL;
+"=>>"           return ASHR;
+"=+"            return AADD;
+"=-"            return ASUB;
+"=%"            return AMOD;
+"=*"            return AMUL;
+"=/"            return ADIV;
 
 "/\*"           { /* flex man page */
                   int c;

@@ -102,6 +102,23 @@ LEND:
 MAXCASE EQU XXX
 SWTAB:  DW A(SWEND),A(CASE1),A(CASE2),A(SWEND)
 
+Assignment operators:
+=====================
+=|
+=&
+===
+=!=
+=<
+=<=
+=>
+=>=
+=<<
+=>>
+=+
+=-
+=%
+=*
+=/
 
 opr(VARDEF,id(symidx),con(size));
 opr(VECDEF,id(symidx),con(size));

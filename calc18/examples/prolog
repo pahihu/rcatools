@@ -185,5 +185,11 @@ Lgetc:
  LDI #00 ;PHI AC
  SEP SRET
 ..
+..  SAVE MA
+..
+ ORG*+(* AND 1)
+SAVMA:
+ DW  0
+..
 ..  PROGRAM
 ..

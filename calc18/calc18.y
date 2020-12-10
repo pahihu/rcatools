@@ -32,12 +32,12 @@ void yyerror(char*);
 %token <con> CONST
 %token <sym> VAR
 %token <str> STRING
-%token WHILE IF FOR INC DEC GOTO RETURN EXTRN AUTO REGISTER FUNCALL UNARY PREINC PREDEC POSTINC POSTDEC ILST XLST FUNDEF VARDEF VECDEF EXTDEF AUTODEF REGDEF SWITCH CASE INIVPTR
+%token WHILE IF FOR INC DEC GOTO RETURN EXTRN AUTO REGISTER FUNCALL PREINC PREDEC POSTINC POSTDEC ILST XLST FUNDEF VARDEF VECDEF EXTDEF AUTODEF REGDEF SWITCH CASE INIVPTR
 %nonassoc IFX
 %nonassoc ELSE
 
 %nonassoc LVALUE
-%right '='
+%right '=' AOR AAND AEQ ANE ALT ALE AGT AGE ASHL ASHR AADD ASUB AMOD AMUL ADIV
 %left '?' ':'
 %left LOR
 %left LAND
@@ -137,6 +137,21 @@ expr:
         | CONST                 { $$ = con($1); }
         | STRING                { $$ = str($1); }
         | lvalue '=' expr       { $$ = opr('=', $1, $3); }
+        | lvalue AOR expr       { $$ = opr(AOR, $1, $3); }
+        | lvalue AAND expr      { $$ = opr(AAND, $1, $3); }
+        | lvalue AEQ expr       { $$ = opr(AEQ, $1, $3); }
+        | lvalue ANE expr       { $$ = opr(ANE, $1, $3); }
+        | lvalue ALT expr       { $$ = opr(ALT, $1, $3); }
+        | lvalue ALE expr       { $$ = opr(ALE, $1, $3); }
+        | lvalue AGT expr       { $$ = opr(AGT, $1, $3); }
+        | lvalue AGE expr       { $$ = opr(AGE, $1, $3); }
+        | lvalue ASHL expr      { $$ = opr(ASHL, $1, $3); }
+        | lvalue ASHR expr      { $$ = opr(ASHR, $1, $3); }
+        | lvalue AADD expr      { $$ = opr(AADD, $1, $3); }
+        | lvalue ASUB expr      { $$ = opr(ASUB, $1, $3); }
+        | lvalue AMOD expr      { $$ = opr(AMOD, $1, $3); }
+        | lvalue AMUL expr      { $$ = opr(AMUL, $1, $3); }
+        | lvalue ADIV expr      { $$ = opr(ADIV, $1, $3); }
         | INC lvalue %prec UNOP { $$ = opr(PREINC, $2, NULL); }
         | DEC lvalue %prec UNOP { $$ = opr(PREDEC, $2, NULL); }
         | lvalue INC %prec GRP  { $$ = opr(POSTINC, $1, NULL); }

@@ -41,5 +41,6 @@ int ex(NODE*);
 #define str(x)          nod(STR,0,x,NULL,NULL)
 
 #define H printf
+#define UNARY           1024
 
 #endif
