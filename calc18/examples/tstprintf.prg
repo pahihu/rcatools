@@ -3,7 +3,10 @@
 
 main() {
    extrn delta;
+
+   printf("this is beB18*n");
    printf("delta is %d*n",delta);
+   printf("by!*n");
 }
 
 delta 1802;

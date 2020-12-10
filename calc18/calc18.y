@@ -32,7 +32,7 @@ void yyerror(char*);
 %token <con> CONST
 %token <sym> VAR
 %token <str> STRING
-%token WHILE IF FOR INC DEC GOTO RETURN EXTRN AUTO REGISTER FUNCALL UNARY PREINC PREDEC POSTINC POSTDEC ILST XLST FUNDEF VARDEF VECDEF EXTDEF AUTODEF REGDEF SWITCH CASE
+%token WHILE IF FOR INC DEC GOTO RETURN EXTRN AUTO REGISTER FUNCALL UNARY PREINC PREDEC POSTINC POSTDEC ILST XLST FUNDEF VARDEF VECDEF EXTDEF AUTODEF REGDEF SWITCH CASE INIVPTR
 %nonassoc IFX
 %nonassoc ELSE
 
@@ -78,7 +78,7 @@ id_list:
         ;
 
 id:
-          VAR                   { $$ = id($1); $$->a[0] = con(2);  }
+          VAR                   { $$ = id($1); }
         | VAR CONST             { $$ = id($1); $$->a[0] = con(2*$2); }
         | CONST                 { $$ = con($1); $$->a[0] = con($1); }
         | STRING                { $$ = str($1); }
@@ -220,7 +220,16 @@ void yyerror(char *s) {
    fprintf(stderr, "%d: %s\n", yylineno, s);
 }
 
-int main(void) {
+extern int dbg;
+int main(int argc, char*argv[]) {
+   int i;
+
+   for (i = 1; i < argc; i++) {
+      if ('-' == *argv[i])
+         switch (argv[i][1]) {
+         case 'd': dbg = 1; break;
+         }
+   }
    yyparse();
    return 0;
 }
