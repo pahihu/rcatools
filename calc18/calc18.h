@@ -10,8 +10,11 @@ typedef struct _NODE {
    int t;               // type: CON, ID, OPR, STR
    int x;               // value
    char *s;             // string value
+   int attr;            // attributes
    struct _NODE *a[2];  // args
 } NODE;
+
+#define A_SIMCMP        1
 
 #define INT     -1
 

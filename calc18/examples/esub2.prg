@@ -16,7 +16,7 @@ main() {
       a = n+1;
       c = i = 0;
       while (i<n) {
-         c =+ v[i] * 10;
+         c =+ 10 * v[i];
          v[i++] = c % a;
          c =/ a--;
       }
