@@ -640,17 +640,31 @@ Z glvaluvar(NODE *p, int regena, int pushma) {
 
 Z gindex(NODE *p) {
    int x;
-   char *r;
+   char *r, *reg1, *reg0;
+   int imm1;
+
+   reg0 = isreg(p->a[0])? reg(p->a[0]) : NULL;
+   imm1 = isimm(p->a[1]);
+   reg1 = isreg(p->a[1])? reg(p->a[1]) : NULL;
 
    // base
    switch (p->a[0]->t) {
    case ID: // id[x]
-      H(" ..ABASE IS ID\n");
-      glvaluvar(p->a[0], 0, 0);
-      // MA contains the address of id, dereference it
-      H(" ..LDN MA,MA\n");
-      H(" LDA MA ;PLO AUX\n");
-      H(" LDN MA ;PHI AUX\n");
+      if (reg0) {
+         H(" ..ABASE IS REG\n");
+         if (!imm1 && !reg1)
+            WPUSH(reg0);
+         else
+            WMOV("AUX",reg0);
+      }
+      else {
+         H(" ..ABASE IS ID\n");
+         glvaluvar(p->a[0], 0, 0);
+         // MA contains the address of id, dereference it
+         H(" ..LDN MA,MA\n");
+         H(" LDA MA ;PLO AUX\n");
+         H(" LDN MA ;PHI AUX\n");
+      }
       break;
    case CON:              // const[x]
       H(" ..ABASE IS CONST\n");
@@ -662,16 +676,15 @@ Z gindex(NODE *p) {
       WMOV("AUX","AC");
    }
 // AUX contains base addr
-   if (isimm(p->a[1])) {
+   if (imm1) {
       H(" ..IDX W/ CONST\n");
       x = p->a[1]->x;
       WADI("MA","AUX",x);
    }
-   else if (isreg(p->a[1])) {
-      r = reg(p->a[1]);
+   else if (reg1) {
       H(" ..IDX W/ REG\n");
-      H(" GHI %s ;STXD\n",r);
-      H(" GLO %s ;STR SP\n",r);
+      H(" GHI %s ;STXD\n",reg1);
+      H(" GLO %s ;STR SP\n",reg1);
       H(" ..ADD MA,MA,*SP++\n");
       H(" GLO AUX ;ADD ;PLO MA\n");
       H(" GHI AUX ;IRX ;ADC ;PHI MA\n");
@@ -680,7 +693,8 @@ Z gindex(NODE *p) {
    }
    else {
       H(" ..IDX W/ EXPR\n");
-      WPUSH("AUX");
+      if (!reg0)
+         WPUSH("AUX");
       ex(p->a[1]); // index
       H(" ..ADD MA,AC,*SP++\n");
       WADD("MA","AC");
@@ -1571,7 +1585,7 @@ int ex(NODE *p) {
             // * expr = expr
             // expr '[' expr ']' = expr
             WPUSH("AC");
-            glvalu(p->a[0], 0); // addr in MA
+            glvalu(p->a[0], 1); // addr in MA
             H(" IRX ;LDXA ;PLO AC; STR MA; INC MA\n");
             H(" LDX ;PHI AC ;STR MA\n");
          }
@@ -1586,7 +1600,7 @@ int ex(NODE *p) {
       case  PREDEC: gpredec(p->a[0]); break;
       case POSTINC: gpostinc(p->a[0]); break;
       case POSTDEC: gpostdec(p->a[0]); break;
-      case '[': H(" ..AREF\n"); glvalu(p, 0); gldvar(p); break;
+      case '[': H(" ..AREF\n"); glvalu(p, 1); gldvar(p); break;
       case UNARY + '-':
          if (isimm(p->a[0])) {
             i = -(p->a[0]->x);
