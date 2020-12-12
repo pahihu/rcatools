@@ -9,6 +9,7 @@
 typedef struct _NODE {
    int t;               // type: CON, ID, OPR, STR
    int x;               // value
+   char *r;             // reg
    char *s;             // string value
    int attr;            // attributes
    struct _NODE *a[2];  // args

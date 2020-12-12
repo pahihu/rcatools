@@ -20,6 +20,26 @@ void yyerror(char*);
  * 201204AP function call, return
  *
  */
+
+#define HILO(x)   (65535 & (x))
+
+// NB. leaks CONFOLDx leak memory
+#define CONFOLD1(op,cop,a) \
+   (a && CON == a->t)? con(HILO(cop (a->x))) : opr(op,a,NULL)
+
+#define CONFOLD2(op,a,cop,b) \
+   (a && b && CON == a->t && CON == b->t) \
+   ? con(HILO(HILO(a->x) cop HILO(b->x))) \
+   : opr(op,a,b)
+
+#define LOGFOLD1(op,cop,a) \
+   (a && CON == a->t)? con(cop (a->x)? 0xFFFF : 0) : opr(op,a,NULL)
+
+#define LOGFOLD2(op,a,cop,b) \
+   (a && b && CON == a->t && CON == b->t) \
+   ? con((a->x) cop (b->x)? 0xFFFF : 0) \
+   : opr(op,a,b)
+
 %}
 
 %union {
@@ -157,26 +177,26 @@ expr:
         | lvalue INC %prec GRP  { $$ = opr(POSTINC, $1, NULL); }
         | lvalue DEC %prec GRP  { $$ = opr(POSTDEC, $1, NULL); }
         | VAR '(' expr_list ')' %prec GRP { $$ = opr(FUNCALL, id($1), $3); }
-        | '-' expr %prec UNOP   { $$ = opr(UNARY + '-', $2, NULL); }
-        | '!' expr %prec UNOP   { $$ = opr('!', $2, NULL); }
-        | '~' expr %prec UNOP   { $$ = opr('~', $2, NULL); }
+        | '-' expr %prec UNOP   { $$ = CONFOLD1(UNARY + '-',-,$2); }
+        | '!' expr %prec UNOP   { $$ = LOGFOLD1('!',!,$2); }
+        | '~' expr %prec UNOP   { $$ = CONFOLD1('~',~,$2); }
         | '&' lvalue %prec UNOP { $$ = opr(UNARY + '&', $2, NULL); }
-        | expr '+' expr         { $$ = opr('+', $1, $3); }
-        | expr '-' expr         { $$ = opr('-', $1, $3); }
-        | expr '*' expr         { $$ = opr('*', $1, $3); }
-        | expr '/' expr         { $$ = opr('/', $1, $3); }
-        | expr '%' expr         { $$ = opr('%', $1, $3); }
-        | expr SHR expr         { $$ = opr(SHR, $1, $3); }
-        | expr SHL expr         { $$ = opr(SHL, $1, $3); }
-        | expr '<' expr         { $$ = opr('<', $1, $3); }
-        | expr '>' expr         { $$ = opr('>', $1, $3); }
-        | expr GE expr          { $$ = opr(GE, $1, $3); }
-        | expr LE expr          { $$ = opr(LE, $1, $3); }
-        | expr NE expr          { $$ = opr(NE, $1, $3); }
-        | expr EQ expr          { $$ = opr(EQ, $1, $3); }
-        | expr '&' expr         { $$ = opr('&', $1, $3); }
-        | expr '^' expr         { $$ = opr('^', $1, $3); }
-        | expr '|' expr         { $$ = opr('|', $1, $3); }
+        | expr '+' expr         { $$ = CONFOLD2('+',$1,+,$3); }
+        | expr '-' expr         { $$ = CONFOLD2('-',$1,-,$3); }
+        | expr '*' expr         { $$ = CONFOLD2('*',$1,*,$3); }
+        | expr '/' expr         { $$ = CONFOLD2('/',$1,/,$3); }
+        | expr '%' expr         { $$ = CONFOLD2('%',$1,%,$3); }
+        | expr SHR expr         { $$ = CONFOLD2(SHR,$1,>>,$3); }
+        | expr SHL expr         { $$ = CONFOLD2(SHL,$1,<<,$3); }
+        | expr '<' expr         { $$ = LOGFOLD2('<',$1,<,$3); }
+        | expr '>' expr         { $$ = LOGFOLD2('>',$1,>,$3); }
+        | expr GE expr          { $$ = LOGFOLD2(GE, $1,>=,$3); }
+        | expr LE expr          { $$ = LOGFOLD2(LE, $1,<=,$3); }
+        | expr NE expr          { $$ = LOGFOLD2(NE, $1,!=,$3); }
+        | expr EQ expr          { $$ = LOGFOLD2(EQ, $1,==,$3); }
+        | expr '&' expr         { $$ = CONFOLD2('&',$1,&,$3); }
+        | expr '^' expr         { $$ = CONFOLD2('^',$1,^,$3); }
+        | expr '|' expr         { $$ = CONFOLD2('|',$1,|,$3); }
         | expr LAND expr        { $$ = opr(LAND, $1, $3); }
         | expr LOR expr         { $$ = opr(LOR, $1, $3); }
         | expr '?' expr ':' expr
@@ -204,6 +224,8 @@ NODE *nod(int typ, int x, char *s, NODE *a0,NODE *a1) {
    ret->s = s;
    ret->a[0] = a0;
    ret->a[1] = a1;
+   ret->attr = 0;
+   ret->r    = NULL;
    return ret;
 }
 

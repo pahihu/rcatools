@@ -36,6 +36,7 @@ int lowreg; // lowest regvar
 int nregvars; // no.of regvars
 int ex(NODE *p);
 Z glvaluvar(NODE *p, int regena, int pushma);
+Z WPOP(char *reg);
 
 typedef struct {
    int prev; // prev switch
@@ -56,8 +57,6 @@ static int lbl = 0; // label generator
 #define HI(x)   LO((x)>>8)
 
 #define ADDR(p) (getoffs((p)->x))
-
-#define HILO(x)   (65535 & (x))
 
 Z prinode1(char *msg,NODE *p) {
    static char *typs[] = { "INT", "CON", "ID", "OPR" };
@@ -181,6 +180,73 @@ static int isrelop(NODE *p) {
        x == '!');
 }
 
+Z garith(char *dst,NODE *arg0,NODE *arg1,
+         char *xop,char *imop,
+         char *xophi,char *imophi)
+{
+   char *reg0, *reg1;
+   int imm0, imm1, x0, x1;
+
+   reg0 = isreg(arg0)? reg(arg0) : NULL;
+   reg1 = isreg(arg1)? reg(arg1) : NULL;
+   imm0 = isimm(arg0);
+   imm1 = isimm(arg1);
+   x0 = arg0->x;
+   x1 = arg1->x;
+
+   if (!xophi) xophi = xop;
+   if (!imophi) imophi = imop;
+
+Lreg0:
+   if (reg0) {
+      if (reg1) { // reg0 op reg1
+         H(" GLO %s ;STR SP ;GLO %s ;%s ;PLO %s\n",reg1,reg0,xop,dst);
+         H(" GHI %s ;STR SP ;GHI %s ;%s ;PHI %s\n",reg1,reg0,xophi,dst);
+      }
+      else if (imm1) { // reg0 op imm1
+         H(" GLO %s ;%s %02X ;PLO %s\n",reg0,imop,LO(x1),dst);
+         H(" GHI %s ;%s %02X ;PHI %s\n",reg0,imophi,HI(x1),dst);
+      }
+      else { // reg0 op stack
+         H(" GLO %s ;IRX ;%s ;PLO %s\n",reg0,xop,dst);
+         H(" GHI %s ;IRX ;%s ;PHI %s\n",reg0,xophi,dst);
+      }
+   }
+   else if (imm0) {
+      if (reg1) { // imm0 op reg1
+         H(" GLO %s ;STR SP ;LDI #%02X ;%s ;PLO %s\n",reg1,LO(x0),xop,dst);
+         H(" GLO %s ;STR SP ;LDI #%02X ;%s ;PHI %s\n",reg1,HI(x0),xophi,dst);
+      }
+      else if (imm1) { // imm0 op imm1
+         fprintf(stderr,"garith(): imm0 op imm1\n");
+         exit(1);
+      }
+      else { // imm0 op stack
+         H(" LDI #%02X ;IRX ;%s ;PLO %s\n",LO(x0),xop,dst);
+         H(" LDI #%02X ;IRX ;%s ;PLO %s\n",HI(x0),xophi,dst);
+      }
+   }
+   else {
+      if (!strcmp(xop,"SM")) {
+         xop = "SD"; xophi = "SDB";
+         imop = "SDI"; imophi = "SDBI";
+      }
+      if (reg1) { // stack op reg1
+         H(" GLO %s ;IRX ;%s ;PLO %s\n",reg1,xop,dst);
+         H(" GHI %s ;IRX ;%s ;PHI %s\n",reg1,xophi,dst);
+      }
+      else if (imm1) { // stack op imm1
+         H(" LDI #%02X ;IRX ;%s ;PLO %s\n",LO(x1),xop,dst);
+         H(" LDI #%02X ;IRX ;%s ;PHI %s\n",HI(x1),xop,dst);
+      }
+      else { // stack0 op stack1
+         // ( stack1 stack0 -- stack0 op stack1)
+         // pop stack0 into AC
+         WPOP("AC"); reg0 = "AC"; goto Lreg0;
+      }
+   }
+}
+
 Z WADI(char *dst,char *src,int x) {
    H(" GLO %s ;ADI #%02X ;PLO %s\n",src,LO(x),dst);
    H(" GHI %s ;ADCI #%02X ;PHI %s\n",src,HI(x),dst);
@@ -189,6 +255,11 @@ Z WADI(char *dst,char *src,int x) {
 Z WADD(char *dst,char *src) {
    H(" GLO %s ;IRX ;ADD ;PLO %s\n",src,dst);
    H(" GHI %s ;IRX ;ADC ;PHI %s\n",src,dst);
+}
+
+Z WADDR(char *dst,char *src0,char *src1) {
+   H(" GLO %s ;STR SP ;GLO %s ;ADD ;PLO %s\n",src1,src0,dst);
+   H(" GLO %s ;STR SP ;GHI %s ;ADC ;PHI %s\n",src1,src0,dst);
 }
 
 Z WCMI(char *reg,int x) {
@@ -201,6 +272,11 @@ Z WCM(char *reg) {
    H(" GHI %s ;IRX ;SMB\n",reg);
 }
 
+Z WCMR(char *reg0, char *reg1) {
+   H(" GLO %s ;STR SP ;GLO %s ;SM\n", reg1, reg0);
+   H(" GHI %s ;STR SP ;GHI %s ;SMB\n", reg1, reg0);
+}
+
 Z WSMI(char *dst,char *src,int x) {
    H(" GLO %s ;SMI #%02X ;PLO %s\n", src,LO(x),dst);
    H(" GHI %s ;SMBI #%02X ;PHI %s\n", src,HI(x),dst);
@@ -209,6 +285,11 @@ Z WSMI(char *dst,char *src,int x) {
 Z WSM(char *dst,char *src) {
    H(" GLO %s ;IRX ;SM ;PLO %s\n",src,dst);
    H(" GHI %s ;IRX ;SMB ;PHI %s\n",src,dst);
+}
+
+Z WSMR(char *dst,char *src0,char *src1) {
+   H(" GLO %s ;STR SP ;GLO %s ;SM ;PLO %s\n",src1,src0,dst);
+   H(" GHI %s ;STR SP ;GHI %s ;SMB ;PHI %s\n",src1,src0,dst);
 }
 
 Z WSHL(char *dst,char *src) {
@@ -316,30 +397,50 @@ Z gpushvar(NODE *p) {
    }
 }
 
-static char *gbinary(NODE *p) {
-   char *r;
+Z gldvar(NODE *p) {
+   if (isreg(p)) {
+      WMOV("AC", reg(p));
+   }
+   else {
+      H(" LDA MA ;PLO AC\n");
+      H(" LDN MA ;PHI AC\n");
+   }
+}
 
-   r = "AC";
-   if (isvar(p->a[1]))
-      gpushvar(p->a[1]);
+Z gbinary(NODE *p) {
+   char *reg0,*reg1;
+
+   reg0 = isreg(p->a[0])? reg(p->a[0]) : NULL;
+   reg1 = isreg(p->a[1])? reg(p->a[1]) : NULL;
+   if (reg1)
+      p->a[1]->r = reg1;
+   else if (isvar(p->a[1])) {
+      if (reg0) {
+         glvaluvar(p->a[1], 1, 0);
+         gldvar(p->a[1]);
+         p->a[1]->r = "AC";
+      }
+      else
+         gpushvar(p->a[1]);
+   }
    else {
       ex(p->a[1]);
       WPUSH("AC");  // (LO,HI) @ X
    }
-   if (isreg(p->a[0]))
-      r = reg(p->a[0]);
+   if (reg0)
+      p->a[0]->r = reg0;
    else {
       ex(p->a[0]); // AC
+      p->a[0]->r = "AC";
    }
-   return r;
 }
 
 Z gsub(NODE *p, int cmp) {
    NODE *con;
-   char *r;
+   char *r, *reg0, *reg1;
 
    r = "AC";
-   if (CON == p->a[1]->t) {
+   if (isimm(p->a[1])) {
       con = p->a[1];
 
       if (isreg(p->a[0]))
@@ -364,13 +465,26 @@ Z gsub(NODE *p, int cmp) {
       }
    }
    else {
-      r = gbinary(p);
+      gbinary(p);
+      reg0 = p->a[0]->r; reg1 = p->a[1]->r;
+      if (reg0 && reg1) {
+         if (1 == cmp) {
+            H(" ..CMR %s,%s\n",reg0,reg1);
+            WCMR(reg0,reg1);
+            return;
+         }
+         else {
+            H(" ..SMR AC,%s,%s\n",reg0,reg1);
+            WSMR("AC",reg0,reg1);
+            return;
+         }
+      }
       if (1 == cmp) {
-         H(" ..CM %s,*SP++\n",r);
+         H(" ..CM %s,*SP++\n",reg0);
          WCM(r);
       }
       else {
-         H(" ..SM AC,%s,*SP++\n",r);
+         H(" ..SM AC,%s,*SP++\n",reg0);
          WSM("AC",r);
       }
    }
@@ -492,13 +606,7 @@ Z gtobool(void) {
 Z gadd(NODE *p) {
    NODE *con;
    int n;
-   char *r;
-
-   if (isimm(p->a[0]) && isimm(p->a[1])) {
-      n = HILO(HILO(p->a[0]->x) + HILO(p->a[1]->x));
-      WLDI("AC",n);
-      return;
-   }
+   char *r, *reg0, *reg1;
 
    r = "AC";
    if (CON == p->a[1]->t) {
@@ -519,15 +627,22 @@ Z gadd(NODE *p) {
       }
    }
    else {
-      r = gbinary(p);
-      H(" ..ADD AC,%s,*SP++\n",r);
-      WADD("AC",r);
+      gbinary(p);
+      reg0 = p->a[0]->r; reg1 = p->a[1]->r;
+      if (reg0 && reg1) {
+         H(" ..ADDR AC,%s,%s\n",reg0,reg1);
+         WADDR("AC",reg0,reg1);
+      }
+      else {
+         H(" ..ADD AC,%s,*SP++\n",reg0);
+         WADD("AC",reg0);
+      }
    }
 }
 
 Z glog(NODE *p, char *xop, char *imop) {
    NODE *con;
-   char *r;
+   char *r, *reg0, *reg1;
 
    r = "AC";
    if (CON == p->a[1]->t) {
@@ -542,10 +657,18 @@ Z glog(NODE *p, char *xop, char *imop) {
       H(" GHI %s ;%s #%02X ;PHI AC\n", r, imop, HI(con->x));
    }
    else {
-      r = gbinary(p);
-      H(" ..%s AC,%s,*SP++\n",xop,r);
-      H(" GLO %s ;IRX ;%s ;PLO AC\n", r, xop);
-      H(" GHI %s ;IRX ;%s ;PHI AC\n", r, xop);
+      gbinary(p);
+      reg0 = p->a[0]->r; reg1 = p->a[1]->r;
+      if (reg0 && reg1) {
+         H(" ..%sR AC,%s,%s\n",xop,reg0,reg1);
+         H(" GLO %s ;STR SP ;GLO %s ;%s ;PLO AC\n", reg1, reg0, xop);
+         H(" GHI %s ;STR SP ;GHI %s ;%s ;PHI AC\n", reg1, reg0, xop);
+      }
+      else {
+         H(" ..%s AC,%s,*SP++\n",xop,reg0);
+         H(" GLO %s ;IRX ;%s ;PLO AC\n", reg0, xop);
+         H(" GHI %s ;IRX ;%s ;PHI AC\n", reg0, xop);
+      }
    }
 }
 
@@ -683,11 +806,9 @@ Z gindex(NODE *p) {
    }
    else if (reg1) {
       H(" ..IDX W/ REG\n");
-      H(" GHI %s ;STXD\n",reg1);
-      H(" GLO %s ;STR SP\n",reg1);
-      H(" ..ADD MA,MA,*SP++\n");
-      H(" GLO AUX ;ADD ;PLO MA\n");
-      H(" GHI AUX ;IRX ;ADC ;PHI MA\n");
+      H(" ..ADD MA,AUX,%s\n",reg1);
+      H(" GLO %s ;STR SP ;GLO AUX ;ADD ;PLO MA\n",reg1);
+      H(" GHI %s ;STR SP ;GHI AUX ;ADC ;PHI MA\n",reg1);
       // WPUSH(r);
       // WADD("MA","AUX");
    }
@@ -718,36 +839,6 @@ Z glvalu(NODE *p, int regena) { // addr in MA
       }
       else if ('[' == p->x) {
          gindex(p);
-/*
-         // base
-         switch (p->a[0]->t) {
-         case ID: // id[x]
-            glvaluvar(p->a[0], 0, 0);
-            // MA contains the address of id, dereference it
-            H(" ..LDN MA,MA\n");
-            H(" ..SHL MA,MA\n");
-            H(" LDA MA ;SHL ;PLO AUX\n");
-            H(" LDN MA ;SHLC ;STXD\n");
-            H(" GLO AUX ;STXD\n");
-            break;
-         case CON:              // const[x]
-            WPUSHI(2*p->a[0]->x);
-            break;
-         default:               // (expr)[x]
-            ex(p->a[0]);
-            H(" GLO AC ;SHL ;PLO AUX\n");
-            H(" GHI AC ;SHLC ;STXD\n");
-            H(" GLO AUX ;STXD\n");
-         }
-         if (isimm(p->a[1]))
-            WLDI("AC",2*p->a[1]->x);
-         else {
-            ex(p->a[1]); // index
-            WSHL("AC","AC");
-         }
-         H(" ..ADD MA,AC,*SP++\n");
-         WADD("MA","AC");
-*/
          return;
       }
    }
@@ -922,16 +1013,6 @@ Z gdiv(NODE *p) {
    gcall("UDIV");
 }
 
-Z gldvar(NODE *p) {
-   if (isreg(p)) {
-      WMOV("AC", reg(p));
-   }
-   else {
-      H(" LDA MA ;PLO AC\n");
-      H(" LDN MA ;PHI AC\n");
-   }
-}
-
 static int idlist(int t,NODE *p, int offs) {
    int n, newoffs;
    char *sym;
@@ -1074,11 +1155,6 @@ static int gspecmul(NODE *p) {
 
 // fprintf(stderr,"before swap\n");
 // prinode(p);
-   if (isimm(p->a[0]) && isimm(p->a[1])) {
-      n = HILO(HILO(p->a[0]->x) * HILO(p->a[1]->x));
-      WLDI("AC",n);
-      return 1;
-   }
    if (isimm(p->a[1])) {
       con = p->a[0]; p->a[0] = p->a[1]; p->a[1] = con;
    }
@@ -1165,13 +1241,17 @@ Z grestma(void) {
    H(" LDI A.1(UMULT) ;PHI SUB\n");
 }
 
-Z GLO(char *reg) {
+Z GLO(char *reg,char *reg1) {
    if (!reg) reg = "AC";
+   if (reg1)
+      H(" GLO %s ;STR SP ;",reg1);
    H(" GLO %s",reg);
 }
 
-Z GHI(char *reg) {
+Z GHI(char *reg,char *reg1) {
    if (!reg) reg = "AC";
+   if (reg1)
+      H(" GHI %s ;STR SP ;",reg1);
    H(" GHI %s",reg);
 }
 
@@ -1191,50 +1271,66 @@ Z PHI(char *reg) {
 
 #define IMM(imm,imop)   ((imm)? (imop) : NULL)
 
-Z instr(char *xop, char *imop, int x) {
+Z instr(char *reg1,char *xop, char *imop, int x) {
    if (imop)
       H(" ;%s #%02X",imop,x);
-   else
-      H(" ;IRX ;%s",xop);
+   else {
+      if (reg1)
+         H(" ;%s",xop);
+      else
+         H(" ;IRX ;%s",xop);
+   }
 }
 
 // load X0 in AC, X1 in SP
-Z gasgnld(char *reg0,int imm1,int x) {
+Z gasgnld(char *reg0,char *reg1,int imm1,int x) {
    // 0    1         AC=*VAR,MA=&VAR
-   // 1    0         Rx=VAR,SP=X1
+   // 1    0         Rx=VAR,AC=X1
    // 1    1         Rx=VAR
    if (reg0 || imm1) {
+      if (reg1)
+         WPUSH(reg1);
       if (reg0)
          WMOV("AC",reg0);
       if (imm1)
          WPUSHI(x);
    }
+   else if (reg1)
+      WPUSH(reg1);
 }
 
 // load X0 in AC, X1 in AUX
-Z gasgnld2(char *reg0,int imm1,int x) {
+Z gasgnld2(char *reg0,char *reg1,int imm1,int x) {
    if (reg0 || imm1) {
+      if (reg1)
+         WMOV("AUX",reg1);
       if (reg0)
          WMOV("AC",reg0);
       if (imm1)
          WLDI("AUX",x);
    }
+   else if (reg1)
+      WMOV("AUX",reg1);
    else
       WPOP("AUX");
 }
 
 Z gasgnop(NODE *p) {
-   char *reg0;
+   char *reg0, *reg1;
    int imm1, x;
 
    reg0 = isreg(p->a[0])? reg(p->a[0]) : NULL;
    imm1 = isimm(p->a[1]);
+   reg1 = NULL;
 
    if (imm1)
       x = p->a[1]->x;
    else {
       ex(p->a[1]);
-      WPUSH("AC");
+      if (reg0)
+         reg1 = "AC";
+      else
+         WPUSH("AC");
    }
 
    if (!reg0) {
@@ -1247,26 +1343,26 @@ Z gasgnop(NODE *p) {
       reg0 imm1
       0    0         AC=*VAR,MA=&VAR,SP=X1
       0    1         AC=*VAR,MA=&VAR
-      1    0         Rx=VAR,SP=X1
-      1    1         Rx=VAR
+      1    0         R0=VAR,AC=X1
+      1    1         R0=VAR
    */
 
    switch (p->x) {
    case AOR:
       H(" ..AOR\n");
-      GLO(reg0); instr("OR",IMM(imm1,"ORI"),LO(x)); PLO(reg0);
-      GHI(reg0); instr("OR",IMM(imm1,"ORI"),HI(x)); PHI(reg0);
+      GLO(reg0,reg1); instr(reg1,"OR",IMM(imm1,"ORI"),LO(x)); PLO(reg0);
+      GHI(reg0,reg1); instr(reg1,"OR",IMM(imm1,"ORI"),HI(x)); PHI(reg0);
       break;
    case AAND:
       H(" ..AAND\n");
-      GLO(reg0); instr("AND",IMM(imm1,"ANI"),LO(x)); PLO(reg0);
-      GHI(reg0); instr("AND",IMM(imm1,"ANI"),HI(x)); PHI(reg0);
+      GLO(reg0,reg1); instr(reg1,"AND",IMM(imm1,"ANI"),LO(x)); PLO(reg0);
+      GHI(reg0,reg1); instr(reg1,"AND",IMM(imm1,"ANI"),HI(x)); PHI(reg0);
       break;
    case AEQ:
    case ANE:
       H(" ..AEQ,ANE\n");
-      GLO(reg0); instr("SM",IMM(imm1,"SMI"),LO(x)); PLO("AC");
-      GHI(reg0); instr("SMB",IMM(imm1,"SMBI"),HI(x)); PHI("AC");
+      GLO(reg0,reg1); instr(reg1,"SM",IMM(imm1,"SMI"),LO(x)); PLO("AC");
+      GHI(reg0,reg1); instr(reg1,"SMB",IMM(imm1,"SMBI"),HI(x)); PHI("AC");
       GEQ0();
       if (ANE == p->x)
          H(" XRI #FF\n");
@@ -1275,8 +1371,8 @@ Z gasgnop(NODE *p) {
    case ALT:
    case AGE:
       H(" ..ALT,AGE\n");
-      GLO(reg0); instr("SM",IMM(imm1,"SMI"),LO(x));
-      GHI(reg0); instr("SM",IMM(imm1,"SMBI"),HI(x));
+      GLO(reg0,reg1); instr(reg1,"SM",IMM(imm1,"SMI"),LO(x));
+      GHI(reg0,reg1); instr(reg1,"SM",IMM(imm1,"SMBI"),HI(x));
       GLT();
       if (AGE == p->x)
          H(" XRI #FF\n");
@@ -1285,8 +1381,8 @@ Z gasgnop(NODE *p) {
    case ALE:
    case AGT:
       H(" ..ALE,AGT\n");
-      GLO(reg0); instr("SM",IMM(imm1,"SMI"),LO(x)); PLO("AC");
-      GHI(reg0); instr("SMB",IMM(imm1,"SMBI"),HI(x)); PHI("AC");
+      GLO(reg0,reg1); instr(reg1,"SM",IMM(imm1,"SMI"),LO(x)); PLO("AC");
+      GHI(reg0,reg1); instr(reg1,"SMB",IMM(imm1,"SMBI"),HI(x)); PHI("AC");
       GGT();
       if (ALE == p->x)
          H(" XRI #FF\n");
@@ -1294,53 +1390,53 @@ Z gasgnop(NODE *p) {
       break;
    case ASHL: // XXX
       H(" ..ASHL\n");
-      gasgnld2(reg0,imm1,x);
+      gasgnld2(reg0,reg1,imm1,x);
       gshln();
-      GLO("AC"); PLO(reg0);
-      GHI("AC"); PHI(reg0);
+      GLO("AC",NULL); PLO(reg0);
+      GHI("AC",NULL); PHI(reg0);
       break; 
    case ASHR: // XXX
       H(" ..ASHR\n");
-      gasgnld2(reg0,imm1,x);
+      gasgnld2(reg0,reg1,imm1,x);
       gshrn();
-      GLO("AC"); PLO(reg0);
-      GHI("AC"); PHI(reg0);
+      GLO("AC",NULL); PLO(reg0);
+      GHI("AC",NULL); PHI(reg0);
       break;
    case AADD:
       H(" ..AADD\n");
-      GLO(reg0); instr("ADD",IMM(imm1,"ADI"),LO(x)); PLO(reg0);
-      GHI(reg0); instr("ADC",IMM(imm1,"ADCI"),HI(x)); PHI(reg0);
+      GLO(reg0,reg1); instr(reg1,"ADD",IMM(imm1,"ADI"),LO(x)); PLO(reg0);
+      GHI(reg0,reg1); instr(reg1,"ADC",IMM(imm1,"ADCI"),HI(x)); PHI(reg0);
       break;
    case ASUB:
       H(" ..ASUB\n");
-      GLO(reg0); instr("SM",IMM(imm1,"SMI"),LO(x)); PLO(reg0);
-      GHI(reg0); instr("SMB",IMM(imm1,"SMBI"),HI(x)); PHI(reg0);
+      GLO(reg0,reg1); instr(reg1,"SM",IMM(imm1,"SMI"),LO(x)); PLO(reg0);
+      GHI(reg0,reg1); instr(reg1,"SMB",IMM(imm1,"SMBI"),HI(x)); PHI(reg0);
       break;
    case AMOD:
       // NB. === MA/MQ are the same ===
-      gasgnld(reg0,imm1,x);
+      gasgnld(reg0,reg1,imm1,x);
       if (!reg0) gsavma();
       gcall("UDIV");
       WMOV("AUX", "MQ");
       if (!reg0) grestma();
-      GLO("AUX"); PLO(reg0);
-      GHI("AUX"); PHI(reg0);
+      GLO("AUX",NULL); PLO(reg0);
+      GHI("AUX",NULL); PHI(reg0);
       break;
    case AMUL:
-      gasgnld(reg0,imm1,x);
+      gasgnld(reg0,reg1,imm1,x);
       if (!reg0) gsavma();
       gcall("UMULT");
       if (!reg0) grestma();
-      GLO("AC");  PLO(reg0);
-      GHI("AC");  PHI(reg0);
+      GLO("AC",NULL);  PLO(reg0);
+      GHI("AC",NULL);  PHI(reg0);
       break;
    case ADIV:
-      gasgnld(reg0,imm1,x);
+      gasgnld(reg0,reg1,imm1,x);
       if (!reg0) gsavma();
       gcall("UDIV");
       if (!reg0) grestma();
-      GLO("AC");  PLO(reg0);
-      GHI("AC");  PHI(reg0);
+      GLO("AC",NULL);  PLO(reg0);
+      GHI("AC",NULL);  PHI(reg0);
       break;
    default:
       fprintf(stderr,"unknown asgn op %d\n",p->x);
