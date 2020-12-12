@@ -3,18 +3,18 @@
 ..
 DMA=#00
 INT=#01
-INTSP=#02
+SP=#02
 PC=#03
 SCALL=#04
 SRET=#05
 ARGPTR=#06
-SP=#07
-AC=#08
-RETVAL=#08
-AUX=#09
-SUB=#0A
-MA=#0B
-MQ=#0B
+AC=#07
+RETVAL=#07
+AUX=#08
+SUB=#09
+MA=#0A
+MQ=#0A
+TMP=#0B
 FP=#0F
 SSEG=#7FFF
 ..
@@ -61,95 +61,93 @@ RET:
 ..  UNSIGNED MULT AC BY AUX
 ..
 UMULT:
- IRX ;IRX
- GHI AC ;BZ UMULT8
- LDI #00 ;PHI MQ ;PLO MQ .. MQ=#0000
- LDI #10 ;PLO AUX        .. AUX.0=#10
+ IRX ;IRX                .. SP->AUX.1
+ LDI #00 ;PHI MQ ;PLO MQ .. MQ=0
+ GHI AC ;BZ UMULT8       .. AC.0==0? GOTO UMULT8
+ LDI #10 ;PLO ARGPTR     .. ARGPTR.0=#10
 M1:
- GLO AC ;SHR             .. IF AC.0 & 1 = 0 GOTO DIV2
- BNF DIV2
+ GLO MQ ;SHL  ;PLO MQ    .. MQ = MQ << 1
+ GHI MQ ;SHLC ;PHI MQ
+ GLO AC ;SHL  ;PLO AC    .. IF MSB(AC) == 0 GOTO NOADD
+ GHI AC ;SHLC ;PHI AC
+ BNF NOADD
  DEC SP                    .. --SP
  GLO MQ       ;ADD ;PLO MQ .. MQ += *SP
- GHI MQ ;IRX  ;ADC         .. ;PHI MQ
- SHR ;LSKP
-DIV2:
- GHI MQ ;SHR  ;PHI MQ    .. (MQ,AC) >> 1
- GLO MQ ;SHRC ;PLO MQ
- GHI AC ;SHRC ;PHI AC
- GLO AC ;SHRC ;PLO AC
- DEC AUX                 .. IF --AUX != 0 GOTO LOOP
- GLO AUX ;BNZ M1
- SEP PC                  .. RESULT IN AC
+ GHI MQ ;IRX  ;ADC ;PHI MQ
+NOADD:
+ DEC ARGPTR                .. IF --ARGPTR != 0 GOTO M1
+ GLO ARGPTR ;BNZ M1
+ BR MACMQ
 UMULT8:
- PLO MQ                  .. MQ.0=#00
- LDI #08 ;PLO AUX        .. AUX.0=#10
+ LDI #08 ;PLO ARGPTR     .. ARGPTR.0=#10
 M18:
- GLO AC ;SHR             .. IF AC.0 & 1 = 0 GOTO DIV2
- BNF DIV28
- DEC SP                    .. --SP
- GHI AC       ;ADD ;PHI AC .. (MQ.0,AC.1) += *SP
- GLO MQ ;IRX  ;ADC         ..;PLO MQ
- SHR ;LSKP
-DIV28:
- GLO MQ ;SHR  ;PLO MQ    .. (MQ.0,AC) >> 1
- GHI AC ;SHRC ;PHI AC
- GLO AC ;SHRC ;PLO AC
- DEC AUX                 .. IF --AUX != 0 GOTO LOOP
- GLO AUX ;BNZ M18
- SEP PC                  .. RESULT IS HIGH/LOW OF PROD?
-..
-..  UNSIGNED DIVIDE AC BY AUX
-..
-UDIV:
- IRX ;LDXA ;PLO MQ       .. MQ=AUX.0, SP->AUX.1
- LDX ;BNZ PAUX           .. AUX.1#0? CONTINUE
- GLO MQ ;SHL ;BNF UDIV8  .. LO<128? GOTO UDIV8
-PAUX:
- DEC SP
- GLO AC ;SM              .. AC<AUX? GOTO LT1
- GHI AC ;IRX ;SMB        .. SP->AUX.1
- BNF LT1
- LDI #00 ;PHI MQ ;PLO MQ .. MQ=#0000
- LDI #10 ;PLO AUX        .. AUX.0=#10
-M2:
- GLO AC ;SHL  ;PLO AC    .. (MQ,AC) << 1
- GHI AC ;SHLC ;PHI AC
- GLO MQ ;SHLC ;PLO MQ
+ GLO MQ ;SHL  ;PLO MQ    .. MQ = MQ << 1
  GHI MQ ;SHLC ;PHI MQ
- DEC SP
- GLO MQ      ;SM  ;PHI AUX .. IF MQ - *SP < 0 GOTO NEG
- GHI MQ ;IRX ;SMB
- BNF NEG
- PHI MQ ;GHI AUX ;PLO MQ .. MQ = MQ - *SP
- INC AC                  .. AC=AC+1
-NEG:
- DEC AUX
- GLO AUX ;BNZ M2
+ GLO AC ;SHL  ;PLO AC    .. IF MSB(AC.0) = 0 GOTO NOADD
+ BNF NOADD8
+ DEC SP                  .. --SP
+ GLO MQ       ;ADD ;PLO MQ .. MQ += *SP
+ GHI MQ ;IRX  ;ADC ;PHI MQ
+NOADD8:
+ DEC ARGPTR              .. IF --ARGPTR != 0 GOTO M18
+ GLO ARGPTR ;BNZ M18
+MACMQ:
+ GLO MQ ;PLO AC          .. AC = MQ
+ GHI MQ ;PHI AC
  SEP PC
-LT1:
- GLO AC; PLO MQ          .. MQ=AC (REMAINDER)
- GHI AC; PHI MQ
- LDI #00 ;PLO AC ;PHI AC .. AC=0
- SEP PC
-UDIV8:
- SHR ;STR SP             .. *SP=AUX.0
+ ..
+ ..  UNSIGNED DIVIDE AC BY AUX
+ ..
+ .. R - REMAINDER, Q - QUOTIENT, X - DIVIDEND, Y - DIVISOR
+ .. X - AC, Y - *SP, Y0 - AUX, R - MQ
+ .. USES ARGPTR
+ ..
+UDIV:
 
- GLO AC ;SM              .. AC<AUX? GOTO LT1
- GHI AC ;SMBI #00        .. SP->AUX.1
- BNF LT1
-
- LDI #00 ;PHI MQ ;PLO MQ .. MQ=#00
- LDI #10 ;PLO AUX        .. AUX.0=#10
-M28:
- GLO AC ;SHL  ;PLO AC
- GHI AC ;SHLC ;PHI AC    .. (MQ.0,AC) << 1
- GLO MQ ;SHLC ;PLO MQ
- SM ;BNF NEG8            .. IF MQ - *SP < 0 GOTO NEG8
- PLO MQ                  .. MQ = MQ - *SP
- INC AC                  .. AC = AC + 1
-NEG8:
- DEC AUX
- GLO AUX ;BNZ M28
+ .. r = x; q = 0 (x dividend, y divisor)
+ .. X - AC, Y - *SP, Y0 - AUX, R - MQ
+SDM:
+ GLO AC ;PLO MQ                 ..R=X
+ GHI AC ;PHI MQ
+ IRX ;LDXA ;PLO AUX             ..Y0=Y
+      LDX ;PHI AUX              .. SP->Y.1
+ DEC SP                         .. SP->Y.0
+ GLO AC      ;SM ;PLO TMP       ..IF X>=Y
+ GHI AC ;IRX ;SMB               .. SP->Y.1
+ BNF COMPQ0
+ PHI AC ;GLO TMP ;PLO AC        ..X=X-Y
+DBLD:                           ..WHILE
+ DEC SP                         .. SP->Y.0
+ GLO AC      ;SM ;PLO TMP       ..X>=Y
+ GHI AC ;IRX ;SMB               .. SP->Y.1
+ BNF COMPQ0
+ PHI AC ;GLO TMP ;PLO AC        ..X=X-Y
+ DEC SP                         .. SP->Y.0
+ LDX ;SHL  ;STR SP              ..Y=Y+Y
+ IRX ;LDX ;SHLC ;STR SP         .. SP->Y.1
+ BR DBLD
+COMPQ0:
+ .. Q IS AC
+ LDI #00 ;PLO AC ;PHI AC        ..Q = 0
+ DEC SP                         .. SP->Y.0
+COMPQ:
+ GLO MQ ;SM ;PLO TMP            ..IF (R >= Y)
+ GHI MQ ;IRX ;SMB               .. SP->Y.1
+ BNF CHK0
+ PHI MQ ;GLO TMP ;PLO MQ        ..R = R - Y
+ INC AC                         ..Q = Q + 1
+CHK0:
+ DEC SP                         .. SP->Y.0
+ GLO AUX ;XOR ;IRX ;LBNZ YNEY0  ..IF Y == Y0 BREAK, SP->Y.1
+ GHI AUX ;XOR ;LBZ SDMEND
+YNEY0:
+ GLO AC ;SHL ;PLO AC            ..Q = Q + Q
+ GHI AC ;SHLC ;PHI AC
+ LDX ;SHR ;STR SP               ..Y = HALF(Y)
+ DEC SP ;LDX ;SHRC ;STR SP      .. SP->Y.0
+ BR COMPQ
+SDMEND:
+ ...
  SEP PC
  ..
  ..  SWITCH

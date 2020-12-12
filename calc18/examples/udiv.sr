@@ -1,0 +1,43 @@
+ .. r = x; q = 0 (x dividend, y divisor)
+ .. X - AC, Y - *SP, Y0 - AUX, R - MQ
+SDM:
+ GLO AC ;PLO MQ                 ..R=X
+ GHI AC ;PHI MQ
+ IRX ;LDXA ;PLO AUX             ..Y0=Y
+      LDX ;PHI AUX              .. SP->Y.1
+ DEC SP                         .. SP->Y.0
+ GLO AC      ;SM ;PLO TMP       ..IF X>=Y
+ GHI AC ;IRX ;SMB               .. SP->Y.1
+ BNF COMPQ0
+ PHI AC ;GLO TMP ;PLO AC        ..X=X-Y
+DBLD:                           ..WHILE
+ DEC SP                         .. SP->Y.0
+ GLO AC      ;SM ;PLO TMP       ..X>=Y
+ GHI AC ;IRX ;SMB               .. SP->Y.1
+ BNF COMPQ0
+ PHI AC ;GLO TMP ;PLO AC        ..X=X-Y
+ DEC SP                         .. SP->Y.0
+ LDX ;SHL  ;STR SP              ..Y=Y+Y
+ IRX ;LDX ;SHLC ;STR SP         .. SP->Y.1
+ BR DBLD
+COMPQ0:
+ .. Q IS AC
+ LDI #00 ;PLO AC ;PHI AC        ..Q = 0
+ DEC SP                         .. SP->Y.0
+COMPQ:
+ GLO MQ ;SM ;PLO TMP            ..IF (R >= Y)
+ GHI MQ ;IRX ;SMB               .. SP->Y.1
+ BNF CHK0
+ PHI MQ ;GLO TMP ;PLO MQ        ..R = R - Y
+ INC AC                         ..Q = Q + 1
+CHK0:
+ DEC SP                         .. SP->Y.0
+ GLO AUX ;XOR ;IRX ;LBNZ YNEY0  ..IF Y == Y0 BREAK, SP->Y.1
+ GHI AUX ;XOR ;LBZ SDMEND
+YNEY0:
+ GLO AC ;SHL ;PLO AC            ..Q = Q + Q
+ GHI AC ;SHLC ;PHI AC
+ LDX ;SHR ;STR SP               ..Y = HALF(Y)
+ DEC SP ;LDX ;SHRC ;STR SP      .. SP->Y.0
+ BR COMPQ
+SDMEND:

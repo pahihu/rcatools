@@ -1225,10 +1225,10 @@ static int gspecmod(NODE *p) {
 }
 
 Z gsavma(void) {
-   H(" LDI A.1(SAVMA) ;PHI AUX\n");
-   H(" LDI A.0(SAVMA) ;PLO AUX\n");
-   H(" GLO MA ;STR AUX ;INC AUX\n");
-   H(" GHI MA ;STR AUX\n");
+   H(" LDI A.1(SAVMA) ;PHI SUB\n");
+   H(" LDI A.0(SAVMA) ;PLO SUB\n");
+   H(" GLO MA ;STR SUB ;INC SUB\n");
+   H(" GHI MA ;STR SUB\n");
 }
 
 Z grestma(void) {

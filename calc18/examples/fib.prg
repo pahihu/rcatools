@@ -9,7 +9,7 @@ fib(n) {
 }
 
 main() {
-   auto a, n;
+   auto n;
 
    n = fib(23); 
    printn(n, 10); nl();
