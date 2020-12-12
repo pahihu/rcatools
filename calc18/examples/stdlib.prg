@@ -33,7 +33,7 @@ getchar() { /* get char from UART */
 char(s,i) { /* i-th char of string s */
    auto n;
 
-   n = *(s+(i>>1));
+   n = s[i>>1];
    /* s[] contains "ABCD", accessed a 'BA' 'DC' */
    if (i&01)
       n=n>>8;
@@ -43,12 +43,12 @@ char(s,i) { /* i-th char of string s */
 lchar(s,i,c) { /* store char c in the i-th pos of string s */
    auto n, x;
 
-   n = *(s + (x = i>>1));
+   n = s[x = i>>1];
    if (i&1)
       n = (n & 0377) + (c << 8);
    else
       n = (n & 0177400) + c;
-   *(s+x) = n;
+   s[x] = n;
 }
 
 puts(s) {
@@ -102,7 +102,7 @@ atoi(s,b) { /* convert string to number in base b */
       d = digit(c);
       if (b - 1 < d)
          return (0177777);
-      n = b * n + digit(c);
+      n = b * n + d;
    }
    return (n);
 }

@@ -8,7 +8,7 @@ main() {
    auto x, y, z;
    register a, b, c;
 
-   x = 1; y = 2; z = 3;
+   x = 1; y = 5; z = 3;
 
    x =+ 4;
    y =* 256;

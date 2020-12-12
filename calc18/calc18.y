@@ -76,7 +76,7 @@ void yyerror(char*);
 %%
 
 program:
-          definition            { exit(0); }
+          definition            { exit(Err); }
         ;
 
 definition:
@@ -255,6 +255,7 @@ void freenod(NODE *p) {
 
 void yyerror(char *s) {
    fprintf(stderr, "%d: %s\n", yylineno, s);
+   Err = 1;
 }
 
 extern int dbg;
@@ -268,7 +269,7 @@ int main(int argc, char*argv[]) {
          }
    }
    yyparse();
-   return 0;
+   exit(Err);
 }
 
 /* vim: set ts=3 sw=3 et: */

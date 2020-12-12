@@ -8,6 +8,10 @@ then
 fi
 cpp $1.prg | grep -v '^#' >pre.$$
 ../calc18 <pre.$$ >out.$$
+if [ $? -ne 0 ];
+then
+   exit $?
+fi
 cat prolog out.$$ epilog >$1.sr
 a18 $1.sr -r -L $1.lst -b $1.bin
 

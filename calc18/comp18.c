@@ -30,7 +30,7 @@
 
 #define Z   static void
 
-
+int Err = 0;
 char *fn;
 int lowreg; // lowest regvar
 int nregvars; // no.of regvars
@@ -58,20 +58,20 @@ static int lbl = 0; // label generator
 
 #define ADDR(p) (getoffs((p)->x))
 
-Z prinode1(char *msg,NODE *p) {
+Z prinode1(FILE *fout,char *msg,NODE *p) {
    static char *typs[] = { "INT", "CON", "ID", "OPR" };
 
    if (!p) {
-      fprintf(stderr,"NULL\n");
+      fprintf(fout,"NULL\n");
       return;
    }
-   fprintf(stderr,"%s: t:%s x:%d\n",msg,typs[1+p->t],p->x);
-   prinode1("A0",p->a[0]);
-   prinode1("A1",p->a[1]);
+   fprintf(fout,"%s: t:%s x:%d\n",msg,typs[1+p->t],p->x);
+   prinode1(fout,"A0",p->a[0]);
+   prinode1(fout,"A1",p->a[1]);
 }
 
 Z prinode(NODE *p) {
-   prinode1("HEAD",p);
+   prinode1(stdout,"HEAD",p);
 }
 
 Z swpush(void) {
@@ -106,7 +106,7 @@ Z swdef(void) {
          }
       if (0 == maxcase) {
          fprintf(stderr,"switch without cases\n");
-         exit(1);
+         Err = 1;
       }
       H(" ..SWITCH%d\n",i);
       H("L%04d EQU %d\n",sw->lmaxcase,maxcase);
@@ -713,6 +713,7 @@ Z glvaluvar(NODE *p, int regena, int pushma) {
    switch (cls) {
    case C_UNDEF:
       fprintf(stderr,"%s undefined\n",sym);
+      Err = 1;
       defcls(p->x, C_EXTRN, 0);
       break;
    case C_EXTRN:
@@ -1074,7 +1075,7 @@ static int idlist(int t,NODE *p, int offs) {
       newoffs--;
       if (newoffs == 0x0B) {
          fprintf(stderr,"too many register variables\n");
-         exit(1);
+         Err = 1;
       }
       defcls(n, C_REG, newoffs);
       break;
@@ -1269,6 +1270,22 @@ Z PHI(char *reg) {
       H(" ;STR MA\n");
 }
 
+Z PLOAC(char *reg) {
+   H(" ;PLO AC");
+   if (reg)
+      H(" ;PLO %s\n",reg);
+   else
+      H(" ;STR MA ;INC MA\n");
+}
+
+Z PHIAC(char *reg) {
+   H(" ;PHI AC");
+   if (reg)
+      H(" ;PHI %s\n",reg);
+   else
+      H(" ;STR MA\n");
+}
+
 #define IMM(imm,imop)   ((imm)? (imop) : NULL)
 
 Z instr(char *reg1,char *xop, char *imop, int x) {
@@ -1350,13 +1367,13 @@ Z gasgnop(NODE *p) {
    switch (p->x) {
    case AOR:
       H(" ..AOR\n");
-      GLO(reg0,reg1); instr(reg1,"OR",IMM(imm1,"ORI"),LO(x)); PLO(reg0);
-      GHI(reg0,reg1); instr(reg1,"OR",IMM(imm1,"ORI"),HI(x)); PHI(reg0);
+      GLO(reg0,reg1); instr(reg1,"OR",IMM(imm1,"ORI"),LO(x)); PLOAC(reg0);
+      GHI(reg0,reg1); instr(reg1,"OR",IMM(imm1,"ORI"),HI(x)); PHIAC(reg0);
       break;
    case AAND:
       H(" ..AAND\n");
-      GLO(reg0,reg1); instr(reg1,"AND",IMM(imm1,"ANI"),LO(x)); PLO(reg0);
-      GHI(reg0,reg1); instr(reg1,"AND",IMM(imm1,"ANI"),HI(x)); PHI(reg0);
+      GLO(reg0,reg1); instr(reg1,"AND",IMM(imm1,"ANI"),LO(x)); PLOAC(reg0);
+      GHI(reg0,reg1); instr(reg1,"AND",IMM(imm1,"ANI"),HI(x)); PHIAC(reg0);
       break;
    case AEQ:
    case ANE:
@@ -1366,7 +1383,7 @@ Z gasgnop(NODE *p) {
       GEQ0();
       if (ANE == p->x)
          H(" XRI #FF\n");
-      PLO(reg0); PHI(reg0);
+      PLOAC(reg0); PHIAC(reg0);
       break;
    case ALT:
    case AGE:
@@ -1376,7 +1393,7 @@ Z gasgnop(NODE *p) {
       GLT();
       if (AGE == p->x)
          H(" XRI #FF\n");
-      PLO(reg0); PHI(reg0);
+      PLOAC(reg0); PHIAC(reg0);
       break;
    case ALE:
    case AGT:
@@ -1386,7 +1403,7 @@ Z gasgnop(NODE *p) {
       GGT();
       if (ALE == p->x)
          H(" XRI #FF\n");
-      PLO(reg0); PHI(reg0);
+      PLOAC(reg0); PHIAC(reg0);
       break;
    case ASHL: // XXX
       H(" ..ASHL\n");
@@ -1404,13 +1421,13 @@ Z gasgnop(NODE *p) {
       break;
    case AADD:
       H(" ..AADD\n");
-      GLO(reg0,reg1); instr(reg1,"ADD",IMM(imm1,"ADI"),LO(x)); PLO(reg0);
-      GHI(reg0,reg1); instr(reg1,"ADC",IMM(imm1,"ADCI"),HI(x)); PHI(reg0);
+      GLO(reg0,reg1); instr(reg1,"ADD",IMM(imm1,"ADI"),LO(x)); PLOAC(reg0);
+      GHI(reg0,reg1); instr(reg1,"ADC",IMM(imm1,"ADCI"),HI(x)); PHIAC(reg0);
       break;
    case ASUB:
       H(" ..ASUB\n");
-      GLO(reg0,reg1); instr(reg1,"SM",IMM(imm1,"SMI"),LO(x)); PLO(reg0);
-      GHI(reg0,reg1); instr(reg1,"SMB",IMM(imm1,"SMBI"),HI(x)); PHI(reg0);
+      GLO(reg0,reg1); instr(reg1,"SM",IMM(imm1,"SMI"),LO(x)); PLOAC(reg0);
+      GHI(reg0,reg1); instr(reg1,"SMB",IMM(imm1,"SMBI"),HI(x)); PHIAC(reg0);
       break;
    case AMOD:
       // NB. === MA/MQ are the same ===
@@ -1419,24 +1436,24 @@ Z gasgnop(NODE *p) {
       gcall("UDIV");
       WMOV("AUX", "MQ");
       if (!reg0) grestma();
-      GLO("AUX",NULL); PLO(reg0);
-      GHI("AUX",NULL); PHI(reg0);
+      GLO("AUX",NULL); PLOAC(reg0);
+      GHI("AUX",NULL); PHIAC(reg0);
       break;
    case AMUL:
       gasgnld(reg0,reg1,imm1,x);
       if (!reg0) gsavma();
       gcall("UMULT");
       if (!reg0) grestma();
-      GLO("AC",NULL);  PLO(reg0);
-      GHI("AC",NULL);  PHI(reg0);
+      GLO("AC",NULL); PLO(reg0);
+      GHI("AC",NULL); PHI(reg0);
       break;
    case ADIV:
       gasgnld(reg0,reg1,imm1,x);
       if (!reg0) gsavma();
       gcall("UDIV");
       if (!reg0) grestma();
-      GLO("AC",NULL);  PLO(reg0);
-      GHI("AC",NULL);  PHI(reg0);
+      GLO("AC",NULL); PLO(reg0);
+      GHI("AC",NULL); PHI(reg0);
       break;
    default:
       fprintf(stderr,"unknown asgn op %d\n",p->x);
@@ -1509,7 +1526,7 @@ int ex(NODE *p) {
       case AUTODEF:
          if (0x0F != lowreg) {
             fprintf(stderr,"auto vars after register vars\n");
-            exit(1);
+            Err = 1;
          }
          offs = idlist(AUTODEF, p->a[0], -1);
          H(" ..AUTO SIZE %d\n",offs);
@@ -1541,7 +1558,7 @@ int ex(NODE *p) {
       case CASE:
          if (currsw < 0) {
             fprintf(stderr, "no switch\n");
-            exit(1);
+            Err = 1;
          }
          i = LO(p->a[0]->x);
          H("L%04d: ..CASE %d\n",lbl,i);
@@ -1663,7 +1680,7 @@ int ex(NODE *p) {
       case GOTO:
          if (C_LABEL != getcls(p->a[0]->x)) {
             fprintf(stderr,"not a label: %s\n",getsym(p->a[0]->x));
-            exit(1);
+            Err = 1;
          }
          H(" ..GOTO\n");
          if (!getoffs(p->a[0]->x))

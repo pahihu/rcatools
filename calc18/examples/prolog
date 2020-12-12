@@ -64,7 +64,7 @@ UMULT:
  IRX ;IRX                .. SP->AUX.1
  LDI #00 ;PHI MQ ;PLO MQ .. MQ=0
  GHI AC ;BZ UMULT8       .. AC.0==0? GOTO UMULT8
- LDI #10 ;PLO ARGPTR     .. ARGPTR.0=#10
+ LDI #10 ;PLO TMP        .. TMP.0=#10
 M1:
  GLO MQ ;SHL  ;PLO MQ    .. MQ = MQ << 1
  GHI MQ ;SHLC ;PHI MQ
@@ -75,11 +75,11 @@ M1:
  GLO MQ       ;ADD ;PLO MQ .. MQ += *SP
  GHI MQ ;IRX  ;ADC ;PHI MQ
 NOADD:
- DEC ARGPTR                .. IF --ARGPTR != 0 GOTO M1
- GLO ARGPTR ;BNZ M1
+ DEC TMP                 .. IF --TMP != 0 GOTO M1
+ GLO TMP ;BNZ M1
  BR MACMQ
 UMULT8:
- LDI #08 ;PLO ARGPTR     .. ARGPTR.0=#10
+ LDI #08 ;PLO TMP        .. TMP.0=#10
 M18:
  GLO MQ ;SHL  ;PLO MQ    .. MQ = MQ << 1
  GHI MQ ;SHLC ;PHI MQ
@@ -89,8 +89,8 @@ M18:
  GLO MQ       ;ADD ;PLO MQ .. MQ += *SP
  GHI MQ ;IRX  ;ADC ;PHI MQ
 NOADD8:
- DEC ARGPTR              .. IF --ARGPTR != 0 GOTO M18
- GLO ARGPTR ;BNZ M18
+ DEC TMP                 .. IF --TMP != 0 GOTO M18
+ GLO TMP ;BNZ M18
 MACMQ:
  GLO MQ ;PLO AC          .. AC = MQ
  GHI MQ ;PHI AC
