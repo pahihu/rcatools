@@ -1,3 +1,5 @@
+/* LCC1802 example */
+
 #define putchar putc
 #define getchar getc
 

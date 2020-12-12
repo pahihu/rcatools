@@ -1,3 +1,5 @@
+/* LCC1802 example */
+
 typedef unsigned char u_char;
 typedef unsigned int u_int;
 
