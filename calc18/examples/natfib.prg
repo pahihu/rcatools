@@ -2,15 +2,14 @@
 
 #include "stdlib.prg"
 
-fib(n) {
-   if (n < 2)
-      return (n);
-   return (fib(n - 1) + fib(n - 2));
-}
+/* NB. ln -s natfib.sr include.sr */
 
 main() {
    auto n;
 
+   /* hack to pass arg to natfib() */
    n = 24; n = natfib();
    printn(n, 10); nl();
 }
+
+/* vim: set ts=3 sw=3 et: */
