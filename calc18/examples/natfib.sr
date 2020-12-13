@@ -1,0 +1,21 @@
+Lnatfib:
+ GLO AC ;SMI #02                ..N<2
+ GHI AC ;SMBI #00
+ BDF NOTLESS
+ SEP SRET                       ..RETURN W/ N
+NOTLESS:
+ DEC AC                         ..N=N-1
+ GHI AC ;STXD                   ..SAVE N-1 ON STACK
+ GLO AC ;STXD
+ SEP SCALL,A(Lnatfib)           ..CALL NATFIB(N-1)
+ IRX ;LDXA ;PLO AUX             ..AUX=N-1
+ LDX ;PHI AUX
+ GHI AC ;STXD                   ..SAVE NATFIB(N-1) ON STACK
+ GLO AC ;STXD
+ GLO AUX ;PLO AC                ..AC=AUX
+ GHI AUX ;PHI AC
+ DEC AC                         ..N-1
+ SEP SCALL,A(Lnatfib)           ..CALL NATFIB(N-2)
+ GLO AC ;IRX ;ADD ;PLO AC       ..NATFIB(N-2) + NATFIB(N-1)
+ GHI AC ;IRX ;ADC ;PHI AC
+ SEP SRET

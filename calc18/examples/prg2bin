@@ -12,8 +12,13 @@ if [ $? -ne 0 ];
 then
    exit $?
 fi
-cat prolog out.$$ epilog >$1.sr
-a18 $1.sr -r -L $1.lst -b $1.bin
+if [ -r "include.sr" ];
+then
+   cat prolog include.sr out.$$ epilog >_$1.sr
+else
+   cat prolog out.$$ epilog >_$1.sr
+fi
+a18 _$1.sr -r -L $1.lst -b $1.bin
 
 ls -l $1.bin
 rm -f out.$$ pre.$$
