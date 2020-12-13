@@ -176,7 +176,7 @@ static int isrelop(NODE *p) {
 
    x = p->x;
    return OPR == p->t &&
-      (x == '=' || x == NE || x == '<' || x == '>' || x == LE || x == GE ||
+      (x == EQ || x == NE || x == '<' || x == '>' || x == LE || x == GE ||
        x == '!');
 }
 
@@ -567,10 +567,26 @@ Z gle(NODE *p) {
       WCOM("AC","AC");
 }
 
-Z GEQ0(void) {
+Z GNE0(void) {
    H(" GLO AC ;LSNZ\n");
    H(" GHI AC ;LSZ\n");
    H(" LDI #FF\n");
+}
+
+Z gne0(NODE *p) {
+   H(" ..AC=0!=AC? #FFFF : #0000\n");
+   GNE0();
+   if (0 == (p->attr & A_SIMCMP))
+      gdtoac();
+}
+
+Z gne(NODE *p) {
+   gsub(p,0);
+   gne0(p);
+}
+
+Z GEQ0(void) {
+   GNE0();
    H(" XRI #FF\n");
 }
 
@@ -586,19 +602,9 @@ Z geq(NODE *p) {
    geq0(p);
 }
 
-Z gne(NODE *p) {
-   geq(p);
-   if (p->attr & A_SIMCMP)
-      H(" XRI #FF\n");
-   else
-      WCOM("AC","AC");
-}
-
 Z gtobool(void) {
    H(" ..AC=AC? #FFFF : #0000\n");
-   H(" GLO AC ;LSNZ\n");
-   H(" GHI AC ;LSZ\n");
-   H(" LDI #FF\n");
+   GNE0();
    gdtoac();
 }
 
@@ -1492,8 +1498,8 @@ Z gasgnop(NODE *p) {
       H(" ..AEQ,ANE\n");
       GLO(reg0,reg1); instr(reg1,"SM",IMM(imm1,"SMI"),LO(x)); PLO("AC");
       GHI(reg0,reg1); instr(reg1,"SMB",IMM(imm1,"SMBI"),HI(x)); PHI("AC");
-      GEQ0();
-      if (ANE == p->x)
+      GNE0();
+      if (AEQ == p->x)
          H(" XRI #FF\n");
       PLOAC(reg0); PHIAC(reg0);
       break;
@@ -1782,21 +1788,33 @@ int ex(NODE *p) {
          gwhile(p->a[0], p->a[1], NULL);
          break;
       case IF:
-         ex(p->a[0]);
-         q = p->a[1];
-         H(" ..0==AC?\n");
-         H(" GHI AC ;LBNZ L%04d\n", lbl1=lbl++);
-         H(" GLO AC ;LBZ  L%04d\n", lbl2=lbl++);
-         H("L%04d:\n",lbl1);
-         ex(q->a[0]);
-         if (q->a[1]) {  // IF expr THEN stmt1 ELSE stmt2
-            H(" LBR L%04d\n",lbl3=lbl++);
-            H("L%04d: ..ELSE\n",lbl2);
-            ex(q->a[1]); 
-            H("L%04d: ..END\n",lbl3);
+         {  int simcmp;
+
+            simcmp = 0;
+            if (isrelop(p->a[0])) {
+               simcmp = 1;
+               p->a[0]->attr |= A_SIMCMP;
+            }
+            ex(p->a[0]);
+            q = p->a[1];
+            H(" ..0==AC?\n");
+            if (simcmp)
+               H(" LBZ L%04d\n", lbl2=lbl++);
+            else {
+               H(" GHI AC ;LBNZ L%04d\n", lbl1=lbl++);
+               H(" GLO AC ;LBZ  L%04d\n", lbl2=lbl++);
+               H("L%04d:\n",lbl1);
+            }
+            ex(q->a[0]);
+            if (q->a[1]) {  // IF expr THEN stmt1 ELSE stmt2
+               H(" LBR L%04d\n",lbl3=lbl++);
+               H("L%04d: ..ELSE\n",lbl2);
+               ex(q->a[1]); 
+               H("L%04d: ..END\n",lbl3);
+            }
+            else
+               H("L%04d: ..END\n",lbl2);
          }
-         else
-            H("L%04d: ..END\n",lbl2);
          break;
       case RETURN:
          if (p->a[0])

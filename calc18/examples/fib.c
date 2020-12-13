@@ -42,6 +42,6 @@ void main(void) {
    u_char *a;
    u_int n;
 
-   n = fib(23); 
+   n = fib(24); 
    puti(n); nl();
 }

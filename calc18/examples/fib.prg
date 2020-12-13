@@ -11,6 +11,6 @@ fib(n) {
 main() {
    auto n;
 
-   n = fib(23); 
+   n = fib(24); 
    printn(n, 10); nl();
 }
