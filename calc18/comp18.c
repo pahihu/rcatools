@@ -58,6 +58,12 @@ static int lbl = 0; // label generator
 
 #define ADDR(p) (getoffs((p)->x))
 
+static int xstrcmp(char *a,char *b) {
+   if (!a || !b)
+      return 1;
+   return strcmp(a,b);
+}
+
 Z prinode1(FILE *fout,char *msg,NODE *p) {
    static char *typs[] = { "INT", "CON", "ID", "OPR" };
 
@@ -941,44 +947,6 @@ Z glvalu(NODE *p, int regena) { // addr in MA
    abort();
 }
 
-Z gshrn(void) {
-   int lbl1, lbl2;
-   H(" ..0==AUX.0?\n");
-   H(" LBZ L%04d\n", lbl1=lbl++);
-   H("L%04d: ..LOOP\n", lbl2=lbl++);
-   WSHR("AC","AC");
-   H(" ..IF (--AUX.0) GOTO LOOP\n");
-   H(" DEC AUX ;GLO AUX ;LBNZ L%04d\n", lbl2);
-   H("L%04d:\n", lbl1);
-}
-
-Z gshr(NODE *p) {
-   int i;
-   NODE *con;
-
-   con = 0;
-   if (CON == p->a[1]->t) {
-      con = p->a[1];
-      if (con->x < 4) {
-         ex(p->a[0]);
-         for (i = 0; i < con->x; i++)
-            WSHR("AC","AC");
-         return;
-      }
-      else {
-         H(" ..PUSHI.0 %02X\n",LO(con->x));
-         H(" LDI #%02X ;STXD\n", LO(con->x));
-      }
-   }
-   if (!con) {
-      ex(p->a[1]);
-      WPUSH0("AC");
-   }
-   ex(p->a[0]);
-   WPOP0("AUX");
-   gshrn();
-}
-
 Z gshln(void) {
    int lbl1, lbl2;
 
@@ -992,30 +960,202 @@ Z gshln(void) {
 }
 
 Z gshl(NODE *p) {
+   char *reg0, *reg1;
+   int i, imm0, imm1, x0, x1;
    NODE *con;
-   int i;
 
-   con = 0;
-   if (CON == p->a[1]->t) {
-      con = p->a[1];
-      if (con->x < 4) { 
+   reg0 = isreg(p->a[0])? reg(p->a[0]) : NULL;
+   imm0 = isimm(p->a[0]);
+   x0   = p->a[0]->x;
+   reg1 = isreg(p->a[1])? reg(p->a[1]) : NULL;
+   imm1 = isimm(p->a[1]);
+   x1   = p->a[1]->x;
+
+   if (reg0) {
+      if (reg1) { // reg0 << reg1
+         H(" ..reg0<<reg1\n");
+         WMOV("AC",reg0);
+         H(" GLO %s ;PLO AUX\n",reg1);
+         gshln();
+      }
+      else if (imm1) { // reg0 << imm1
+         H(" ..reg0<<imm1\n");
+Limm:
+         if (x1 > 15) {
+            H(" LDI #00 ;PLO AC ;PHI AC\n");
+         }
+         else {
+            if (x1 > 7) {
+               H(" GLO %s ;PHI AC\n",reg0);
+               H(" LDI #00 ;PLO AC\n");
+               x1 -= 8;
+            }
+            else if (xstrcmp(reg0,"AC"))
+               WMOV("AC",reg0);
+            if (x1 < 3) {
+               for (i = 0; i < x1; i++)
+                  WSHL("AC","AC");
+            }
+            else {
+               H(" LDI #%02X ;PLO AUX\n",x1);
+               gshln();
+            }
+         }
+      }
+      else { // reg0 << expr
+         H(" ..reg0<<expr\n");
+         ex(p->a[1]);
+         H(" GLO AC ;PLO AUX\n");
+         WMOV("AC",reg0);
+         gshln();
+      }
+   }
+   else if (imm0) {
+      if (reg1) { // imm0 << reg1
+         H(" ..imm0<<reg1\n");
+         WLDI("AC",x0);
+         H(" GLO %s ;PLO AUX\n",reg1);
+         gshln();
+      }
+      else if (imm1) { // imm0 << imm1
+         fprintf(stderr,"gshr(): imm0 op imm1\n");
+         abort();
+      }
+      else { // imm0 << expr
+         H(" ..imm0<<expr\n");
+         ex(p->a[1]);
+         H(" GLO AC ;PLO AUX\n");
+         WLDI("AC",x0);
+         gshln();
+      }
+   }
+   else {
+      if (reg1) { // expr << reg1
+         H(" ..expr<<reg1\n");
          ex(p->a[0]);
-         for (i = 0; i < con->x; i++)
-            WSHL("AC","AC");
-         return;
+         H(" GLO %s ;PLO AUX\n",reg1);
+         gshln();
       }
-      else {
-         H(" ..PUSHI.0 %02X\n",LO(con->x));
-         H(" LDI #%02X ;STXD\n", LO(con->x));
+      else if (imm1) { // expr << imm1
+         H(" ..expr<<imm1\n");
+         ex(p->a[0]);
+         reg0 = "AC";
+         goto Limm;
+      }
+      else { // expr << expr
+         H(" ..expr<<expr\n");
+         ex(p->a[1]);
+         WPUSH0("AC");
+         ex(p->a[0]);
+         WPOP0("AUX");
+         gshln();
       }
    }
-   if (!con) {
-      ex(p->a[1]);
-      WPUSH0("AC");
+}
+
+Z gshrn(void) {
+   int lbl1, lbl2;
+   H(" ..0==AUX.0?\n");
+   H(" LBZ L%04d\n", lbl1=lbl++);
+   H("L%04d: ..LOOP\n", lbl2=lbl++);
+   WSHR("AC","AC");
+   H(" ..IF (--AUX.0) GOTO LOOP\n");
+   H(" DEC AUX ;GLO AUX ;LBNZ L%04d\n", lbl2);
+   H("L%04d:\n", lbl1);
+}
+
+Z gshr(NODE *p) {
+   char *reg0, *reg1;
+   int i, imm0, imm1, x0, x1;
+   NODE *con;
+
+   reg0 = isreg(p->a[0])? reg(p->a[0]) : NULL;
+   imm0 = isimm(p->a[0]);
+   x0   = p->a[0]->x;
+   reg1 = isreg(p->a[1])? reg(p->a[1]) : NULL;
+   imm1 = isimm(p->a[1]);
+   x1   = p->a[1]->x;
+
+   if (reg0) {
+      if (reg1) { // reg0 >> reg1
+         H(" ..reg0>>reg1\n");
+         WMOV("AC",reg0);
+         H(" GLO %s ;PLO AUX\n",reg1);
+         gshrn();
+      }
+      else if (imm1) { // reg0 >> imm1
+         H(" ..reg0>>imm1\n");
+Limm:
+         if (x1 > 15) {
+            H(" LDI #00 ;PLO AC ;PHI AC\n");
+         }
+         else {
+            if (x1 > 7) {
+               H(" GHI %s ;PLO AC\n",reg0);
+               H(" LDI #00 ;PHI AC\n");
+               x1 -= 8;
+            }
+            else if (xstrcmp(reg0,"AC"))
+               WMOV("AC",reg0);
+            if (x1 < 3) {
+               for (i = 0; i < x1; i++)
+                  WSHR("AC","AC");
+            }
+            else {
+               H(" LDI #%02X ;PLO AUX\n",x1);
+               gshrn();
+            }
+         }
+      }
+      else { // reg0 >> expr
+         H(" ..reg0>>expr\n");
+         ex(p->a[1]);
+         H(" GLO AC ;PLO AUX\n");
+         WMOV("AC",reg0);
+         gshrn();
+      }
    }
-   ex(p->a[0]);
-   WPOP0("AUX");
-   gshln();
+   else if (imm0) {
+      if (reg1) { // imm0 >> reg1
+         H(" ..imm0>>reg1\n");
+         WLDI("AC",x0);
+         H(" GLO %s ;PLO AUX\n",reg1);
+         gshrn();
+      }
+      else if (imm1) { // imm0 >> imm1
+         fprintf(stderr,"gshr(): imm0 >> imm1\n");
+         abort();
+      }
+      else { // imm0 >> expr
+         H(" ..imm0>>expr\n");
+         ex(p->a[1]);
+         H(" GLO AC ;PLO AUX\n");
+         WLDI("AC",x0);
+         gshrn();
+      }
+   }
+   else {
+      if (reg1) { // expr >> reg1
+         H(" ..expr>>reg1\n");
+         ex(p->a[0]);
+         H(" GLO %s ;PLO AUX\n",reg1);
+         gshrn();
+      }
+      else if (imm1) { // expr >> imm1
+         H(" ..expr>>imm1\n");
+         ex(p->a[0]);
+         reg0 = "AC";
+         goto Limm;
+      }
+      else { // expr >> expr
+         H(" ..expr>>expr\n");
+         ex(p->a[1]);
+         WPUSH0("AC");
+         ex(p->a[0]);
+         WPOP0("AUX");
+         gshrn();
+      }
+   }
 }
 
 Z gstvar(NODE *p) {
@@ -1334,12 +1474,6 @@ Z grestma(void) {
    H(" LDN SUB ;PHI MA\n");
    // restore SUB.1
    H(" LDI A.1(UMULT) ;PHI SUB\n");
-}
-
-static int xstrcmp(char *a,char *b) {
-   if (!a || !b)
-      return 1;
-   return strcmp(a,b);
 }
 
 Z GLO(char *reg,char *reg1) {
