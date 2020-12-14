@@ -64,6 +64,22 @@ static int xstrcmp(char *a,char *b) {
    return strcmp(a,b);
 }
 
+static int toprintable(int c) {
+   if (!c)
+      return c;
+   return (31 < c && c < 128)? c : '.';
+}
+
+static char* printable(char *str) {
+   static char buf[128], *p;
+   int i;
+
+   i = 0; p = buf;
+   while (i++ < 127 && (*p++ = toprintable(*str++)));
+   *p = '\0';
+   return buf;
+}
+
 Z prinode1(FILE *fout,char *msg,NODE *p) {
    static char *typs[] = { "INT", "CON", "ID", "OPR" };
 
@@ -1324,7 +1340,7 @@ static int idlist(int t,NODE *p, int offs) {
       else if (isimm(q))
          H(" DW #%02X%02X\n",LO(n),HI(n));
       else if (isstr(q)) {
-         H(" ..STR %s [%d]\n",q->s,q->x=lbl++);
+         H(" ..STR %s [%d]\n",printable(q->s),q->x=lbl++);
          H(" DB A.0(L%d SHR 1),A.1(L%d SHR 1)\n",q->x,q->x);
       }
    }
@@ -1779,7 +1795,7 @@ int ex(NODE *p) {
       WLDI("AC",p->x);
       break;
    case STR:
-      H(" ..STR %s [%d]\n",p->s,p->x=lbl++);
+      H(" ..STR %s [%d]\n",printable(p->s),p->x=lbl++);
       H(" LDI A.1(L%d SHR 1) ;PHI AC\n",p->x);
       H(" LDI A.0(L%d SHR 1) ;PLO AC\n",p->x);
       break;

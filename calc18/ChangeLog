@@ -2,3 +2,5 @@ History
 =======
 
 201214AP faster <</>>, fixed runtime vector init
+         str const converted to printable rep in ASM src
+         fixed str const compilation (lost in INT nodes)

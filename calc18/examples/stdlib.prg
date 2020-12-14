@@ -99,7 +99,7 @@ atoi(s,b) { /* convert string to number in base b */
    auto i, c, n, d;
 
    n = i = 0;
-   while (isdigit(c = char(s,i++))) {
+   while (isnum(c = char(s,i++))) {
       d = digit(c);
       if (b - 1 < d)
          return (0177777);

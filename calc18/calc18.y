@@ -234,7 +234,7 @@ void freenod(NODE *p) {
    char *s;
 
    if (!p) return;
-   if (OPR == p->t)
+   if (OPR == p->t || INT == p->t)
       for (i = 0; i < 2; i++)
          if (p->a[i])
             freenod(p->a[i]);
