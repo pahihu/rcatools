@@ -1,4 +1,12 @@
 calc18 is a native compiler for a B-like language.
 For a reference on B see https://www.bell-labs.com/usr/dmr/www/kbman.html
 
+This implementation has the following limitations:
+- unsigned arithmetic
+- for << and >> the shift amount is modulo 256
+- relational and logical operators return -1
+- operator evaluation order is undefined
+- no function pointers (yet)
+
+
 Good luck!

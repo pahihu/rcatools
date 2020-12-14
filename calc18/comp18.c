@@ -1289,19 +1289,21 @@ static int idlist(int t,NODE *p, int offs) {
       q = q->a[0];
       if (q) {
          //  VEC0.1
-         //  VEC0.0 <--+
-         //  PTR.1     |
-         //  PTR.0   --+
+         //  VEC0.0 <-- MA
+         //  PTR.1
+         //  PTR.0  <-- MA >> 1
          offs = getoffs(n);
          sym = getsym(n);
          H(" ..INIT %s=&%s[0]\n",sym,sym);
-         H(" GLO FP ;ADI #%02X ;PLO MA\n",LO(offs));
-         H(" GHI FP ;ADCI #%02X ;PHI MA\n",HI(offs));
-         // *ptr = (ptr + 2) >> 1
-         H(" GLO MA ;ADI #02 ;PLO AUX\n");
-         H(" GHI MA ;ADI #00\n");
-         H(" SHR ;STR MA ;INC MA\n");
-         H(" GLO AUX ;SHRC ;STR MA\n");
+         offs -= 2;
+         H(" GLO FP ;SMI #%02X ;PLO MA\n",LO(offs));
+         // *--ptr = ptr >> 1
+         H(" GHI FP ;SMBI #%02X ;PHI MA\n",HI(offs));
+         H(" SHR ;PHI AUX\n");
+         H(" GLO MA ;SHRC\n");
+         H(" DEC MA ;DEC MA\n");
+         H(" STR MA ;INC MA\n");
+         H(" GHI AUX ;STR MA\n");
       }
       break;
    case REGDEF:
@@ -1834,6 +1836,8 @@ int ex(NODE *p) {
             H(" GLO SP ;SMI #%02X; PLO SP\n",LO(offs));
             H(" GHI SP ;SMBI #%02X; PHI SP\n",HI(offs));
          }
+         // init vector ptrs
+         idlist(INIVPTR,p->a[0],0);
          break;
       case REGDEF:
          lowreg = idlist(REGDEF, p->a[0], 0x0F);
@@ -1872,8 +1876,6 @@ int ex(NODE *p) {
          WMOV("FP", "SP");
          q = p->a[1];
          ex(q->a[0]); // ID list
-         // init vector ptrs
-         idlist(INIVPTR,q->a[0],0);
          ex(q->a[1]); // stmt
          H("E%s:\n",sym); // fn epilogue
          for(i = 0x0F; i > lowreg; i--)

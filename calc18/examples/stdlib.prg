@@ -49,6 +49,7 @@ lchar(s,i,c) { /* store char c in the i-th pos of string s */
    else
       n = (n & 0177400) + c;
    s[x] = n;
+   return (c);
 }
 
 puts(s) {
