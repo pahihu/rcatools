@@ -118,7 +118,7 @@ stmt:
                                 { $$ = opr(WHILE, $3, $5); }
         | compound_stmt         { $$ = $1; }
         | SWITCH expr compound_stmt { $$ = opr(SWITCH,$2,$3); }
-        | CASE CONST ':'        { $$ = opr(CASE, con($2), NULL); }
+        | CASE expr ':'         { $$ = opr(CASE, $2, NULL); }
         /*  1   2    3    4          5   6    7 */
         | FOR '(' stmt stmt simplestmt ')' stmt
                                 { $$ = opr(FOR, $7, opr(INT, $3, opr(INT, $4, $5))); }

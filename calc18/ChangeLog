@@ -4,3 +4,9 @@ History
 201214AP faster <</>>, fixed runtime vector init
          str const converted to printable rep in ASM src
          fixed str const compilation (lost in INT nodes)
+         allow const expr in CASE labels
+
+                        src  #bytes
+         B run-time     ASM   262
+         stdlib           B  2212
+         memdump+disasm   B  3452

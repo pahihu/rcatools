@@ -59,21 +59,21 @@ dasm(p) {
    arg = ('*e' == char(args,1))? char(args,0) : char(args,N);
    
    nargs = 0; hastmp = 0;
-   switch (arg) {
-   case '-':
+   switch (arg - '0') {
+   case 0:
       goto end;
-   case '1':
+   case 1:
       nargs = 1; hastmp = 1;
       tmp = char(0,p+1);
       goto end;
-   case '2':
+   case 2:
       nargs = 2; hastmp = 1;
       tmp = (char(0,p+1) << 8) + char(0,p+2);
       goto end;
-   case 'N':
-   case 'R':
+   case 7:
+   case 8:
       hastmp = 1; tmp = N;
-      if (arg == 'N') tmp =& 7;
+      if (arg == '7') tmp =& 7;
       goto end;
    }
 end:
@@ -87,15 +87,16 @@ end:
    i = 0;
    while (i < 4)
       putchar(char(mnemo,i++));
-   if (hastmp)
-      printn(tmp,16);
+   if (hastmp) {
+      putchar(' '); printn(tmp,16);
+   }
    putchar('*n');
    return (nargs);
 }
 
 /* dasm tables */
 m "0   INC DEC 3   LDA STR 6   7   GLO GHI PLO PHI 12  SEP SEX 15  ";
-a "R";
+a "8";
 ma[0]
    "IDL LDN LDN LDN LDN LDN LDN LDN LDN LDN LDN LDN LDN LDN LDN LDN ",
    1,
@@ -115,22 +116,22 @@ ma[0]
    "LDX OR  AND XOR ADD SD  SHR SM  LDI ORI ANI XRI ADI SDI SHL SMI ";
    
 aa[0]
-   "-RRRRRRRRRRRRRRR",
+   "0888888888888888",
    1,
    2,
-   "11111111-1111111",
+   "1111111101111111",
    4,
    5,
-   "-NNNNNNNNNNNNNNN",
-   "------------11-1",
+   "0777777777777777",
+   "0000000000001101",
    8,
    9,
    10,
    11,
-   "2222-----222----",
+   "2222000002220000",
    13,
    14,
-   "--------111111-1";
+   "0000000011111101";
 
 prompt(msg) {
    auto s, buf 16;

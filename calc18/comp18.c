@@ -1878,6 +1878,10 @@ int ex(NODE *p) {
             fprintf(stderr, "no switch\n");
             Err = 1;
          }
+         if (!isimm(p->a[0])) {
+            fprintf(stderr, "case expr is not constant\n");
+            exit(1);
+         }
          i = LO(p->a[0]->x);
          H("L%04d: ..CASE %d\n",lbl,i);
          switches[currsw].tab[i] = lbl++;
