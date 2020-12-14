@@ -28,6 +28,13 @@ main() {
    show("a",a);
    show("b",b);
    show("c",c);
+
+   x = 0;
+   a = -!x++;
+   show("x = 0",a);
+   x = 0;
+   a = -!x++;
+   show("x = 1",a);
 }
 
 /* vim: set ts=3 sw=3 et: */

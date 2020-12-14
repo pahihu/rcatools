@@ -68,8 +68,8 @@ void yyerror(char*);
 %left SHR SHL
 %left '+' '-'
 %left '*' '/' '%'
-%nonassoc UNOP
-%nonassoc GRP
+%right UNOP
+%left GRP
 
 %type <ptr> stmt compound_stmt stmt_list expr expr_list id id_list simplestmt lvalue base extdef
 
