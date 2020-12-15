@@ -258,7 +258,16 @@ void yyerror(char *s) {
    Err = 1;
 }
 
-extern int dbg;
+void usage(void) {
+   fprintf(stderr,"beb18 [-d] [-h] [-v]\n\n");
+   fprintf(stderr,"B18 compiler. input = stdin, output = stdout\n\n");
+   fprintf(stderr,"options:\n");
+   fprintf(stderr,"  -d       compiler dbg info\n");
+   fprintf(stderr,"  -h       help\n");
+   fprintf(stderr,"  -v       variable access stats\n");
+   exit(1);
+}
+
 int main(int argc, char*argv[]) {
    int i;
 
@@ -266,6 +275,8 @@ int main(int argc, char*argv[]) {
       if ('-' == *argv[i])
          switch (argv[i][1]) {
          case 'd': dbg = 1; break;
+         case 'h': usage();
+         case 'v': varstat = 1; break;
          }
    }
    yyparse();

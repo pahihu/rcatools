@@ -3,7 +3,9 @@ History
 
 201215AP printf %d is signed, %o is unsigned
          allow '.' in names
-         stdlib: strcopy, concat, getarg (stdlib 3313bytes)
+         stdlib: strcopy, concat, getarg, printf (stdlib 4339bytes)
+         stdlib: register defs (3273 bytes)
+         faster WADI (case 0), fixed WADDR, more efficient arg passing
 
 201214AP faster <</>>, fixed runtime vector init
          str const converted to printable rep in ASM src

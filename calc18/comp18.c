@@ -37,6 +37,7 @@ int nregvars; // no.of regvars
 int ex(NODE *p);
 Z glvaluvar(NODE *p, int regena, int pushma);
 Z WPOP(char *reg);
+Z WMOV(char *dst, char *src);
 
 typedef struct {
    int prev; // prev switch
@@ -226,8 +227,8 @@ Lreg0:
          H(" GHI %s ;STR SP ;GHI %s ;%s ;PHI %s\n",reg1,reg0,xophi,dst);
       }
       else if (imm1) { // reg0 op imm1
-         H(" GLO %s ;%s %02X ;PLO %s\n",reg0,imop,LO(x1),dst);
-         H(" GHI %s ;%s %02X ;PHI %s\n",reg0,imophi,HI(x1),dst);
+         H(" GLO %s ;%s #%02X ;PLO %s\n",reg0,imop,LO(x1),dst);
+         H(" GHI %s ;%s #%02X ;PHI %s\n",reg0,imophi,HI(x1),dst);
       }
       else { // reg0 op stack
          H(" GLO %s ;IRX ;%s ;PLO %s\n",reg0,xop,dst);
@@ -270,8 +271,12 @@ Lreg0:
 }
 
 Z WADI(char *dst,char *src,int x) {
-   H(" GLO %s ;ADI #%02X ;PLO %s\n",src,LO(x),dst);
-   H(" GHI %s ;ADCI #%02X ;PHI %s\n",src,HI(x),dst);
+   if (x) {
+      H(" GLO %s ;ADI #%02X ;PLO %s\n",src,LO(x),dst);
+      H(" GHI %s ;ADCI #%02X ;PHI %s\n",src,HI(x),dst);
+   }
+   else
+      WMOV(dst,src);
 }
 
 Z WADD(char *dst,char *src) {
@@ -281,7 +286,7 @@ Z WADD(char *dst,char *src) {
 
 Z WADDR(char *dst,char *src0,char *src1) {
    H(" GLO %s ;STR SP ;GLO %s ;ADD ;PLO %s\n",src1,src0,dst);
-   H(" GLO %s ;STR SP ;GHI %s ;ADC ;PHI %s\n",src1,src0,dst);
+   H(" GHI %s ;STR SP ;GHI %s ;ADC ;PHI %s\n",src1,src0,dst);
 }
 
 Z WCMI(char *reg,int x) {
@@ -415,7 +420,7 @@ Z gpushvar(NODE *p) {
    else {
       H(" LDA MA ;PLO AUX\n");
       H(" LDN MA ;STXD\n");
-      H(" GLO AUX; STXD\n");
+      H(" GLO AUX ;STXD\n");
    }
 }
 
@@ -888,8 +893,14 @@ Z gindex(NODE *p) {
          }
          else if (imm1) { // ID[imm1]
             H(" ..ID[imm1]\n");
-            H(" LDA MA ;ADI #%02X ;PLO AUX\n",LO(x1));
-            H(" LDN MA ;ADCI #%02X ;PHI AUX\n",HI(x1));
+            if (x1) {
+               H(" LDA MA ;ADI #%02X ;PLO AUX\n",LO(x1));
+               H(" LDN MA ;ADCI #%02X ;PHI AUX\n",HI(x1));
+            }
+            else {
+               H(" LDA MA ;PLO AUX\n");
+               H(" LDN MA ;PHI AUX\n");
+            }
             WSHL("MA","AUX");
             return;
          }
@@ -1363,8 +1374,9 @@ static int revidlist(int t,NODE *p, int offs) {
    return revidlist(t,p->a[0],2+offs);
 }
 static int exprlist(NODE *p, int offs) {
-   int n;
+   int n, x1;
    NODE *q;
+   char *s1;
 
    if (!p)
       return offs;
@@ -1373,6 +1385,23 @@ static int exprlist(NODE *p, int offs) {
    H(" ..PUSH ARG%d\n",++offs);
    if (isvar(p->a[1])) /* push in reverse order */
       gpushvar(p->a[1]);
+   else if (isimm(p->a[1])) {
+      x1 = p->a[1]->x;
+      H(" ..PUSH #%02X%02X\n",HI(x1),LO(x1));
+      if (x1) {
+         H(" LDI #%02X ;STXD\n",HI(x1));
+         H(" LDI #%02X ;STXD\n",LO(x1));
+      }
+      else
+         H(" LDI #00 ;STXD ;STXD\n");
+   }
+   else if (isstr(p->a[1])) {
+      s1 = p->a[1]->s;
+      x1 = p->a[1]->x;
+      H(" ..PUSH STR %s [%d]\n",printable(s1),x1 = p->a[1]->x = lbl++);
+      H(" LDI A.1(L%d SHR 1) ;STXD\n",x1);
+      H(" LDI A.0(L%d SHR 1) ;STXD\n",x1);
+   }
    else {
       ex(p->a[1]);
       WPUSH("AC");
@@ -1746,8 +1775,14 @@ Z gasgn(NODE *p) {
          H(" GHI %s ;PHI %s ;PHI AC\n",reg1,reg0);
       }
       else if (imm1) { // reg0 = imm1
-         H(" LDI #%02X ;PLO %s ;PLO AC\n",LO(x1),reg0);
-         H(" LDI #%02X ;PHI %s ;PHI AC\n",HI(x1),reg0);
+         if (x1) {
+            H(" LDI #%02X ;PLO %s ;PLO AC\n",LO(x1),reg0);
+            H(" LDI #%02X ;PHI %s ;PHI AC\n",HI(x1),reg0);
+         }
+         else {
+            H(" LDI #00 ;PLO %s ;PLO AC\n",reg0);
+            H("          PHI %s ;PHI AC\n",reg0);
+         }
       }
       else { // reg0 = expr
          ex(p->a[1]); // val in AC
@@ -1763,8 +1798,14 @@ Z gasgn(NODE *p) {
       }
       else if (imm1) { // lvalu = imm1
          glvalu(p->a[0],1); // addr in MA
-         H(" LDI #%02X ;PLO AC ;STR MA ;INC MA\n",LO(x1));
-         H(" LDI #%02X ;PHI AC ;STR MA\n",HI(x1));
+         if (x1) {
+            H(" LDI #%02X ;PLO AC ;STR MA ;INC MA\n",LO(x1));
+            H(" LDI #%02X ;PHI AC ;STR MA\n",HI(x1));
+         }
+         else {
+            H(" LDI #00 ;PLO AC ;STR MA ;INC MA\n");
+            H("          PHI AC ;STR MA\n");
+         }
       }
       else { // lvalu = expr
          ex(p->a[1]); // val in AC
@@ -1888,6 +1929,8 @@ int ex(NODE *p) {
          break;
       case FUNDEF:
          sym = getsym(p->a[0]->x);
+         if (varstat)
+            fprintf(stderr,"FN %s\n",sym);
          H(" ..FN %s\n",fn = sym);
          lowreg = 0x0F; nswitches = 0; currsw = -1;
          galign();

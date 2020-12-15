@@ -1,5 +1,4 @@
 #include "stdlib.prg"
-#include "printf.prg"
 
 myoct(msg,n) {
    printf("%s @ %o*n",msg,n);

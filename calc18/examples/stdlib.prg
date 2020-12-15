@@ -31,7 +31,7 @@ getchar() { /* get char from UART */
 }
 
 char(s,i) { /* i-th char of string s */
-   auto n;
+   register n;
 
    n = s[i>>1];
    /* s[] contains "ABCD", accessed a 'BA' 'DC' */
@@ -41,7 +41,7 @@ char(s,i) { /* i-th char of string s */
 }
 
 lchar(s,i,c) { /* store char c in the i-th pos of string s */
-   auto n, x;
+   register n, x;
 
    n = s[x = i>>1];
    if (i&1)
@@ -53,7 +53,7 @@ lchar(s,i,c) { /* store char c in the i-th pos of string s */
 }
 
 puts(s) {
-   auto c,i;
+   register c,i;
 
    i = 0;
    while ((c = char(s,i++)) != '*e')
@@ -61,7 +61,7 @@ puts(s) {
 }
 
 gets(s) { /* get string */
-   auto i, c;
+   register i, c;
 
    i = 0;
    while ('*n' != (c = getchar())) {
@@ -73,7 +73,7 @@ gets(s) { /* get string */
 }
 
 printn(n,b) { /* print number in base b */
-   auto a;
+   register a;
 
    if (a=n/b)
       printn(a,b);
@@ -96,7 +96,8 @@ digit(c) {
 }
 
 atoi(s,b) { /* convert string to number in base b */
-   auto i, c, n, d;
+   auto c;
+   register n, d, i;
 
    n = i = 0;
    while (isnum(c = char(s,i++))) {
@@ -109,7 +110,7 @@ atoi(s,b) { /* convert string to number in base b */
 }
 
 strcopy(d,s) {
-   auto i;
+   register i;
 
    i = 0;
    while (lchar(d,i,char(s,i)) != '*e')
@@ -118,7 +119,8 @@ strcopy(d,s) {
 }
 
 concat(a,x1,x2,x3,x4,x5,x6,x7,x8,x9,x10) { /* terminate w/ zero */
-   auto c, i, j, adx, x;
+   auto i, adx;
+   register c, j, x;
 
    j = 0; adx = &x1;
    while (x = *adx++) {
@@ -131,7 +133,7 @@ concat(a,x1,x2,x3,x4,x5,x6,x7,x8,x9,x10) { /* terminate w/ zero */
 }
 
 getarg(a,s,n) {
-   auto c, i;
+   register c, i;
 
    while(((c = char(s,n)) != '*e') && (c == ' ' || c == '*t'))
       n++;
@@ -141,6 +143,48 @@ getarg(a,s,n) {
    }
    lchar(a,i,'*e');
    return (n);
+}
+
+/* Thompson: User's Reference to B */
+
+printf(fmt, x1,x2,x3,x4,x5,x6,x7,x8,x9) {
+   extrn printn, char, putchar;
+   auto adx, i;
+   register c, j, x;
+
+   i = 0; /* fmt index */
+   adx = &x1;  /* argument pointer */
+loop:
+   while ((c=char(fmt,i++)) != '%') {
+      if ('*e' == c)
+         return;
+      putchar(c);
+   }
+   x = *adx++;
+   switch (c = char(fmt,i++)) - 'a' {
+   case 'd' - 'a': /* decimal */
+      if (x & 0100000) {
+         x = -x;
+         putchar('-');
+      }
+   case 'o' - 'a': /* octal */
+      printn(x,c=='o'?8:10);
+      goto loop;
+
+   case 'c' - 'a': /* char */
+      putchar(x);
+      goto loop;
+
+   case 's' - 'a': /* string */
+      j = 0;
+      while ((c = char(x,j++)) != '*e')
+         putchar(c);
+      goto loop;
+   }
+   putchar('%');
+   i--;
+   adx--;
+   goto loop;
 }
 
 /* vim: set ts=3 sw=3 et: */

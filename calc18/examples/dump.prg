@@ -17,7 +17,7 @@ printable(c) {
 }
 
 dump(a,n) {
-   auto i, j;
+   register i, j;
 
    i=0; a =>> 1;
    while (i<n) {
@@ -42,7 +42,8 @@ dump(a,n) {
 
 dasm(p) {
    extrn m, a, ma, aa;
-   auto c0de, mnemo, args, arg, hastmp, tmp, i, nargs, I, N;
+   auto c0de, mnemo, args, arg, hastmp, nargs, I, N;
+   register tmp, i;
 
    c0de = char(0,p); I = Hi(c0de); N = Lo(c0de);
 /* hex4(p); putchar(' '); hex2(c0de); hex(I); putchar(' '); hex(N); putchar('*n'); */

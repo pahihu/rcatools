@@ -11,6 +11,7 @@ struct {
    char *sym;   // name
    int cls;     // storage cls
    int offs;    // addr/offset
+   int cnt;     // access count
 } syms[MAXSYM];
 
 int findsym(char*);
@@ -222,6 +223,7 @@ char *getsym(int n) {
 }
 
 int getoffs(int n) {
+   syms[n].cnt++;
    return syms[n].offs;
 }
 
@@ -233,10 +235,19 @@ int getcls(int n) {
    return syms[n].cls;
 }
 
+int varstat = 0;
+
 void dropsyms(void) {
-   int i;
-   for (i = 0; i < nsyms; i++)
+   int i, cls;
+   for (i = 0; i < nsyms; i++) {
+      if (varstat) {
+         cls = syms[i].cls;
+         if ((cls == C_REG || cls == C_AUTO) && syms[i].cnt)
+            fprintf(stderr,"\t%s %d\n",syms[i].sym,syms[i].cnt);
+      }
+      syms[i].cnt = 0;
       syms[i].cls = C_UNDEF;
+   }
 }
 
 int unescape(int c) {
