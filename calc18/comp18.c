@@ -1912,10 +1912,8 @@ int ex(NODE *p) {
          break;
       case FUNCALL:
          sym = getsym(p->a[0]->x);
-         if (C_UNDEF == getcls(p->a[0]->x)) {
-            // fprintf(stderr,"%s undefined\n",sym);
+         if (C_UNDEF == getcls(p->a[0]->x)) // see bref 6.1
             defcls(p->a[0]->x,C_EXTRN,0);
-         }
          argcnt = ex(p->a[1]); // push args
          H(" ..CALL %s\n",sym);
          H(" SEP SCALL,A(L%s)\n",sym);

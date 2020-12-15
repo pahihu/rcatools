@@ -15,11 +15,11 @@ loop:
    x = *adx++;
    switch c = char(fmt,i++) {
    case 'd': /* decimal */
-   case 'o': /* octal */
       if (x & 0100000) {
          x = -x;
          putchar('-');
       }
+   case 'o': /* octal */
       printn(x,c=='o'?8:10);
       goto loop;
 

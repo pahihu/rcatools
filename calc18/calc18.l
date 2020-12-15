@@ -43,7 +43,7 @@ int dbg = 0;
 
 %%
 
-[a-zA-Z][a-zA-Z0-9]* {
+[a-zA-Z_][a-zA-Z0-9_\.]* {
                    int s;
                    if ((s = findid(yytext)))
                       return s;

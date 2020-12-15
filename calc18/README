@@ -3,10 +3,19 @@ For a reference on B see https://www.bell-labs.com/usr/dmr/www/kbman.html
 
 This implementation has the following limitations:
 - unsigned arithmetic
-- for << and >> the shift amount is modulo 256
-- relational and logical operators return -1
+- for << and >> the shift count is mod 256
 - operator evaluation order is undefined
+- the switch stmt is numeric, ie. it uses a jump table, the cases
+  are restricted to mod 256
 - no function pointers (yet)
+- external vector declarations cannot omit the vector size, use v[0]
+
+
+Changes:
+- *e is ASCII DC3
+- relational and logical operators return -1
+- use 'register' instead of 'auto' to allocate register vars, max. 3
+- case stmt can contain constant numeric expr, not just constants
 
 
 Good luck!

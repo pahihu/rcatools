@@ -108,4 +108,39 @@ atoi(s,b) { /* convert string to number in base b */
    return (n);
 }
 
+strcopy(d,s) {
+   auto i;
+
+   i = 0;
+   while (lchar(d,i,char(s,i)) != '*e')
+      i++;
+   return(d);
+}
+
+concat(a,x1,x2,x3,x4,x5,x6,x7,x8,x9,x10) { /* terminate w/ zero */
+   auto c, i, j, adx, x;
+
+   j = 0; adx = &x1;
+   while (x = *adx++) {
+      i = 0;
+      while ((c=char(x,i++)) != '*e')
+         lchar(a,j++,c);
+   }
+   lchar(a,j,'*e');
+   return (a);
+}
+
+getarg(a,s,n) {
+   auto c, i;
+
+   while(((c = char(s,n)) != '*e') && (c == ' ' || c == '*t'))
+      n++;
+   i = 0;
+   while(((c = char(s,n)) != '*e') && (c != ' ' && c != '*t')) {
+      lchar(a,i++,c); n++;
+   }
+   lchar(a,i,'*e');
+   return (n);
+}
+
 /* vim: set ts=3 sw=3 et: */

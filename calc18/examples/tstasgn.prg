@@ -35,6 +35,9 @@ main() {
    x = 0;
    a = -!x++;
    show("x = 1",a);
+   x = 42;
+   show("**&x = ",*&x);
+   show("&(**x) = ",&*x);
 }
 
 /* vim: set ts=3 sw=3 et: */

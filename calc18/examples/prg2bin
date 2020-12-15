@@ -10,6 +10,7 @@ cpp $1.prg | grep -v '^#' >pre.$$
 ../calc18 <pre.$$ >out.$$
 if [ $? -ne 0 ];
 then
+   rm -f out.$$ pre.$$
    exit $?
 fi
 if [ -r "include.sr" ];

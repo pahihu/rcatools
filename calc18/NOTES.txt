@@ -167,3 +167,28 @@ SUB1:   <use LDXA to get inline data>
 c) SCRT (Standard CALL/RET Technique)
    parameter passing: inline after the call, in registers, memory area pointed
    by a register, a reserved area of memory, DF, Q
+
+
+Units
+=====
+- unit numbers: -1 - 10
+- rd.unit wr.unit
+- getchar(), putchar() operates on the above units
+
+-1 SYSTEM output
+ 0 tty input
+ 1 tty output
+
+openr(u,s)
+   empty s is tty, returns 0 on success
+openw(u,s)
+   read/write access, returns 0 on success
+getstr(a)
+   *n replaced by *e, returns a
+putstr(a)
+system(a)
+close(u)
+flush() same as close(wr.unit)
+ioerrors(n)
+   0 - terminate on error, 1 anything goes
+

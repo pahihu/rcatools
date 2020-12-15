@@ -1,6 +1,10 @@
 History
 =======
 
+201215AP printf %d is signed, %o is unsigned
+         allow '.' in names
+         stdlib: strcopy, concat, getarg (stdlib 3313bytes)
+
 201214AP faster <</>>, fixed runtime vector init
          str const converted to printable rep in ASM src
          fixed str const compilation (lost in INT nodes)
@@ -10,3 +14,5 @@ History
          B run-time     ASM   262
          stdlib           B  2212
          memdump+disasm   B  3452
+
+         allow '_' in names
