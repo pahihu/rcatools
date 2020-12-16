@@ -49,7 +49,8 @@
  * 201203AP load Intel Hex fmt
  * 201206AP 64bit MCLK
  * 201208AP wrap-around memadr (MAX_MEM is the limit)
- *          profile
+ *          profiler
+ * 201216AP MCLK cycle simulation @ 2MHz CLK, MCLK = 4us
  *
  */
 
@@ -70,6 +71,8 @@
 #include <ctype.h>
 #include <string.h>
 #include <errno.h>
+#include <unistd.h>
+#include <sys/time.h>
 
 #include "curterm.h"
 
@@ -129,6 +132,7 @@ int noidle = 1; // no IDL processing
 int prof = 0;
 unsigned long *prodat = 0;
 char **regs = cdpregs;
+int cycsim = 0;
 
 #define NFDD   4
 FILE *fdd[NFDD];
@@ -641,13 +645,34 @@ void prinregs()
    printf("\n");
 }
 
+static struct timeval tv0;
+
+unsigned long elapsed(void)
+{
+   struct timeval tv;
+   unsigned long dt;
+
+   gettimeofday(&tv,NULL);
+   dt = (tv.tv_sec - tv0.tv_sec) * 1000000 + (tv.tv_usec - tv0.tv_usec);
+   return dt;
+}
+
 void cycle(void)
 {
+   unsigned long t;
+
    MCLK++;
    if (TLIO && 1 == SEL) {
       timin();
       lprin();
       fddcyc();
+   }
+   if (cycsim) {
+      if (0 == (MCLK & 1023)) {
+         t = elapsed();
+         if (t < MCLK * 4)
+            usleep(MCLK * 4 - t);
+      }
    }
 }
 
@@ -1589,7 +1614,7 @@ void usage(void)
    fprintf(stderr,"   -2         enable TLIO\n");
    fprintf(stderr,"   -4         fig-Forth compat, UART on Grp 1\n");
    fprintf(stderr,"   -bxxxx     disasm/load/start 'begin' address\n");
-   fprintf(stderr,"   -c         calc18 register names\n");
+   fprintf(stderr,"   -c         MCLK cycle simulation\n");
    fprintf(stderr,"   -d         disassemble only\n");
    fprintf(stderr,"   -exxxx     end address\n");
    fprintf(stderr,"   -f<fdd>    use disk file (max. 4)\n");
@@ -1664,8 +1689,9 @@ int main(int argc, char *argv[])
          switch (argv[i][1]) {
          case '2': TLIO = 1; break;
          case '4': GRP_UART = 1; break;
-         case 'd': onlydasm = 1; break;
          case 'b': begin = strtol(argv[i] + 2, &endptr, 16); break;
+         case 'c': cycsim = 1;break;
+         case 'd': onlydasm = 1; break;
          case 'e': end   = strtol(argv[i] + 2, &endptr, 16); break;
          case 'f':
             if (nfdd < 4) {
@@ -1730,6 +1756,8 @@ int main(int argc, char *argv[])
       if (!prodat)
          fprintf(stderr,"not enough memory for profiling!\n");
    }
+
+   gettimeofday(&tv0, NULL);
 
    if (onlydasm) {
       if (!end) end = bytes;
