@@ -1,5 +1,3 @@
-#include "stdlib.prg"
-
 main() {
    auto buf 16, s, n;
 
@@ -27,5 +25,8 @@ loop: ;
 end: puts("bye!*n");
    return;
 }
+
+#define NEED_atoi
+#include "stdlib.prg"
 
 /* vim: set ts=3 sw=3 et: */

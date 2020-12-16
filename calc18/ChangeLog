@@ -5,6 +5,7 @@ History
          constant multiply generator
          stdlib: atoi,strcopy,concat,getarg,printf optional (define NEED_xxx)
          prg2bin uses B18OPTS env var to pass args to beb18
+         WADI optimizes SP
 
 201215AP printf %d is signed, %o is unsigned
          allow '.' in names

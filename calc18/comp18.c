@@ -271,11 +271,23 @@ Lreg0:
 }
 
 Z WADI(char *dst,char *src,int x) {
+   int i;
+
    if (x) {
-      H(" GLO %s ;ADI #%02X ;PLO %s\n",src,LO(x),dst);
-      H(" GHI %s ;ADCI #%02X ;PHI %s\n",src,HI(x),dst);
+      if (!strcmp(dst,"SP") && !strcmp(src,"SP") && x < 7) {
+         H(" ");
+         for (i = 0; i < x; i++) {
+            if (i) H(" ;");
+            H("IRX");
+         }
+         H("\n");
+      }
+      else {
+         H(" GLO %s ;ADI #%02X ;PLO %s\n",src,LO(x),dst);
+         H(" GHI %s ;ADCI #%02X ;PHI %s\n",src,HI(x),dst);
+      }
    }
-   else
+   else if (strcmp(dst,src))
       WMOV(dst,src);
 }
 
@@ -676,18 +688,19 @@ Z gadd(NODE *p) {
 Z glog(NODE *p, char *xop, char *imop) {
    NODE *con;
    char *r, *reg0, *reg1;
+   int x1;
 
    r = "AC";
-   if (CON == p->a[1]->t) {
-      con = p->a[1];
+   if (isimm(p->a[1])) {
+      x1 = p->a[1]->x;
 
       if (isreg(p->a[0]))
          r = reg(p->a[0]);
       else
          ex(p->a[0]);
-      H(" ..%s AC,%s,%04X\n",imop,r,con->x);
-      H(" GLO %s ;%s #%02X ;PLO AC\n", r, imop, LO(con->x));
-      H(" GHI %s ;%s #%02X ;PHI AC\n", r, imop, HI(con->x));
+      H(" ..%s AC,%s,%04X\n",imop,r,x1);
+      H(" GLO %s ;%s #%02X ;PLO AC\n", r, imop, LO(x1));
+      H(" GHI %s ;%s #%02X ;PHI AC\n", r, imop, HI(x1));
    }
    else {
       gbinary(p);
@@ -1913,8 +1926,7 @@ int ex(NODE *p) {
          H(" ..SMI SP,SP,%d\n",offs+1);
          offs++;
          if (offs) {
-            H(" GLO SP ;SMI #%02X; PLO SP\n",LO(offs));
-            H(" GHI SP ;SMBI #%02X; PHI SP\n",HI(offs));
+            WSMI("SP","SP",offs);
          }
          // init vector ptrs
          idlist(INIVPTR,p->a[0],0);
@@ -1985,18 +1997,7 @@ int ex(NODE *p) {
          H(" SEP SCALL,A(L%s)\n",sym);
          argcnt *= 2; // 2byte args
          if (argcnt) {
-            if (argcnt < 7) {
-               H(" ");
-               for (i = 0; i < argcnt; i++) {
-                  if (i) H(" ;");
-                  H("IRX");
-               }
-               H("\n");
-            }
-            else {
-               H(" GLO SP ;ADI #%02X ;PLO SP\n",LO(argcnt));
-               H(" GHI SP ;ADCI #%02X ;PHI SP\n",HI(argcnt));
-            }
+            WADI("SP","SP",argcnt);
          }
          break;
       case FOR:

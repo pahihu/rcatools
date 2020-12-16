@@ -1,4 +1,4 @@
-/* Memory dump or disassembler */
+/* Memory dump and disassembler */
 
 hex(n) {
    putchar(char("0123456789ABCDEF",n&017));
@@ -51,13 +51,13 @@ dump(a,n) {
 
 dasm(p) {
    extrn m, a, ma, aa;
-   auto c0de, arg, nargs, I, N;
+   auto c0de, arg, nargs, N;
    register i, mnemo, args;
 
-   c0de = char(0,p); I = Hi(c0de); N = Lo(c0de);
-/* hex4(p); putchar(' '); hex2(c0de); hex(I); putchar(' '); hex(N); putchar('*n'); */
+   c0de = char(0,p); N = Lo(c0de);
+/* hex4(p); putchar(' '); hex2(c0de); hex(Hi(c0de)); putchar(' '); hex(N); putchar('*n'); */
    args = a;
-   mnemo = m + 2*I;
+   mnemo = m + 2*Hi(c0de);
 /* puts(mnemo); putchar('*n'); */
    if (char(mnemo,1) == ' ') {
       i = htoi(mnemo,10);
@@ -66,9 +66,10 @@ dasm(p) {
       mnemo = ma[i] + 2*N;
 /* puts(mnemo); putchar('*n'); */
    }
-   arg = ('*e' == char(args,1))? char(args,0) : char(args,N);
+   /* arg = ('*e' == char(args,1))? char(args,0) : char(args,N); */
+   arg = char(args,('*e' == char(args,1))? 0 : N) - '0';
    
-   nargs = (arg - '0') & 3;
+   nargs = arg & 3;
    nargs++;
    hex4(p); putchar(' ');
    i = 0;
@@ -81,7 +82,7 @@ dasm(p) {
       putchar(char(mnemo,i++));
    putchar(' ');
 
-   switch (arg - '0') {
+   switch arg {
    case 0:
       goto end;
    case 1:
@@ -92,7 +93,7 @@ dasm(p) {
       goto end;
    case 4:
    case 8:
-      if (arg == '4') N =& 7;
+      if (arg == 4) N =& 7;
       hex(N);
       goto end;
    }

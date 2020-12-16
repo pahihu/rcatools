@@ -1,5 +1,3 @@
-#include "stdlib.prg"
-
 main() {
    auto s, buf 16, n;
 
@@ -8,3 +6,7 @@ main() {
    n = atoi(s, 16);
    printn(n, 10); putchar('*n');
 }
+
+#define NEED_atoi
+#include "stdlib.prg"
+
