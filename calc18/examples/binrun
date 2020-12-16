@@ -1,1 +1,1 @@
-sim18 -2 -4 -rcalc18.reg $1.bin
+sim18 -2 -4 -rcalc18.reg $SIM18OPTS $1.bin

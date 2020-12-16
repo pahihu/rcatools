@@ -1,1 +1,1 @@
-sim18 -2 -4 -rcalc18.reg -h $1.hex
+sim18 -2 -4 -rcalc18.reg $SIM18OPTS -h $1.hex

@@ -1,15 +1,15 @@
 /* Memory dump and disassembler */
 
 hex(n) {
-   putchar(char("0123456789ABCDEF",n&017));
+   putchar(char("0123456789ABCDEF",n));
 }
 
 hex2(n) {
-   hex(n >> 4); hex(n);
+   hex(n >> 4); hex(n & 017);
 }
 
 hex4(n) {
-   hex2(n >> 8); hex2(n);
+   hex2(n >> 8); hex2(n & 0377);
 }
 
 printable(c) {
@@ -30,12 +30,12 @@ dump(a,n) {
 
    i=0; a =>> 1;
    while (i<n) {
-      hex4(2*a); putchar('');
+      hex4(2*a); putchar(' ');
       j=0;
       while (j<8) {
          putchar(' '); hex2(char(a,j++));
       }
-      putchar('  ');
+      putchar('  '); /* 2B */
       j=0;
       while (j++<8)
          putchar(printable(char(a,i++)));
@@ -76,7 +76,7 @@ dasm(p) {
    while (i < nargs)
       hex2(char(0,p+i++));
    while (i++ < 4)
-      putchar('  ');
+      putchar('  '); /* 2B */
    i = 0;
    while (i < 4)
       putchar(char(mnemo,i++));

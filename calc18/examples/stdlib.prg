@@ -10,9 +10,11 @@ putci(c) {
 
 putchar(c) { /* put char to UART */
    extrn putc;
+   register h;
 
    putci(c & 0377);
-   putci(c >> 8);
+   if (h = c >> 8)
+      putci(h);
    return (c);
 }
 
