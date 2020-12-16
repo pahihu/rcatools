@@ -1431,30 +1431,60 @@ int ilog2(int x)
    return -1;
 }
 
+Z gimul(int x,int depth) {
+   if (!x)
+      return;
+   if (x & 1) {
+      gimul(x-1,depth + 1);
+      if (x == 1)
+         WSHL("AUX","AC");
+      else {
+         if (depth)
+            WADDR("AUX","AUX","AC");
+         else
+            WADDR("AC","AUX","AC");
+      }
+      return;
+   }
+   else {
+      gimul(x >> 1,depth + 1);
+      if (x != 2) {
+         if (depth)
+            WSHL("AUX","AUX");
+         else
+            WSHL("AC","AUX");
+      }
+   }
+}
+
 static int gspecmul(NODE *p) {
    NODE *con, r;
-   int i, n;
+   int i, n, x0;
 
-// fprintf(stderr,"before swap\n");
-// prinode(p);
    if (isimm(p->a[1])) {
       con = p->a[0]; p->a[0] = p->a[1]; p->a[1] = con;
    }
-// fprintf(stderr,"after swap\n");
-// prinode(p);
    if (isimm(p->a[0])) {
-      con = p->a[0];
-      i = ilog2(con->x);
-      if (i < 0)
+      x0 = p->a[0]->x;
+      i = ilog2(x0);
+      if (i < 0) {
+         if (!HI(x0)) {
+            ex(p->a[1]); // result in AC
+            H(" ..IMUL #%02X\n",LO(x0));
+            gimul(LO(x0),0);
+            H(" ..IMUL END\n");
+            return 1;
+         }
          return 0;
-      if (i == 0)
+      }
+      if (i == 0) {
+         ex(p->a[1]);
          return 1;
+      }
 
       r = *p;
       r.a[0] = p->a[1];
       r.a[1] = con(i);
-// fprintf(stderr,"before gshl\n");
-// prinode(&r);
       gshl(&r);
       freenod(r.a[1]);
       return 1;
@@ -1464,15 +1494,17 @@ static int gspecmul(NODE *p) {
 
 static int gspecdiv(NODE *p) {
    NODE r, *con; 
-   int i;
+   int i, x1;
 
    if (isimm(p->a[1])) {
-      con = p->a[1];
-      i = ilog2(con->x);
+      x1 = p->a[1]->x;
+      i = ilog2(x1);
       if (i < 0)
          return 0;
-      if (i == 0)
+      if (i == 0) {
+         ex(p->a[0]);
          return 1;
+      }
 
       r = *p;
       r.a[1] = con(i);
@@ -1507,20 +1539,11 @@ static int gspecmod(NODE *p) {
 }
 
 Z gsavma(void) {
-   H(" LDI A.1(SAVMA) ;PHI SUB\n");
-   H(" LDI A.0(SAVMA) ;PLO SUB\n");
-   H(" GLO MA ;STR SUB ;INC SUB\n");
-   H(" GHI MA ;STR SUB\n");
+   WPOP("TMP"); WPUSH("MA"); WPUSH("TMP");
 }
 
 Z grestma(void) {
-   // NB. cannot use AUX
-   H(" LDI A.1(SAVMA) ;PHI SUB\n");
-   H(" LDI A.0(SAVMA) ;PLO SUB\n");
-   H(" LDA SUB ;PLO MA\n");
-   H(" LDN SUB ;PHI MA\n");
-   // restore SUB.1
-   H(" LDI A.1(UMULT) ;PHI SUB\n");
+   WPOP("MA");
 }
 
 Z GLO(char *reg,char *reg1) {

@@ -105,7 +105,7 @@ MACMQ:
 UDIV:
 
  .. r = x; q = 0 (x dividend, y divisor)
- .. X - AC, Y - *SP, Y0 - AUX, R - MQ
+ .. X - AC, Y - *SP, Y0 - AUX, R - MQ, TMP -
 SDM:
  GLO AC ;PLO MQ                 ..R=X
  GHI AC ;PHI MQ
@@ -180,12 +180,6 @@ Lgetc:
  INP 2  ;PLO AC                 ..AC.0=KEY
  LDI #00 ;PHI AC
  SEP SRET
-..
-..  SAVE MA
-..
- ORG*+(* AND 1)
-SAVMA:
- DW  0
 ..
 ..  PROGRAM
 ..

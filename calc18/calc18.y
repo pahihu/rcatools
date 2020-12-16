@@ -260,7 +260,7 @@ void yyerror(char *s) {
 
 void usage(void) {
    fprintf(stderr,"beb18 [-d] [-h] [-v]\n\n");
-   fprintf(stderr,"B18 compiler. input = stdin, output = stdout\n\n");
+   fprintf(stderr,"B compiler for CDP1802. input = stdin, output = stdout\n\n");
    fprintf(stderr,"options:\n");
    fprintf(stderr,"  -d       compiler dbg info\n");
    fprintf(stderr,"  -h       help\n");
