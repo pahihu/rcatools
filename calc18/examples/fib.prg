@@ -12,5 +12,5 @@ main() {
    auto n;
 
    n = fib(24);
-   printn(n, 10); nl();
+   printn(n, 10); putchar('*n');
 }

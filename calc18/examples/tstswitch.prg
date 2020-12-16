@@ -7,7 +7,7 @@ main() {
       puts(" enter a number: ");
       gets(s = &buf[0]);
       n = atoi(s, 10);
-      puts("got "); printn(n, 10); nl();
+      puts("got "); printn(n, 10); putchar('*n');
       if (!n) goto end;
       switch n {
       case 1:

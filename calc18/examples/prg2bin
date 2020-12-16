@@ -7,7 +7,7 @@ then
    exit 1
 fi
 cpp $1.prg | grep -v '^#' >pre.$$
-../beb18 <pre.$$ >out.$$
+../beb18 $B18OPTS <pre.$$ >out.$$
 if [ $? -ne 0 ];
 then
    rm -f out.$$ pre.$$

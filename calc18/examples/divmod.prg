@@ -12,9 +12,9 @@ Loop:
    d = 1;
    while (d < 256) {
       r1 = n / d; r2 = n % d;
-      nl(); putn(n); putn(d); putn(r1); putn(r2);
+      putchar('*n'); putn(n); putn(d); putn(r1); putn(r2);
       d++;
    } 
    if (++n) goto Loop;
-   nl();
+   putchar('*n');
 }

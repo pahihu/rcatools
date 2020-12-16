@@ -1,14 +1,12 @@
-#include "stdlib.prg"
-
 show(msg,n) {
-   puts(msg); putchar(' '); printn(n,10); putchar('*n');
+   printf("%s %d*n",msg,n);
 }
 
 main() {
    extrn v, n;
    auto x, y 2, z;
 
-   printn(n,10); nl();
+   printn(n,10); putchar('*n');
    x = 3;
    y[0] = 2;
    z = 1;
@@ -22,5 +20,8 @@ main() {
 
 v[2] ;
 n 2000 ;
+
+#define NEED_printf
+#include "stdlib.prg"
 
 /* vim: set ts=3 sw=3 et: */

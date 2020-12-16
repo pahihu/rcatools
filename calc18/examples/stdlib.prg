@@ -16,10 +16,6 @@ putchar(c) { /* put char to UART */
    return (c);
 }
 
-nl() {
-   putchar('*n');
-}
-
 getchar() { /* get char from UART */
    extrn getc;
    auto c;
@@ -81,6 +77,7 @@ printn(n,b) { /* print number in base b */
    putchar(char("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ",n%b));
 }
 
+#ifdef NEED_atoi
 isdigit(c) {
    return ('0' <= c && c <= '9');
 }
@@ -108,7 +105,9 @@ atoi(s,b) { /* convert string to number in base b */
    }
    return (n);
 }
+#endif
 
+#ifdef NEED_strcopy
 strcopy(d,s) {
    register i;
 
@@ -117,7 +116,9 @@ strcopy(d,s) {
       i++;
    return(d);
 }
+#endif
 
+#ifdef NEED_concat
 concat(a,x1,x2,x3,x4,x5,x6,x7,x8,x9,x10) { /* terminate w/ zero */
    auto i, adx;
    register c, j, x;
@@ -131,7 +132,9 @@ concat(a,x1,x2,x3,x4,x5,x6,x7,x8,x9,x10) { /* terminate w/ zero */
    lchar(a,j,'*e');
    return (a);
 }
+#endif
 
+#ifdef NEED_getarg
 getarg(a,s,n) {
    register c, i;
 
@@ -144,9 +147,11 @@ getarg(a,s,n) {
    lchar(a,i,'*e');
    return (n);
 }
+#endif
 
 /* Thompson: User's Reference to B */
 
+#ifdef NEED_printf
 printf(fmt, x1,x2,x3,x4,x5,x6,x7,x8,x9) {
    extrn printn, char, putchar;
    auto adx, i;
@@ -186,5 +191,6 @@ loop:
    adx--;
    goto loop;
 }
+#endif
 
 /* vim: set ts=3 sw=3 et: */

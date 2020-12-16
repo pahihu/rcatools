@@ -16,6 +16,15 @@ printable(c) {
    return ((31 < c && c < 128)? c : '.');
 }
 
+htoi(s) {
+   register i, c, n;
+
+   n = i = 0;
+   while ((c = char(s,i++)) != '*e' && c != ' ')
+      n = (n << 4) + c - (c <= '9'? '0' : 'A' - 10);
+   return (n);
+}
+
 dump(a,n) {
    register i, j;
 
@@ -42,42 +51,24 @@ dump(a,n) {
 
 dasm(p) {
    extrn m, a, ma, aa;
-   auto c0de, mnemo, args, arg, hastmp, nargs, I, N;
-   register tmp, i;
+   auto c0de, arg, nargs, I, N;
+   register i, mnemo, args;
 
    c0de = char(0,p); I = Hi(c0de); N = Lo(c0de);
 /* hex4(p); putchar(' '); hex2(c0de); hex(I); putchar(' '); hex(N); putchar('*n'); */
    args = a;
    mnemo = m + 2*I;
-/* puts(mnemo); nl(); */
-   if (isdigit(char(mnemo,0))) {
-      i = atoi(mnemo,10);
-/* puts("change to "); printn(i,10); nl(); */
+/* puts(mnemo); putchar('*n'); */
+   if (char(mnemo,1) == ' ') {
+      i = htoi(mnemo,10);
+/* puts("change to "); printn(i,10); putchar('*n'); */
       args = aa[i];
       mnemo = ma[i] + 2*N;
-/* puts(mnemo); nl(); */
+/* puts(mnemo); putchar('*n'); */
    }
    arg = ('*e' == char(args,1))? char(args,0) : char(args,N);
    
-   nargs = 0; hastmp = 0;
-   switch (arg - '0') {
-   case 0:
-      goto end;
-   case 1:
-      nargs = 1; hastmp = 1;
-      tmp = char(0,p+1);
-      goto end;
-   case 2:
-      nargs = 2; hastmp = 1;
-      tmp = (char(0,p+1) << 8) + char(0,p+2);
-      goto end;
-   case 7:
-   case 8:
-      hastmp = 1; tmp = N;
-      if (arg == '7') tmp =& 7;
-      goto end;
-   }
-end:
+   nargs = (arg - '0') & 3;
    nargs++;
    hex4(p); putchar(' ');
    i = 0;
@@ -88,15 +79,30 @@ end:
    i = 0;
    while (i < 4)
       putchar(char(mnemo,i++));
-   if (hastmp) {
-      putchar(' '); printn(tmp,16);
+   putchar(' ');
+
+   switch (arg - '0') {
+   case 0:
+      goto end;
+   case 1:
+      hex2(char(0,p+1));
+      goto end;
+   case 2:
+      hex4((char(0,p+1) << 8) + char(0,p+2));
+      goto end;
+   case 4:
+   case 8:
+      if (arg == '4') N =& 7;
+      hex(N);
+      goto end;
    }
+end:
    putchar('*n');
    return (nargs);
 }
 
 /* dasm tables */
-m "0   INC DEC 3   LDA STR 6   7   GLO GHI PLO PHI 12  SEP SEX 15  ";
+m "0   INC DEC 3   LDA STR 6   7   GLO GHI PLO PHI C   SEP SEX F   ";
 a "8";
 ma[0]
    "IDL LDN LDN LDN LDN LDN LDN LDN LDN LDN LDN LDN LDN LDN LDN LDN ",
@@ -123,7 +129,7 @@ aa[0]
    "1111111101111111",
    4,
    5,
-   "0777777777777777",
+   "0444444444444444",
    "0000000000001101",
    8,
    9,
@@ -135,18 +141,19 @@ aa[0]
    "0000000011111101";
 
 prompt(msg) {
-   auto s, buf 16;
+   auto buf 16;
+   register s;
 
    puts(msg);
-   gets(s = &buf[0]);
-   return (atoi(s,16));
+   gets(s = buf);
+   return (htoi(s));
 }
 
 main() {
-   auto a, n, i;
+   register a, n, i;
 
-   a = prompt(" address: ");
-   n = prompt(" length: ");
+   a = prompt(" address: $");
+   n = prompt("  length: $");
 
    puts("memory dump:*n");
    dump(a, n);

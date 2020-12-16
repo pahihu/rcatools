@@ -1,7 +1,8 @@
+#define NEED_printf
 #include "stdlib.prg"
 
 show(msg,n) {
-   puts(msg); putchar(' '); printn(n,10); nl();
+   printf("%s %d*n",msg,n);
 }
 
 main() {
