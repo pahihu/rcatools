@@ -380,7 +380,7 @@ int skipcmd(Byte data)
 
 void fddctrl(Byte data)
 {
-   size_t s;
+   int s;
    int sent;
 
 //   if (!skipcmd(data))

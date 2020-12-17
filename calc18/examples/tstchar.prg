@@ -1,5 +1,3 @@
-#include "stdlib.prg"
-
 myoct(msg,n) {
    printf("%s @ %o*n",msg,n);
 }
@@ -24,7 +22,9 @@ upper(s) {
 
 main() {
    extrn a, b, s, rd.unit;
-   auto s1 8, s2 8, bigs 16, a1 8, a2 8, a3 8, n;
+   auto s1 8, s2 8, bigs 16;
+   auto a1 8, a2 8, a3 8;
+   auto n;
 
    puts("hello, world!*n");
    putchar(a); putchar(b);
@@ -62,5 +62,11 @@ a 'hi' ;
 b '!*n' ;
 s[2] "hello, ", "world!*n";
 rd.unit 0;
+
+#define NEED_strcopy
+#define NEED_concat
+#define NEED_getarg
+#define NEED_printf
+#include "stdlib.prg"
 
 /* vim: set ts=3 sw=3 et: */

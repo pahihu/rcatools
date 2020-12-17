@@ -74,6 +74,32 @@ par     GLO FP ;ADD #ARG ;PLO VARPTR            ..MAX 256BYTES  5,7,...
 auto    GLO FP ; SMI #AUT.0 ;PLO VARPTR         ..1,3,5...
         GHI FP ; SMBI #AUT.1 ;PHI VARPTR
 
+Argument passing in registers
+=============================
+
+        ..NARGS=1
+        ..EXPR
+        PUSH ARG1
+        MOV ARG1,AC
+        SEP SCALL,A(subr)
+        POP ARG1
+
+        ..NARGS2=2
+        ..EXPR2
+        PUSH AC
+        ..EXPR1
+        ..AC=EXPR1,*SP=EXPR2
+        POP  AUX
+        PUSH ARG2
+        MOV  ARG2,AUX
+        PUSH ARG1
+        MOV  ARG1,AC
+        SEP  SCALL,A(SUBR)
+        POP ARG1
+        POP ARG2
+        ..ADJUST SP IF MORE THAN 2 ARGS
+
+
 switch / case (numeric case)
 ============================
 

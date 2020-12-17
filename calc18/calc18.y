@@ -276,6 +276,7 @@ int main(int argc, char*argv[]) {
          switch (argv[i][1]) {
          case 'd': dbg = 1; break;
          case 'h': usage();
+         case 'r': regpar = 1; break;
          case 'v': varstat = 1; break;
          }
    }

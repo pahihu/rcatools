@@ -1,6 +1,9 @@
 History
 =======
 
+201217AP multiple auto def lines
+         parameter passing in registers (slow...)
+
 201216AP fixed nesting of assignment operators =% =/ =* (MA saved now on stack)
          constant multiply generator
          stdlib: atoi,strcopy,concat,getarg,printf optional (define NEED_xxx)

@@ -34,6 +34,7 @@ int Err = 0;
 char *fn;
 int lowreg; // lowest regvar
 int nregvars; // no.of regvars
+int regpar = 0; // no params in registers
 int ex(NODE *p);
 Z glvaluvar(NODE *p, int regena, int pushma);
 Z WPOP(char *reg);
@@ -51,6 +52,11 @@ typedef struct {
 int nswitches;
 swdesc switches[MAX_SWITCHES];
 int currsw = -1;
+#define MAXAUTOS 8
+int nautos = 0;
+NODE *autos[MAXAUTOS];
+int autooffs = -1; // next AUTO offset
+int lastoprx = -1; // last OPR type
 
 static int lbl = 0; // label generator
 
@@ -201,6 +207,10 @@ static int isrelop(NODE *p) {
    return OPR == p->t &&
       (x == EQ || x == NE || x == '<' || x == '>' || x == LE || x == GE ||
        x == '!');
+}
+
+static int isdef(int x) {
+   return (x == EXTDEF || x == AUTODEF || x == REGDEF);
 }
 
 Z garith(char *dst,NODE *arg0,NODE *arg1,
@@ -1305,7 +1315,11 @@ static int idlist(int t,NODE *p, int offs) {
       assert(isvar(q));
       newoffs += 2;
       // fprintf(stderr,"defpar%d: %s\n",offs,getsym(n));
-      defcls(n, C_PARAM, newoffs);
+      if (regpar && newoffs < 9) {
+         defcls(n, C_REG, --lowreg);
+      }
+      else
+         defcls(n, C_PARAM, newoffs);
       break;
    case EXTDEF:
       assert(isvar(q));
@@ -1386,7 +1400,16 @@ static int revidlist(int t,NODE *p, int offs) {
    defcls(n, C_PARAM, offs);
    return revidlist(t,p->a[0],2+offs);
 }
-static int exprlist(NODE *p, int offs) {
+
+Z gpusharg2(int nargs) {
+   if (nargs > 1) {
+      WPOP("AUX");
+      WPUSH("REG2");
+      WMOV("REG2","AUX");
+   }
+}
+
+static int exprlist(NODE *p, int offs, int nargs) {
    int n, x1;
    NODE *q;
    char *s1;
@@ -1395,31 +1418,81 @@ static int exprlist(NODE *p, int offs) {
       return offs;
 
    assert(OPR == p->t && XLST == p->x);
-   H(" ..PUSH ARG%d\n",++offs);
-   if (isvar(p->a[1])) /* push in reverse order */
-      gpushvar(p->a[1]);
-   else if (isimm(p->a[1])) {
-      x1 = p->a[1]->x;
-      H(" ..PUSH #%02X%02X\n",HI(x1),LO(x1));
-      if (x1) {
-         H(" LDI #%02X ;STXD\n",HI(x1));
-         H(" LDI #%02X ;STXD\n",LO(x1));
+   H(" ..PUSH ARG%d\n",nargs - offs++);
+   if (isvar(p->a[1])) { /* push in reverse order */
+      if (regpar && (nargs == offs)) {
+         glvaluvar(p->a[1],1,0);
+         if (isreg(p->a[1])) {
+            gpusharg2(nargs);
+            WPUSH("REG1");
+            WMOV("REG1",reg(p->a[1]));
+         }
+         else {
+            gpusharg2(nargs);
+            WPUSH("REG1");
+            H(" LDA MA ;PLO REG1\n");
+            H(" LDN MA ;PHI REG1\n");
+         }
       }
       else
-         H(" LDI #00 ;STXD ;STXD\n");
+         gpushvar(p->a[1]);
+   }
+   else if (isimm(p->a[1])) {
+      x1 = p->a[1]->x;
+      if (regpar && (nargs == offs)) {
+         gpusharg2(nargs);
+         WPUSH("REG1");
+         WLDI("REG1",x1);
+      }
+      else {
+         H(" ..PUSH #%02X%02X\n",HI(x1),LO(x1));
+         if (x1) {
+            H(" LDI #%02X ;STXD\n",HI(x1));
+            H(" LDI #%02X ;STXD\n",LO(x1));
+         }
+         else
+            H(" LDI #00 ;STXD ;STXD\n");
+      }
    }
    else if (isstr(p->a[1])) {
       s1 = p->a[1]->s;
       x1 = p->a[1]->x;
-      H(" ..PUSH STR %s [%d]\n",printable(s1),x1 = p->a[1]->x = lbl++);
-      H(" LDI A.1(L%d SHR 1) ;STXD\n",x1);
-      H(" LDI A.0(L%d SHR 1) ;STXD\n",x1);
+      if (regpar && (nargs == offs)) {
+         gpusharg2(nargs);
+         WPUSH("REG1");
+         H(" ..REG1=STR %s [%d]\n",printable(s1),x1 = p->a[1]->x = lbl++);
+         H(" LDI A.1(L%d SHR 1) ;PHI REG1\n",x1);
+         H(" LDI A.0(L%d SHR 1) ;PLO REG1\n",x1);
+      }
+      else {
+         H(" ..PUSH STR %s [%d]\n",printable(s1),x1 = p->a[1]->x = lbl++);
+         H(" LDI A.1(L%d SHR 1) ;STXD\n",x1);
+         H(" LDI A.0(L%d SHR 1) ;STXD\n",x1);
+      }
    }
    else {
       ex(p->a[1]);
-      WPUSH("AC");
+      if (regpar && (nargs == offs)) {
+         gpusharg2(nargs);
+         WPUSH("REG1");
+         WMOV("REG1","AC");
+      }
+      else
+         WPUSH("AC");
    }
-   return exprlist(p->a[0],offs);
+   return exprlist(p->a[0],offs,nargs);
+}
+
+static int len(NODE *p, int t) {
+   int n, x1;
+   NODE *q;
+   char *s1;
+
+   if (!p)
+      return 0;
+
+   assert(OPR == p->t && t == p->x);
+   return len(p->a[0], t) + 1;
 }
 
 Z galign(void) {
@@ -1878,6 +1951,18 @@ int ex(NODE *p) {
       break;
    case ID: glvalu(p, 1); gldvar(p); break;
    case OPR:
+      if (!isdef(p->x) && isdef(lastoprx)) {
+         // def inits
+         H(" ..AUTO OFFSET %d\n",autooffs);
+         H(" ..SMI SP,SP,%d\n",autooffs+1);
+         if (autooffs + 1) {
+            WSMI("SP","SP",autooffs + 1);
+         }
+         // init vector ptrs
+         for (i = 0; i < nautos; i++)
+            idlist(INIVPTR,autos[i],0);
+      }
+      lastoprx = p->x;
       switch (p->x) {
       case VARDEF:
          sym = getsym(p->a[0]->x);
@@ -1917,21 +2002,26 @@ int ex(NODE *p) {
          idlist(EXTDEF, p->a[0], 0);
          break;
       case AUTODEF:
-         if (0x0F != lowreg) {
-            fprintf(stderr,"auto vars after register vars\n");
+Lautodef:
+         if (!regpar) {
+            if (0x0F != lowreg) {
+               fprintf(stderr,"auto vars after register vars\n");
+               Err = 1;
+            }
+         }
+         autooffs = idlist(AUTODEF, p->a[0], autooffs);
+         if (MAXAUTOS == nautos) {
+            fprintf(stderr,"too much auto defs (max 8)\n");
             Err = 1;
          }
-         offs = idlist(AUTODEF, p->a[0], -1);
-         H(" ..AUTO SIZE %d\n",offs);
-         H(" ..SMI SP,SP,%d\n",offs+1);
-         offs++;
-         if (offs) {
-            WSMI("SP","SP",offs);
+         else {
+            autos[nautos++] = p->a[0];
          }
-         // init vector ptrs
-         idlist(INIVPTR,p->a[0],0);
          break;
       case REGDEF:
+         // register is auto, when parameter passing in registers
+         if (regpar)
+            goto Lautodef;
          lowreg = idlist(REGDEF, p->a[0], 0x0F);
          H(" ..#REG VARS %d\n", 0x0F - lowreg);
          for (i = lowreg; i < 0x0F; i++)
@@ -1968,6 +2058,7 @@ int ex(NODE *p) {
             fprintf(stderr,"FN %s\n",sym);
          H(" ..FN %s\n",fn = sym);
          lowreg = 0x0F; nswitches = 0; currsw = -1;
+         lastoprx = -1; autooffs = -1; nautos = 0;
          galign();
          H("L%s:\n",sym);
          WPUSH("FP");
@@ -1976,8 +2067,10 @@ int ex(NODE *p) {
          ex(q->a[0]); // ID list
          ex(q->a[1]); // stmt
          H("E%s:\n",sym); // fn epilogue
-         for(i = 0x0F; i > lowreg; i--)
-            WPOP(regnm(i-1));
+         if (!regpar) {
+            for(i = 0x0F; i > lowreg; i--)
+               WPOP(regnm(i-1));
+         }
          WMOV("SP", "FP");
          WPOP("FP");
          H(" SEP SRET\n");
@@ -1986,7 +2079,8 @@ int ex(NODE *p) {
          fn = NULL;
          break;
       case XLST: // expr list
-         argcnt = exprlist(p, 0);
+         argcnt = len(p, XLST);
+         exprlist(p, 0, argcnt);
          break;
       case FUNCALL:
          sym = getsym(p->a[0]->x);
@@ -1995,6 +2089,14 @@ int ex(NODE *p) {
          argcnt = ex(p->a[1]); // push args
          H(" ..CALL %s\n",sym);
          H(" SEP SCALL,A(L%s)\n",sym);
+         if (regpar) {
+            if (argcnt) {
+               WPOP("REG1"); argcnt--;
+               if (argcnt) {
+                  WPOP("REG2"); argcnt--;
+               }
+            }
+         }
          argcnt *= 2; // 2byte args
          if (argcnt) {
             WADI("SP","SP",argcnt);
