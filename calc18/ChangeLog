@@ -3,6 +3,10 @@ History
 
 201217AP multiple auto def lines
          parameter passing in registers (slow...), fixing bugs
+         faster logical operators
+         run-time: AUT8/PAR8 loading auto/param addresses,
+                   SUBENT, SUBRET subroutine entry/exit 
+                   activate with -Os
 
 201216AP fixed nesting of assignment operators =% =/ =* (MA saved now on stack)
          constant multiply generator

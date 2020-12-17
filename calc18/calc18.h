@@ -26,6 +26,7 @@ typedef struct _NODE {
 #define C_PARAM   4
 #define C_REG     5
 
+int defsym(char *s);
 void defcls(int n, int cls, int offs);
 char *getsym(int n);
 int getoffs(int n);
@@ -35,6 +36,7 @@ void dropsyms(void);
 extern char *fn; // current fn
 extern int Err;
 extern int dbg, varstat, regpar;
+extern int opttime;
 
 NODE *nod(int typ, int n, char *s, NODE *arg0, NODE *arg1);
 void freenod(NODE*);

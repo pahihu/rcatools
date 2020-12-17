@@ -15,7 +15,6 @@ struct {
 } syms[MAXSYM];
 
 int findsym(char*);
-int defsym(char*);
 int findid(char*);
 
 #define MAX_STR   128
@@ -90,6 +89,7 @@ int dbg = 0;
                      appendc(*yptr++);
                 }
 
+"\.\.\."        return DOTS;
 ">="            return GE;
 "<="            return LE;
 "=="            return EQ;

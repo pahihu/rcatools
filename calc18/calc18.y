@@ -50,7 +50,7 @@ void yyerror(char*);
 };
 
 %token <con> CONST
-%token <sym> VAR
+%token <sym> VAR DOTS
 %token <str> STRING
 %token WHILE IF FOR INC DEC GOTO RETURN EXTRN AUTO REGISTER FUNCALL PREINC PREDEC POSTINC POSTDEC ILST XLST FUNDEF VARDEF VECDEF EXTDEF AUTODEF REGDEF SWITCH CASE INIVPTR
 %nonassoc IFX
@@ -102,6 +102,7 @@ id:
         | VAR CONST             { $$ = id($1); $$->a[0] = con(2*$2); }
         | CONST                 { $$ = con($1); $$->a[0] = con($1); }
         | STRING                { $$ = str($1); }
+        | DOTS                  { $$ = id(0); }
         ;
 
 simplestmt:                     { $$ = opr(';', NULL, NULL); }
@@ -264,6 +265,7 @@ void usage(void) {
    fprintf(stderr,"options:\n");
    fprintf(stderr,"  -d       compiler dbg info\n");
    fprintf(stderr,"  -h       help\n");
+   fprintf(stderr,"  -O[s|t]  'optimize' for space or time\n");
    fprintf(stderr,"  -v       variable access stats\n");
    exit(1);
 }
@@ -271,10 +273,14 @@ void usage(void) {
 int main(int argc, char*argv[]) {
    int i;
 
+   opttime = 1;
+   defsym("...");
    for (i = 1; i < argc; i++) {
       if ('-' == *argv[i])
          switch (argv[i][1]) {
          case 'd': dbg = 1; break;
+         case 'O': if ('s' == argv[i][2]) opttime = 0;
+                   break;
          case 'h': usage();
          case 'r': regpar = 1; break;
          case 'v': varstat = 1; break;

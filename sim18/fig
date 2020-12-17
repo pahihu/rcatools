@@ -1,6 +1,7 @@
 sim18   -2 \
         -b8000 ut20p_1.bin \
         -b8400 ut20p_2.bin \
+        $SIM18OPTS \
         -4 \
         -rfig.reg \
         -ffforth.img \
