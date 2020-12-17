@@ -2,7 +2,9 @@ main() {
    auto a, b;
    auto c, d;
    register e, f;
+   auto s 8;
 
+   gets(s); puts(s); putchar('*n'); return;
    a = 2; b = 3; c = 4; d = 5;
    e = 6; f = 7;
    puts("a ** b = "); printn(a*b,10); putchar('*n');

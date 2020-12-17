@@ -57,6 +57,10 @@ int nautos = 0;
 NODE *autos[MAXAUTOS];
 int autooffs = -1; // next AUTO offset
 int lastoprx = -1; // last OPR type
+int nparams = 0; // no.of params
+int needfp = 1; // need FP
+int funhd = 0; // fn header
+
 
 static int lbl = 0; // label generator
 
@@ -1951,16 +1955,22 @@ int ex(NODE *p) {
       break;
    case ID: glvalu(p, 1); gldvar(p); break;
    case OPR:
-      if (!isdef(p->x) && isdef(lastoprx)) {
+      if (!isdef(p->x) && (isdef(lastoprx) || funhd)) {
          // def inits
-         H(" ..AUTO OFFSET %d\n",autooffs);
-         H(" ..SMI SP,SP,%d\n",autooffs+1);
-         if (autooffs + 1) {
-            WSMI("SP","SP",autooffs + 1);
+         if (regpar)
+            needfp = nparams > 2 || (autooffs + 1);
+         if (needfp) {
+            WPUSH("FP");
+            WMOV("FP","SP");
+            H(" ..AUTO OFFSET %d\n",autooffs);
+            H(" ..SMI SP,SP,%d\n",autooffs+1);
+            if (autooffs + 1)
+               WSMI("SP","SP",autooffs + 1);
+            // init vector ptrs
+            for (i = 0; i < nautos; i++)
+               idlist(INIVPTR,autos[i],0);
          }
-         // init vector ptrs
-         for (i = 0; i < nautos; i++)
-            idlist(INIVPTR,autos[i],0);
+         funhd = 0;
       }
       lastoprx = p->x;
       switch (p->x) {
@@ -2059,20 +2069,25 @@ Lautodef:
          H(" ..FN %s\n",fn = sym);
          lowreg = 0x0F; nswitches = 0; currsw = -1;
          lastoprx = -1; autooffs = -1; nautos = 0;
+         nparams = 0; needfp = 1;
          galign();
          H("L%s:\n",sym);
-         WPUSH("FP");
-         WMOV("FP", "SP");
+         // WPUSH("FP");
+         // WMOV("FP", "SP");
          q = p->a[1];
+         nparams = len(q->a[0],ILST);
          ex(q->a[0]); // ID list
+         funhd = 1;
          ex(q->a[1]); // stmt
          H("E%s:\n",sym); // fn epilogue
          if (!regpar) {
             for(i = 0x0F; i > lowreg; i--)
                WPOP(regnm(i-1));
          }
-         WMOV("SP", "FP");
-         WPOP("FP");
+         if (needfp) {
+            WMOV("SP", "FP");
+            WPOP("FP");
+         }
          H(" SEP SRET\n");
          swdef();
          dropsyms();

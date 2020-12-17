@@ -2,7 +2,7 @@ History
 =======
 
 201217AP multiple auto def lines
-         parameter passing in registers (slow...)
+         parameter passing in registers (slow...), fixing bugs
 
 201216AP fixed nesting of assignment operators =% =/ =* (MA saved now on stack)
          constant multiply generator
