@@ -629,8 +629,12 @@ Z glvaluvar(NODE *p) {
 
 Z gindex(NODE *p) {
    gbinary(p);
-   WADD(MA,AC);
-   WSHL(MA,MA);
+   if (!opttime)
+      H(" LDI A.0(IDX) ;PLO SUB ;SEP SUB\n");
+   else {
+      WADD(MA,AC);
+      WSHL(MA,MA);
+   }
 }
 
 
