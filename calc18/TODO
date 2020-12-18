@@ -1,0 +1,21 @@
+Limitations
+===========
+- unsigned arithmetic
+- << and >> shifts with (shift amount % 256)
+- relational and logical operators return -1
+- operator evaluation order is undefined
+- function argument expression evaluation is right to left
+- no function pointers
+
+
+TODO
+====
+? n << 8 is {LO(n),0}
+? n >> 8 is {0,HI(n)}
+
+- simplify code generator
+- gdtoac() 1 instead of -1 ?
+- fix operator evaluation order as arg0 op arg1
+  1st evaluate arg0 then arg1
+- n & 0377 is {0,LO(n)}
+- n & 0177400 is {HI(n),0}
