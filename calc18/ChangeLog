@@ -1,6 +1,9 @@
 History
 =======
 
+201218AP simplified code generator, special cases removed
+         only trivial optimizations: x+1,x-1,x*2,x/2,x+i,x-i,x log i,x cmp i
+
 201217AP multiple auto def lines
          parameter passing in registers (slow...), fixing bugs
          faster logical operators
