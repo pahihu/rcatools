@@ -1,6 +1,9 @@
 History
 =======
 
+201219AP relops return 0/1
+         reworked conditional codegen, work in-progress
+
 201218AP simplified code generator, special cases removed
          only trivial optimizations: x+1,x-1,x*2,x/2,x+i,x-i,x log i,x cmp i
          runtime: IDX, array indexing

@@ -5,6 +5,8 @@
 #define ID  1
 #define OPR 2
 #define STR 3
+#define COND 4
+#define SKIP 5
 
 typedef struct _NODE {
    int t;               // type: CON, ID, OPR, STR
