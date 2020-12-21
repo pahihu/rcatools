@@ -51,8 +51,10 @@
  * 201208AP wrap-around memadr (MAX_MEM is the limit)
  *          profiler
  * 201216AP MCLK cycle simulation @ 2MHz CLK, MCLK = 4us
+ * 201220AP RTC/NVR uses nvr.ram file
  *
  */
+
 
 // TIM
 //    'OUT7' 67 STROBE OUT
@@ -158,6 +160,44 @@ static int digit(int c)
    return 10 + c - 'A';
 }
 
+// DS12885 RTC/NVR
+#define RTC_SECONDS  0x00
+#define RTC_MINUTES  0x02
+#define RTC_HOURS    0x04
+#define RTC_DOW      0x06
+#define RTC_DATE     0x07
+#define RTC_MONTH    0x08
+#define RTC_YEAR     0x09
+
+static time_t rtc = 0;
+Byte rtcregs[128];
+Byte rtcbase = 0x00;
+
+Byte rtcrd(int offs) {
+   time_t t;
+   struct tm *lt;
+
+   if (rtc != time(&t)) {
+      rtc = t;
+      lt = localtime(&rtc);
+      rtcregs[RTC_SECONDS] = lt->tm_sec;
+      rtcregs[RTC_MINUTES] = lt->tm_min;
+      rtcregs[RTC_HOURS]   = lt->tm_hour;
+      rtcregs[RTC_DOW]     = lt->tm_wday + 1;
+      rtcregs[RTC_DATE]    = lt->tm_mday;
+      rtcregs[RTC_MONTH]   = lt->tm_mon + 1;
+      rtcregs[RTC_YEAR]    = lt->tm_year - 100;
+   }
+   offs &= 127;
+   return rtcregs[offs & 127];
+}
+
+void rtcwr(int offs, Byte data) {
+   offs &= 127;
+   if (offs > 0x0D)
+      rtcregs[offs] = data;
+}
+
 static int memaddr; // last memory address
 
 Byte memrd(int addr)
@@ -170,6 +210,9 @@ Byte memrd(int addr)
    }
    else
       memaddr = addr & (MAX_MEM-1);
+
+   if (rtcbase && rtcbase == HI(memaddr))
+      return rtcrd(LO(memaddr));
    return M[memaddr];
 }
 
@@ -183,6 +226,11 @@ Byte memwr(int addr, Byte data)
    }
    else
       addr &= MAX_MEM-1;
+
+   if (rtcbase && rtcbase == HI(addr)) {
+      rtcwr(LO(addr),data);
+      return data;
+   }
    M[addr] = data;
    return data;
 }
@@ -1570,6 +1618,26 @@ int readidi(char *fn, int offs)
    return bytes;
 }
 
+void readnvr(void)
+{
+   FILE *fin;
+   
+   fin = fopen("nvr.ram","r");
+   if (fin) {
+      fread(rtcregs,sizeof(Byte),128,fin);
+      fclose(fin);
+   }
+}
+
+void writenvr(void)
+{
+   FILE *fout;
+   
+   fout = fopen("nvr.ram","w");
+   fwrite(rtcregs,sizeof(Byte),128,fout);
+   fclose(fout);
+}
+
 void fini(void)
 {
    int i;
@@ -1593,6 +1661,8 @@ void fini(void)
    for (i = 0; i < NFDD; i++)
       if (fdd[i])
          fclose(fdd[i]);
+   if (rtcbase)
+      writenvr();
 }
 
 void storage(void)
@@ -1609,7 +1679,7 @@ void storage(void)
 
 void usage(void)
 {
-   fprintf(stderr,"usage: sim18 [-24ilmprutx] [-bxxxx] [-d -exxxx] [-f<fdd.img>] -s<kbytes> <file>...\n");
+   fprintf(stderr,"usage: sim18 [-24ilmnprutx] [-bxxxx] [-d -exxxx] [-f<fdd.img>] -s<kbytes> <file>...\n");
    fprintf(stderr,"options:\n");
    fprintf(stderr,"   -2         enable TLIO\n");
    fprintf(stderr,"   -4         fig-Forth compat, UART on Grp 1\n");
@@ -1621,6 +1691,7 @@ void usage(void)
    fprintf(stderr,"   -h         set Intel Hex fmt\n");
    fprintf(stderr,"   -i         enable IDL processing\n");
    fprintf(stderr,"   -m         set M-rec fmt\n");
+   fprintf(stderr,"   -nxx       RTC/NVR page, uses file nvr.ram\n");
    fprintf(stderr,"   -l<file>   lpr file name, default \"lpr.out\"\n");
    fprintf(stderr,"   -p         profiling (data in profile.out)\n");
    fprintf(stderr,"   -r<regdef> read register names from <regdef>\n");
@@ -1670,6 +1741,7 @@ int main(int argc, char *argv[])
    noidle = 1;
    readdat = readbin;
    MAX_MEM = 64 * 1024;
+   rtcbase = 0x00;
 
    nfdd = 0;
    for (i = 0; i < 4; i++) {
@@ -1714,6 +1786,9 @@ int main(int argc, char *argv[])
          case 'i': noidle = 0; break;
          case 'l': strcpy(lprnm, argv[i]+2); break;
          case 'm': readdat = readidi; break;
+         case 'n': rtcbase = strtol(argv[i] + 2, &endptr, 16);
+                   readnvr();
+                   break;
          case 'p': prof = 1; break;
          case 'r': if (readregs(argv[i]+2))
                       fprintf(stderr,"no reg defs %s",argv[i]+2);

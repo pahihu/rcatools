@@ -37,9 +37,9 @@ dump(a,n) {
       }
       putchar('  '); /* 2B */
       j=0;
-      while (j++<8)
-         putchar(printable(char(a,i++)));
-      a =+ 4;
+      while (j<8)
+         putchar(printable(char(a,j++)));
+      a =+ 4; i =+ 8;
       putchar('*n');
    }
 }

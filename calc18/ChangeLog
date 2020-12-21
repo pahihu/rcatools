@@ -1,6 +1,9 @@
 History
 =======
 
+201220AP fixed gcondexpr, conditional expressions seems to be working
+         runtime: SUBRET integrates SEP SRET, added assignment
+
 201219AP relops return 0/1
          reworked conditional codegen, work in-progress
 

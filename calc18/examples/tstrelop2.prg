@@ -3,7 +3,9 @@ test00() {
 
    a = 1; b = 1; c = 1; d = 1; e = 1; f = 1; g = 1; h = 1;
    if (((a < b) || (c < d)) && ((e < f) || (g < h)))
-      puts("test00*n");
+      puts("fail00*n");
+   else
+      puts("pass00*n");
 }
 
 test01() {
@@ -11,7 +13,9 @@ test01() {
 
    a = 1; b = 1; c = 1; d = 1; e = 1; f = 1; g = 1; h = 2;
    if (((a < b) || (c < d)) && ((e < f) || (g < h)))
-      puts("test01*n");
+      puts("fail01*n");
+   else
+      puts("pass01*n");
 }
 
 test02() {
@@ -19,7 +23,9 @@ test02() {
 
    a = 1; b = 1; c = 1; d = 1; e = 1; f = 2; g = 1; h = 1;
    if (((a < b) || (c < d)) && ((e < f) || (g < h)))
-      puts("test02*n");
+      puts("fail02*n");
+   else
+      puts("pass02*n");
 }
 
 test03() {
@@ -27,7 +33,9 @@ test03() {
 
    a = 1; b = 1; c = 1; d = 1; e = 1; f = 2; g = 1; h = 2;
    if (((a < b) || (c < d)) && ((e < f) || (g < h)))
-      puts("test03*n");
+      puts("fail03*n");
+   else
+      puts("pass03*n");
 }
 
 test04() {
@@ -35,7 +43,9 @@ test04() {
 
    a = 1; b = 1; c = 1; d = 2; e = 1; f = 1; g = 1; h = 1;
    if (((a < b) || (c < d)) && ((e < f) || (g < h)))
-      puts("test04*n");
+      puts("fail04*n");
+   else
+      puts("pass04*n");
 }
 
 test05() {
@@ -43,7 +53,9 @@ test05() {
 
    a = 1; b = 1; c = 1; d = 2; e = 1; f = 1; g = 1; h = 2;
    if (((a < b) || (c < d)) && ((e < f) || (g < h)))
-      puts("test05*n");
+      puts("pass05*n");
+   else
+      puts("fail05*n");
 }
 
 test06() {
@@ -51,7 +63,9 @@ test06() {
 
    a = 1; b = 1; c = 1; d = 2; e = 1; f = 2; g = 1; h = 1;
    if (((a < b) || (c < d)) && ((e < f) || (g < h)))
-      puts("test06*n");
+      puts("pass06*n");
+   else
+      puts("fail06*n");
 }
 
 test07() {
@@ -59,7 +73,9 @@ test07() {
 
    a = 1; b = 1; c = 1; d = 2; e = 1; f = 2; g = 1; h = 2;
    if (((a < b) || (c < d)) && ((e < f) || (g < h)))
-      puts("test07*n");
+      puts("pass07*n");
+   else
+      puts("fail07*n");
 }
 
 test08() {
@@ -67,7 +83,9 @@ test08() {
 
    a = 1; b = 2; c = 1; d = 1; e = 1; f = 1; g = 1; h = 1;
    if (((a < b) || (c < d)) && ((e < f) || (g < h)))
-      puts("test08*n");
+      puts("fail08*n");
+   else
+      puts("pass08*n");
 }
 
 test09() {
@@ -75,7 +93,9 @@ test09() {
 
    a = 1; b = 2; c = 1; d = 1; e = 1; f = 1; g = 1; h = 2;
    if (((a < b) || (c < d)) && ((e < f) || (g < h)))
-      puts("test09*n");
+      puts("pass09*n");
+   else
+      puts("fail09*n");
 }
 
 test10() {
@@ -83,7 +103,9 @@ test10() {
 
    a = 1; b = 2; c = 1; d = 1; e = 1; f = 2; g = 1; h = 1;
    if (((a < b) || (c < d)) && ((e < f) || (g < h)))
-      puts("test10*n");
+      puts("pass10*n");
+   else
+      puts("fail10*n");
 }
 
 test11() {
@@ -91,7 +113,9 @@ test11() {
 
    a = 1; b = 2; c = 1; d = 1; e = 1; f = 2; g = 1; h = 2;
    if (((a < b) || (c < d)) && ((e < f) || (g < h)))
-      puts("test11*n");
+      puts("pass11*n");
+   else
+      puts("fail11*n");
 }
 
 test12() {
@@ -99,7 +123,9 @@ test12() {
 
    a = 1; b = 2; c = 1; d = 2; e = 1; f = 1; g = 1; h = 1;
    if (((a < b) || (c < d)) && ((e < f) || (g < h)))
-      puts("test12*n");
+      puts("fail12*n");
+   else
+      puts("pass12*n");
 }
 
 test13() {
@@ -107,7 +133,9 @@ test13() {
 
    a = 1; b = 2; c = 1; d = 2; e = 1; f = 1; g = 1; h = 2;
    if (((a < b) || (c < d)) && ((e < f) || (g < h)))
-      puts("test13*n");
+      puts("pass13*n");
+   else
+      puts("fail13*n");
 }
 
 test14() {
@@ -115,7 +143,9 @@ test14() {
 
    a = 1; b = 2; c = 1; d = 2; e = 1; f = 2; g = 1; h = 1;
    if (((a < b) || (c < d)) && ((e < f) || (g < h)))
-      puts("test14*n");
+      puts("pass14*n");
+   else
+      puts("fail14*n");
 }
 
 test15() {
@@ -123,7 +153,9 @@ test15() {
 
    a = 1; b = 2; c = 1; d = 2; e = 1; f = 2; g = 1; h = 2;
    if (((a < b) || (c < d)) && ((e < f) || (g < h)))
-      puts("test15*n");
+      puts("pass15*n");
+   else
+      puts("fail15*n");
 }
 
 main() {

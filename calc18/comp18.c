@@ -981,6 +981,15 @@ Z gand(NODE *p) { glog(p, "AND", "ANI"); }
 Z gxor(NODE *p) { glog(p, "XOR", "XRI"); }
 Z gor(NODE *p)  { glog(p, "OR", "ORI");  }
 
+Z WSTRMA(void) {
+   if (opttime) {
+      WPOP(MA);
+      WSTR(MA,AC);
+   }
+   else
+      H(" LDI A.0(ASGN) ;PLO SUB ;SEP SUB\n");
+}
+
 Z gasgnop(NODE *p) {
    glvalu(p->a[0]);
    WPUSH(MA);
@@ -1009,16 +1018,14 @@ Z gasgnop(NODE *p) {
    }
 
    // AC - result, stack lvalu addr
-   WPOP(MA);
-   WSTR(MA,AC);
+   WSTRMA();
 }
 
 Z gasgn(NODE *p) {
    glvalu(p->a[0]); // MA is the addr
    WPUSH(MA);
    load(p->a[1]);
-   WPOP(MA);
-   WSTR(MA,AC);
+   WSTRMA();
 }
 
 Z glnot(NODE *p) {
@@ -1111,10 +1118,10 @@ Z gcondexpr(NODE *p) {
    else
       BEQ(AC,Fbranch,Tbranch);
    H("L%d:\n",Tbranch);
-   ex(q->a[0]);
+   load(q->a[0]);
    H(" LBR L%d\n", lbl1=lbl++);
    H("L%d: ..ELSE", Fbranch);
-   ex(q->a[1]);
+   load(q->a[1]);
    H("L%d: ..END\n", lbl1);
 
    Fbranch = savF; Tbranch = savT;
@@ -1298,7 +1305,8 @@ int ex(NODE *p) {
                WPOP(FP);
             }
          }
-         H(" SEP SRET\n");
+         if (opttime)
+            H(" SEP SRET\n");
          swdef();
          dropsyms();
          fn = NULL;

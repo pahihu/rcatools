@@ -2103,7 +2103,8 @@ Lautodef:
                WPOP("FP");
             }
          }
-         H(" SEP SRET\n");
+         if (opttime)
+            H(" SEP SRET\n");
          swdef();
          dropsyms();
          fn = NULL;
