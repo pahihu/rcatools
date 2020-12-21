@@ -173,6 +173,12 @@ static int isvar(NODE *p) {
    return ID == p->t;
 }
 
+static int isaref(NODE *p) {
+   if (!p)
+      return 0;
+   return OPR == p->t && '[' == p->x && isvar(p->a[0]) && isvar(p->a[1]);
+}
+
 static int isreg(NODE *p) {
    if (!p)
       return 0;
@@ -265,7 +271,7 @@ Z WDEC(int r) {
 }
 
 Z WADI(int dst,int src,int x) {
-   int i;
+   int i,lbl1;
 
    if (dst == src && x < 7) {
       H(" ");
@@ -274,6 +280,12 @@ Z WADI(int dst,int src,int x) {
          H("INC %s",reg(src));
       }
       H("\n");
+   }
+   else if (dst == src && 0 == HI(x)) {
+      H(" GLO %s ;ADI #%02X ;PLO %s\n",reg(src),LO(x),reg(dst));
+      H(" LBNF L%d\n",lbl1=lbl++);
+      H(" GHI %s ;ADCI #%02X ;PHI %s\n",reg(src),HI(x),reg(dst));
+      H("L%d:\n",lbl1);
    }
    else {
       H(" GLO %s ;ADI #%02X ;PLO %s\n",reg(src),LO(x),reg(dst));
@@ -292,8 +304,18 @@ Z WADDR(int dst,int src0,int src1) {
 }
 
 Z WCMI(int r,int x) {
-   H(" GLO %s ;SMI #%02X\n",reg(r),LO(x));
-   H(" GHI %s ;SMBI #%02X\n",reg(r),HI(x));
+   int lbl1;
+
+   if (0 == HI(x)) {
+      H(" GLO %s ;SMI #%02X\n",reg(r),LO(x));
+      H(" LBDF L%d\n",lbl1=lbl++);
+      H(" GHI %s ;SMBI #%02X\n",reg(r),HI(x));
+      H("L%d:\n",lbl1);
+   }
+   else {
+      H(" GLO %s ;SMI #%02X\n",reg(r),LO(x));
+      H(" GHI %s ;SMBI #%02X\n",reg(r),HI(x));
+   }
 }
 
 Z WCD(int r) {
@@ -302,8 +324,18 @@ Z WCD(int r) {
 }
 
 Z _WSMI(int dst,int src,int x) {
-   H(" GLO %s ;SMI #%02X ;PLO %s\n",reg(src),LO(x),reg(dst));
-   H(" GHI %s ;SMBI #%02X ;PHI %s\n",reg(src),HI(x),reg(dst));
+   int lbl1;
+
+   if (dst == src && 0 == HI(x)) {
+      H(" GLO %s ;SMI #%02X ;PLO %s\n",reg(src),LO(x),reg(dst));
+      H(" LBDF L%d\n",lbl1=lbl++);
+      H(" GHI %s ;SMBI #%02X ;PHI %s\n",reg(src),HI(x),reg(dst));
+      H("L%d:\n",lbl1);
+   }
+   else {
+      H(" GLO %s ;SMI #%02X ;PLO %s\n",reg(src),LO(x),reg(dst));
+      H(" GHI %s ;SMBI #%02X ;PHI %s\n",reg(src),HI(x),reg(dst));
+   }
 }
 
 Z WSMI(int dst,int src,int x) {
@@ -322,8 +354,17 @@ Z WSMI(int dst,int src,int x) {
 }
 
 Z WSDI(int dst,int src,int x) {
-   H(" GLO %s ;SDI #%02X ;PLO %s\n",reg(src),LO(x),reg(dst));
-   H(" GHI %s ;SDBI #%02X ;PHI %s\n",reg(src),HI(x),reg(dst));
+   int lbl1;
+   if (dst == src && 0 == HI(x)) {
+      H(" GLO %s ;SDI #%02X ;PLO %s\n",reg(src),LO(x),reg(dst));
+      H(" LBDF L%d\n",lbl1=lbl++);
+      H(" GHI %s ;SDBI #%02X ;PHI %s\n",reg(src),HI(x),reg(dst));
+      H("L%d:\n",lbl1);
+   }
+   else {
+      H(" GLO %s ;SDI #%02X ;PLO %s\n",reg(src),LO(x),reg(dst));
+      H(" GHI %s ;SDBI #%02X ;PHI %s\n",reg(src),HI(x),reg(dst));
+   }
 }
 
 Z WSM(int dst,int src) {
@@ -693,12 +734,22 @@ Z glvaluvar(NODE *p) {
 }
 
 Z gindex(NODE *p) {
-   gbinary(p);
-   if (!opttime)
-      H(" LDI A.0(IDX) ;PLO SUB ;SEP SUB\n");
-   else {
-      WADD(MA,AC);
+   if (isaref(p)) {
+      glvaluvar(p->a[0]); // AUX = base
+      WLDN(AUX,MA);
+      glvaluvar(p->a[1]); // TMP = idx
+      WLDN(TMP,MA);
+      WADDR(MA,AUX,TMP);
       WSHL(MA,MA);
+   }
+   else {
+      gbinary(p);
+      if (!opttime)
+         H(" LDI A.0(IDX) ;PLO SUB ;SEP SUB\n");
+      else {
+         WADD(MA,AC);
+         WSHL(MA,MA);
+      }
    }
 }
 
@@ -1022,10 +1073,18 @@ Z gasgnop(NODE *p) {
 }
 
 Z gasgn(NODE *p) {
-   glvalu(p->a[0]); // MA is the addr
-   WPUSH(MA);
-   load(p->a[1]);
-   WSTRMA();
+   if (isvar(p->a[0]) || isaref(p->a[0])) {
+      H(" ..SIMPLE ASGN\n");
+      load(p->a[1]);
+      glvalu(p->a[0]);
+      WSTR(MA,AC);
+   }
+   else {
+      glvalu(p->a[0]); // MA is the addr
+      WPUSH(MA);
+      load(p->a[1]);
+      WSTRMA();
+   }
 }
 
 Z glnot(NODE *p) {
@@ -1323,9 +1382,8 @@ int ex(NODE *p) {
          H(" ..CALL %s\n",sym);
          H(" SEP SCALL,A(L%s)\n",sym);
          argcnt *= 2; // 2byte args
-         if (argcnt) {
+         if (argcnt)
             WADI(SP,SP,argcnt);
-         }
          break;
       case FOR:
          stmt = p->a[0]; q = p->a[1];

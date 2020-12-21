@@ -1,6 +1,9 @@
 History
 =======
 
+201221AP faster simple assignment: v = x, a[i] = x
+         faster WADI/WSMI/WCMI
+
 201220AP fixed gcondexpr, conditional expressions seems to be working
          runtime: SUBRET integrates SEP SRET, added assignment
 

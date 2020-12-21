@@ -69,17 +69,15 @@ dasm(p) {
    /* arg = ('*e' == char(args,1))? char(args,0) : char(args,N); */
    arg = char(args,('*e' == char(args,1))? 0 : N) - '0';
    
-   nargs = arg & 3;
-   nargs++;
+   nargs = (arg & 3) + 1;
    hex4(p); putchar(' ');
    i = 0;
    while (i < nargs)
       hex2(char(0,p+i++));
    while (i++ < 4)
       putchar('  '); /* 2B */
-   i = 0;
-   while (i < 4)
-      putchar(char(mnemo,i++));
+   putchar(mnemo[0]);
+   putchar(mnemo[1]);
    putchar(' ');
 
    switch arg {

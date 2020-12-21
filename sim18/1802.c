@@ -52,6 +52,7 @@
  *          profiler
  * 201216AP MCLK cycle simulation @ 2MHz CLK, MCLK = 4us
  * 201220AP RTC/NVR uses nvr.ram file
+ * 201221AP reg display uses XP:
  *
  */
 
@@ -160,7 +161,7 @@ static int digit(int c)
    return 10 + c - 'A';
 }
 
-// DS12885 RTC/NVR
+// DS12885 RTC/NVR, binary mode (DM=1)
 #define RTC_SECONDS  0x00
 #define RTC_MINUTES  0x02
 #define RTC_HOURS    0x04
@@ -684,8 +685,8 @@ void prinregs()
    int i;
 
    printf("TIO:   %X SEL: %s\n", TLIO? 1 : 0, prinb(SEL, 128));
-   printf("  P:   %X  IE:   %X   T:  %02X   D: %03X   X:   %X  EF:%s\n",
-            P, IE, T, D + (DF? 256 : 0), X, prinb(EF, 8));
+   printf(" XP:  %02X  IE:   %X   T:  %02X   D: %03X  EF:%s\n",
+            HiLo(X,P), IE, T, D + (DF? 256 : 0), prinb(EF, 8));
    for (i = 0; i < 16; i++) {
       printf("%s:%04X ", regs[i], r[i]);
       if (7 == i) printf("\n");
