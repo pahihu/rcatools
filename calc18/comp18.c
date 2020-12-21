@@ -603,7 +603,6 @@ Z geq0(int r) {
 }
 
 Z load(NODE *p) {
-   int lbl1;
    int savF, savT;
 
    savF = Fbranch; savT = Tbranch;
@@ -613,12 +612,12 @@ Z load(NODE *p) {
    }
    ex(p);
    if (COND == p->t) {
+      grelop(p->x,AC,Tbranch,Fbranch);
       H("L%d:\n", Tbranch); 
       H(" LDI #01\n");
-      H(" LBR L%d\n",lbl1=lbl++);
+      H(" LSKP\n");
       H("L%d:\n",Fbranch);
       H(" LDI #00\n");
-      H("L%d:\n",lbl1);
       H(" PLO AC ;LDI #00 ;PHI AC\n");
    }
 

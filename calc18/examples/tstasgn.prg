@@ -1,6 +1,3 @@
-#define NEED_printf
-#include "stdlib.prg"
-
 show(msg,n) {
    printf("%s %d*n",msg,n);
 }
@@ -40,5 +37,8 @@ main() {
    show("**&x = ",*&x);
    show("&(**x) = ",&*x);
 }
+
+#define NEED_printf
+#include "stdlib.prg"
 
 /* vim: set ts=3 sw=3 et: */
