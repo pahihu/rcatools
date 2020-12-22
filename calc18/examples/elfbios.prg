@@ -35,8 +35,14 @@ f_type (c) {
       putc(c);
 }
 
-f_read (c)
-   return (getc());
+f_read () {
+   auto c;
+
+   c = getc();
+   if (c == 13)
+      c = '*n';
+   return (c);
+}
 
 f_msg(s) {
    auto c, i;
@@ -77,13 +83,12 @@ f_strcpy(d,s) { /* byte cpy */
       i++;
 }
 
-f_memcpy(d,s,n) { /* word cpy */
+f_memcpy(d,s,n) {
    auto i;
 
-   n =>> 1;
    i = 0;
    while (i < n) {
-      d[i] = s[i]; i++;
+      lchar(0,d++,char(0,s++)); i++;
    }
 }
 
@@ -159,8 +164,10 @@ f_isnum(c) {
 }
 
 f_ishex(c) {
+   if (f_isnum(c))
+      return (1);
    c =& ~32; /* toupper */
-   return (f_isnum(c) || ('A' <= c && c <= 'F'));
+   return ('A' <= c && c <= 'F');
 }
 
 f_isalpha(c) {
@@ -183,13 +190,12 @@ digit(c) {
    return (c - 'A' + 10);
 }
 
-f_hexin(s,pn) { /* return next not converted index */
-   auto c, i, n;
+f_hexin(s,i,pn) { /* return next not converted index */
+   auto c, n;
 
-   n = i = 0;
-   while (f_ishex(c = char(s,i))) {
-      n = (n << 4) + digit(c); i++;
-   }
+   n = 0;
+   while (f_ishex(c = char(s,i++)))
+      n = (n << 4) + digit(c);
    *(pn) = n;
    return (i);
 }
@@ -198,15 +204,15 @@ hexc(n) {
    return (char("0123456789ABCDEF",n & 017));
 }
 
-f_hexout2(buf,n) {
-   lchar(buf,0,hexc(n >> 4));
-   lchar(buf,1,hexc(n));
-   return (buf + 1);
+f_hexout2(buf,i,n) {
+   lchar(buf,i++,hexc(n >> 4));
+   lchar(buf,i++,hexc(n));
+   return (i);
 }
 
-f_hexout4(buf,n) {
-   buf = f_hexout2(buf,n >> 8);
-   return (f_hexout2(buf,n & 0377));
+f_hexout4(buf,i,n) {
+   i = f_hexout2(buf,i,n >> 8);
+   return (f_hexout2(buf,i,n & 0377));
 }
 
 f_tty(c)
@@ -217,7 +223,7 @@ f_minimon() {
 }
 
 f_freemem() {
-   return (077777);
+   return (037777);
 }
 
 f_atoi(s,i,pn) {
@@ -255,8 +261,12 @@ f_inputl(buf,n) {
    auto c, i;
 
    i = 0;
-   while (i < n && (c = f_read()) != '*n' && c != CTRL_C)
+   while (i < n && (c = f_read()) != '*n' && c != CTRL_C) {
       lchar(buf,i++,c);
+      f_type(c);
+   }
+   f_type(c);
+   lchar(buf,i,'*e');
    return (c == CTRL_C);
 }
 
