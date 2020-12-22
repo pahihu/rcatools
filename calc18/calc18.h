@@ -37,7 +37,7 @@ int getcls(int n);
 void dropsyms(void);
 extern char *fn; // current fn
 extern int Err;
-extern int dbg, varstat, regpar;
+extern int dbg, varstat, regpar, verbose;
 extern int opttime;
 
 NODE *nod(int typ, int n, char *s, NODE *arg0, NODE *arg1);

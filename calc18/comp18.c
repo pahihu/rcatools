@@ -49,6 +49,7 @@ char *fn;
 int opttime = 1;
 int nregvars; // no.of regvars
 int regpar = 0; // no params in registers
+int verbose = 0; // verbose
 int ex(NODE *p);
 Z load(NODE *p);
 Z glvaluvar(NODE *p);
@@ -1341,7 +1342,7 @@ int ex(NODE *p) {
          break;
       case FUNDEF:
          sym = getsym(p->a[0]->x);
-         if (varstat || dbg)
+         if (varstat || dbg || verbose)
             fprintf(stderr,"FN %s\n",sym);
          H(" ..FN %s\n",fn = sym);
          nswitches = 0; currsw = -1;
@@ -1374,15 +1375,24 @@ int ex(NODE *p) {
          exprlist(p, 0, argcnt);
          break;
       case FUNCALL:
-         sym = getsym(p->a[0]->x);
-         if (C_UNDEF == getcls(p->a[0]->x)) // see bref 6.1
-            defcls(p->a[0]->x,C_EXTRN,0);
-         argcnt = ex(p->a[1]); // push args
-         H(" ..CALL %s\n",sym);
-         H(" SEP SCALL,A(L%s)\n",sym);
-         argcnt *= 2; // 2byte args
+         if (isvar(p->a[0])) {
+            sym = getsym(p->a[0]->x);
+            if (C_UNDEF == getcls(p->a[0]->x)) // see bref 6.1
+               defcls(p->a[0]->x,C_EXTRN,0);
+            argcnt = ex(p->a[1]); // push args
+            H(" ..CALL %s\n",sym);
+            H(" SEP SCALL,A(L%s)\n",sym);
+         }
+         else { // NB. paren expr!
+            q = p->a[0];
+            assert(OPR == q->t && INT == q->x);
+            argcnt = ex(p->a[1]); // push args
+            load(q->a[0]);
+            H(" ..CALL expr\n");
+            H(" LDI A.0(NCALL) ;PLO SUB ;SEP SUB\n");
+         }
          if (argcnt)
-            WADI(SP,SP,argcnt);
+            WADI(SP,SP,2*argcnt); // 2byte args
          break;
       case FOR:
          stmt = p->a[0]; q = p->a[1];

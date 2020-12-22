@@ -1,6 +1,9 @@
 History
 =======
 
+201222AP function pointers, call with (x)(a1,a2,...)
+         added sprintf.prg
+
 201221AP faster simple assignment: v = x, a[i] = x
          faster WADI/WSMI/WCMI
          fixed !x

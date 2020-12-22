@@ -1,6 +1,8 @@
 Changes to A18
 ==============
 
+201222AP        report binary file address change, when change > 1
+
 !		statement separator, no labels on subsequent statements
 ..              begin line comment
 CONST, DC	define constant, automatic width adjustment (1 or 2bytes)

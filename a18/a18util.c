@@ -660,7 +660,8 @@ unsigned a;
             binaddr = a;
         }
         else if (a != binaddr) {
-            printf("binary file address change from %4X to %4X, fill with %02X!\n",binaddr,a,filler);
+            if (a - binaddr > 1)
+                printf("binary file address change from %4X to %4X, fill with %02X!\n",binaddr,a,filler);
             for (i = binaddr; i < a; bputc(filler), i++);
         }
     }

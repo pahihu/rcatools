@@ -178,6 +178,7 @@ expr:
         | lvalue INC %prec GRP  { $$ = opr(POSTINC, $1, NULL); }
         | lvalue DEC %prec GRP  { $$ = opr(POSTDEC, $1, NULL); }
         | VAR '(' expr_list ')' %prec GRP { $$ = opr(FUNCALL, id($1), $3); }
+        | '(' expr ')' '(' expr_list ')' %prec GRP { $$ = opr(FUNCALL, opr(INT,$2,NULL), $5); }
         | '-' expr %prec UNOP   { $$ = CONFOLD1(UNARY + '-',-,$2); }
         | '!' expr %prec UNOP   { $$ = LOGFOLD1('!',!,$2); }
         | '~' expr %prec UNOP   { $$ = CONFOLD1('~',~,$2); }
@@ -284,6 +285,7 @@ int main(int argc, char*argv[]) {
          case 'h': usage();
          case 'r': regpar = 1; break;
          case 'v': varstat = 1; break;
+         case 'V': verbose = 1; break;
          }
    }
    yyparse();

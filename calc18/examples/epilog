@@ -1,9 +1,4 @@
 ..
 ..  EPILOG
 ..
- ORG*+(* AND 1)
-Lexit:
- IDL     ..STOP
-DIE:
- LBR DIE,#DEAD
  END
