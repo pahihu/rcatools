@@ -53,6 +53,7 @@
  * 201216AP MCLK cycle simulation @ 2MHz CLK, MCLK = 4us
  * 201220AP RTC/NVR uses nvr.ram file
  * 201221AP reg display uses XP:
+ * 201222AP begin FDS integration
  *
  */
 
@@ -79,18 +80,11 @@
 
 #include "curterm.h"
 
-typedef unsigned char Byte;
-typedef unsigned short Word;
+#include "1802.h"
 
 #define H   printf
 #define O   fprintf
 
-#define Lo(x)           ((x) & 15)
-#define Hi(x)           Lo((x) >> 4)
-#define HiLo(x,y)       ((Lo(x) << 4) + Lo(y))
-#define LO(x)           (0xFF & (x))
-#define HI(x)           LO((x) >> 8)
-#define HILO(x,y)       ((LO(x) << 8) + LO(y))
 #define FLAG(x)         ((x) ? 1 : 0)
 #define CY(x)           FLAG(0x100 & (x))
 #define MASK8           0x00FF
@@ -142,19 +136,24 @@ FILE *fdd[NFDD];
 int fddro[NFDD];
 int nfdd = 0;
 
-static int ucase(int c)
+int ucase(int c)
 {
    if ('a' <= c && c <= 'z')
       c = c + 'A' - 'a';
    return c;
 }
 
-static int ishex(int c)
+int isdig(int c)
 {
-   return ('0' <= c && c <= '9') || ('A' <= c && c <= 'F');
+   return ('0' <= c && c <= '9');
 }
 
-static int digit(int c)
+int ishex(int c)
+{
+   return isdig(c) || ('A' <= c && c <= 'F');
+}
+
+int digit(int c)
 {
    if (c <= '9')
       return c - '0';
@@ -1267,6 +1266,32 @@ LError:
    return -1;
 }
 
+void ut20xy(FILE *out,Word adr,Word len,int cont)
+{
+   int i;
+
+   O(out,"!M");
+   if (20 == cont)
+      O(out,"%04X",adr);
+   for (i = 0; i <= (len - adr); i++) {
+      if (0 == (i % cont)) {
+         if (i)
+            O(out,"%c", 20==cont? ',' : ';');
+         O(out, "\n");
+         if (16 == cont)
+            O(out,"%04X",adr + i);
+      }
+      if ((16 == cont) && !(i & 1))
+         O(out," ");
+      O(out,"%02X", memrd(adr + i));
+   }
+   O(out,"\n");
+   if (out != stdout) {
+      O(out,"%c",DC3); // write DC3
+      fclose(out);
+   }
+}
+
 int ut20mon(FILE *inp)
 {
    Word adr, len;
@@ -1389,6 +1414,8 @@ int ut20mon(FILE *inp)
             utc = utget(inp);
             brkadr = utadr(inp);
          } 
+         else if (utc == 'F')
+            cmdShell();
          else if (utc == 'U' || utc == 'P') {
             cmd = utc;
             utc = utget(inp);
@@ -1437,26 +1464,9 @@ int ut20mon(FILE *inp)
             adr = utadr(inp);
             len = utadr(inp);
             out = strcmp(fn,"TTY")? fopen(fn,"w+") : stdout;
-            O(out,"!M");
-            if (20 == cont)
-               O(out,"%04X",adr);
-            for (i = 0; i <= (len - adr); i++) {
-               if (0 == (i % cont)) {
-                  if (i)
-                     O(out,"%c", 20==cont? ',' : ';');
-                  O(out, "\n");
-                  if (16 == cont)
-                     O(out,"%04X",adr + i);
-               }
-               if ((16 == cont) && !(i & 1))
-                  O(out," ");
-               O(out,"%02X", memrd(adr + i));
-            }
-            O(out,"\n");
-            if (out != stdout) {
-               O(out,"%c",DC3); // write DC3
+            ut20xy(out,adr,len,cont);
+            if (out != stdout)
                fclose(out);
-            }
          }
          else if (utc == 'Q')
             exit(0);
@@ -1698,7 +1708,7 @@ void usage(void)
    fprintf(stderr,"   -r<regdef> read register names from <regdef>\n");
    fprintf(stderr,"   -s<kbytes> memory size (default 64KB)\n");
    fprintf(stderr,"   -t         trace\n");
-   fprintf(stderr,"   -u         start BUT20 (?DMR,!AM,$BLPQUXY)\n");
+   fprintf(stderr,"   -u         start BUT20 (?DMR,!AM,$BFLPQUXY)\n");
    fprintf(stderr,"   -x         Mark Riley's port extender+mapper\n");
    fprintf(stderr,"   file       load bin/M-rec/IHex fmt at 'begin' adr\n");
    fprintf(stderr,"\n");
@@ -1709,6 +1719,7 @@ void usage(void)
    fprintf(stderr,"   !Aadr instr[, instr..]    1-line asm\n");
    fprintf(stderr,"   !Madr bytes[,; bytes..]   memory entry\n");
    fprintf(stderr,"   $Badr                     set brkptr, 0 disable\n");
+   fprintf(stderr,"   $F                        run FDS\n");
    fprintf(stderr,"   $L                        load (unit,track)\n");
    fprintf(stderr,"   $Padr                     xecute\n");
    fprintf(stderr,"   $Q                        quit\n");

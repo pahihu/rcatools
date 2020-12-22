@@ -1,7 +1,7 @@
 CC = cc -Wall
 CFLAGS = -O2
 LDFLAGS = #-g
-SRCS = 1802.c curterm.c
+SRCS = 1802.c fds.c curterm.c
 OBJS = $(SRCS:.c=.o)
 
 all: sim18 ut20.rom fforth.idi
