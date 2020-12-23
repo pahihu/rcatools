@@ -1,6 +1,9 @@
 History
 =======
 
+201223AP -Os uses asm char(), lchar(), otherwise compiles code directly
+         elfbios.prg uses Elf/OS date/time encoding
+
 201222AP function pointers, call with (x)(a1,a2,...)
          added sprintf.prg, elfbios.prg, minimon.prg
 

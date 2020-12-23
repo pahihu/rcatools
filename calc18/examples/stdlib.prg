@@ -28,6 +28,7 @@ getchar() { /* get char from UART */
    return (c);
 }
 
+#if 0
 char(s,i) { /* i-th char of string s */
    register n;
 
@@ -49,6 +50,7 @@ lchar(s,i,c) { /* store char c in the i-th pos of string s */
    s[x] = n;
    return (c);
 }
+#endif
 
 puts(s) {
    register c,i;

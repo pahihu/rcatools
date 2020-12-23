@@ -410,10 +410,20 @@ Z WLDN(int dst,int src) {
    H(" LDN %s ;PHI %s\n",reg(src),reg(dst));
 }
 
+Z WLDN0(int dst,int src) {
+   H(" LDN %s ;PLO %s\n",reg(src),reg(dst));
+   H(" LDI #00 ;PHI %s\n",reg(dst));
+}
+
 Z WSTR(int dst,int src) {
    H(" ..STR %s,%s\n",reg(dst),reg(src));
    H(" GLO %s ;STR %s ;INC %s\n",reg(src),reg(dst),reg(dst));
    H(" GHI %s ;STR %s\n",reg(src),reg(dst));
+}
+
+Z WSTR0(int dst,int src) {
+   H(" ..STR0 %s,%s.0\n",reg(dst),reg(src));
+   H(" GLO %s ;STR %s\n",reg(src),reg(dst));
 }
 
 Z WLDI(int r,int x) {
@@ -1214,6 +1224,77 @@ Z gifelse(NODE *p) {
    Fbranch = savF; Tbranch = savT;
 }
 
+#define ARG1(x)   ((x)->a[0]->a[1])
+
+Z gcaref(NODE *arg1, NODE *arg2) { // [l]char(arg1,arg2,...)
+   int imm1, imm2, x1, x2;
+
+   imm1 = isimm(arg1);
+   imm2 = isimm(arg2);
+   x1   = arg1->x;
+   x2   = arg2->x;
+   if (imm1) {
+      if (imm2) { // imm1[imm2]
+         WLDI(MA,2*x1+x2);
+      }
+      else { // imm1[expr2]
+         load(arg2);
+         if (x1)
+            WADI(MA,AC,2*x1);
+         else
+            WMOV(MA,AC);
+      }
+   }
+   else {
+      load(arg1);
+      WSHL(AC,AC);
+      if (imm2) {
+         WADI(MA,AC,x2);
+      }
+      else {
+         WPUSH(AC);
+         load(arg2); // AC = index, *SP = (base << 1)
+         WADD(MA,AC);
+      }
+   }
+}
+
+static int gintrinsic(char *sym,NODE *p) {
+   NODE *q, *arg1, *arg2, *arg3;
+   int x3;
+
+   if (!opttime)
+      return 0;
+
+   if (!strcmp(sym,"char")) {
+      q = p->a[1];
+      arg1 = q->a[0]->a[1];
+      arg2 = q->a[1];
+      gcaref(arg1, arg2);
+      WLDN0(AC,MA);
+      return 1;
+   }
+   else if (!strcmp(sym,"lchar")) {
+      q = p->a[1];
+      arg1 = q->a[0]->a[0]->a[1];
+      arg2 = q->a[0]->a[1];
+      arg3 = q->a[1];
+      gcaref(arg1, arg2);
+      if (isimm(arg3)) {
+         x3 = arg3->x;
+         WLDI(AC,x3);
+      }
+      else {
+         WPUSH(MA);
+         load(arg3); // AC = char
+         WPOP(MA);
+      }
+      WSTR0(MA,AC);
+      return 1;
+   }
+   return 0;
+}
+
 
 int ex(NODE *p) {
    NODE *q, *stmt;
@@ -1377,11 +1458,13 @@ int ex(NODE *p) {
       case FUNCALL:
          if (isvar(p->a[0])) {
             sym = getsym(p->a[0]->x);
-            if (C_UNDEF == getcls(p->a[0]->x)) // see bref 6.1
-               defcls(p->a[0]->x,C_EXTRN,0);
-            argcnt = ex(p->a[1]); // push args
-            H(" ..CALL %s\n",sym);
-            H(" SEP SCALL,A(L%s)\n",sym);
+            if (!gintrinsic(sym,p)) {
+               if (C_UNDEF == getcls(p->a[0]->x)) // see bref 6.1
+                  defcls(p->a[0]->x,C_EXTRN,0);
+               argcnt = ex(p->a[1]); // push args
+               H(" ..CALL %s\n",sym);
+               H(" SEP SCALL,A(L%s)\n",sym);
+            }
          }
          else { // NB. paren expr!
             q = p->a[0];

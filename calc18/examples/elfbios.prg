@@ -1,5 +1,6 @@
 /* Elfish BIOS */
 
+#if 0
 char(s,i) { /* i-th char of string s */
    register n;
 
@@ -21,6 +22,7 @@ lchar(s,i,c) { /* store char c in the i-th pos of string s */
    s[x] = n;
    return (c);
 }
+#endif
 
 #define CTRL_C 03
 
@@ -367,18 +369,6 @@ f_wrnvr(offs,buf,n) {
    return (0);
 }
 
-f_gettod(buf) {
-   return (f_rdnvr(0,buf,10));
-}
-
-f_settod(buf) {
-   return (f_wrnvr(0,buf,10));
-}
-
-f_rtctest() { /* hardwired */
-   return (128 + 114);
-}
-
 #define RTC_SS  0
 #define RTC_MM  2
 #define RTC_HH  4
@@ -386,6 +376,52 @@ f_rtctest() { /* hardwired */
 #define RTC_D   7
 #define RTC_M   8
 #define RTC_Y   9
+
+packd(tod,raw) { /* pack date */
+   tod[0] =   (char(raw,RTC_Y) << 9)
+            + (char(raw,RTC_M) << 5)
+            +  char(raw,RTC_D);
+}
+
+packt(tod,raw) { /* pack time */
+   tod[1] =   (char(raw,RTC_HH) << 11)
+            + (char(raw,RTC_MM) <<  5)
+            + (char(raw,RTC_SS) >>  1);
+}
+
+unpkd(raw,tod) { /* unpack date */
+   lchar(raw,RTC_Y,tod[0] >> 9);
+   lchar(raw,RTC_M,(tod[0] >> 5) & 017);
+   lchar(raw,RTC_D,tod[0] & 037);
+}
+
+unpkt(raw,tod) { /* unpack time */
+   lchar(raw,RTC_HH,tod[1] >> 11);
+   lchar(raw,RTC_MM,(tod[1] >> 5) & 077);
+   lchar(raw,RTC_SS,(tod[1] & 037) << 1);
+}
+
+f_gettod(tod) {
+   auto raw 5;
+
+   if (f_rdnvr(0,raw,10))
+      return (1);
+   packd(tod,raw);
+   packt(tod,raw);
+}
+
+f_settod(tod) {
+   auto raw 5;
+
+   unpkd(raw,tod);
+   unpkt(raw,tod);
+   return (f_wrnvr(0,raw,10));
+}
+
+f_rtctest() { /* have RTC, with 114bytes of NVR */
+   return (128 + 114);
+}
+
 
 sprintn(buf,i,n) {
    auto a;
@@ -397,42 +433,50 @@ sprintn(buf,i,n) {
 }
 
 f_dttoas(buf,i,tod) {
-   i = sprintn(buf,i,char(tod,RTC_M));
+   auto raw 5;
+
+   unpkd(raw,tod);
+   i = sprintn(buf,i,char(raw,RTC_M));
    lchar(buf,i++,'/');
-   i = sprintn(buf,i,char(tod,RTC_D));
+   i = sprintn(buf,i,char(raw,RTC_D));
    lchar(buf,i++,'/');
-   return (sprintn(buf,i,char(tod,RTC_Y)+2000));
+   return (sprintn(buf,i,char(raw,RTC_Y)+2000));
 }
 
 f_tmtoas(buf,i,tod) {
-   i = sprintn(buf,i,char(tod,RTC_HH));
+   auto raw 5;
+
+   unpkt(raw,tod);
+   i = sprintn(buf,i,char(raw,RTC_HH));
    lchar(buf,i++,':');
-   i = sprintn(buf,i,char(tod,RTC_MM));
+   i = sprintn(buf,i,char(raw,RTC_MM));
    lchar(buf,i++,':');
-   return (sprintn(buf,i,char(tod,RTC_MM)));
+   return (sprintn(buf,i,char(raw,RTC_MM)));
 }
 
 f_astodt(buf,i,tod) { /* m/d/y */
-   auto n;
+   auto n, raw 5;
 
    i = f_atoi(buf,i,&n);
-   lchar(tod,RTC_M,n);
+   lchar(raw,RTC_M,n);
    i = f_atoi(buf,i,&n);
-   lchar(tod,RTC_D,n);
+   lchar(raw,RTC_D,n);
    i = f_atoi(buf,i,&n);
-   lchar(tod,RTC_Y,n-2000);
+   lchar(raw,RTC_Y,n-2000);
+   packd(tod,raw);
    return (i);
 }
 
 f_astotm(buf,i,tod) { /* hh:mm:ss */
-   auto n;
+   auto n, raw 5;
 
    i = f_atoi(buf,i,&n);
-   lchar(tod,RTC_HH,n);
+   lchar(raw,RTC_HH,n);
    i = f_atoi(buf,i,&n);
-   lchar(tod,RTC_MM,n);
+   lchar(raw,RTC_MM,n);
    i = f_atoi(buf,i,&n);
-   lchar(tod,RTC_SS,n);
+   lchar(raw,RTC_SS,n);
+   packt(tod,raw);
    return (i);
 }
 

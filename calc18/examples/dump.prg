@@ -28,18 +28,18 @@ htoi(s) {
 dump(a,n) {
    register i, j;
 
-   i=0; a =>> 1;
+   i=0;
    while (i<n) {
-      hex4(2*a); putchar(' ');
+      hex4(a); putchar(' ');
       j=0;
       while (j<8) {
-         putchar(' '); hex2(char(a,j++));
+         putchar(' '); hex2(char(0,a + j++));
       }
       putchar('  '); /* 2B */
       j=0;
-      while (j<8)
-         putchar(printable(char(a,j++)));
-      a =+ 4; i =+ 8;
+      while (j++<8)
+         putchar(printable(char(0,a++)));
+      i =+ 8;
       putchar('*n');
    }
 }
