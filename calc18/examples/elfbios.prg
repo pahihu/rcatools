@@ -1,40 +1,25 @@
-/* Elfish BIOS */
-
-#if 0
-char(s,i) { /* i-th char of string s */
-   register n;
-
-   n = s[i>>1];
-   /* s[] contains "ABCD", accessed a 'BA' 'DC' */
-   if (i&01)
-      n=n>>8;
-   return (n&0377);
-}
-
-lchar(s,i,c) { /* store char c in the i-th pos of string s */
-   register n, x;
-
-   n = s[x = i>>1];
-   if (i&1)
-      n = (n & 0377) + (c << 8);
-   else
-      n = (n & 0177400) + c;
-   s[x] = n;
-   return (c);
-}
-#endif
+/*
+ * Elfish BIOS 
+ *
+ * History
+ * =======
+ *
+ * 201223AP direct char pointers with [l]char(0,ptr,...)
+ *          fixed unpkd()
+ *
+ */
 
 #define CTRL_C 03
 
 f_type (c) {
    if (c == 13) {
-      putc(27);
+      putc(033);
       putc('[');
       putc('2');
       putc('J');
+      return;
    }
-   else
-      putc(c);
+   putc(c);
 }
 
 f_read () {
@@ -47,10 +32,10 @@ f_read () {
 }
 
 f_msg(s) {
-   auto c, i;
+   auto c;
 
-   i = 0;
-   while ((c = char(s,i++)) != '*e')
+   s =<< 1;
+   while ((c = char(0,s++)) != '*e')
       f_type(c);
 }
 
@@ -60,11 +45,10 @@ f_input(buf) {
 }
 
 f_strcmp(s1, s2) {
-   auto i, c1, c2;
+   auto c1, c2;
 
-   i = 0;
-   while ((c1 = char(s1,i)) == (c2 = char(s2,i)))
-      i++;
+   s1 =<< 1; s2 =<< 1;
+   while ((c1 = char(0,s1++)) == (c2 = char(0,s2++)));
    return (c1 - c2);
 }
 
@@ -78,20 +62,16 @@ f_ltrim(s) { /* return next idx */
 }
 
 f_strcpy(d,s) { /* byte cpy */
-   auto i;
-
-   i = 0;
-   while (lchar(d,i,char(s,i)) != '*e')
-      i++;
+   d =<< 1; s =<< 1;
+   while (lchar(0,d++,char(0,s++)) != '*e');
 }
 
 f_memcpy(d,s,n) {
    auto i;
 
    i = 0;
-   while (i < n) {
-      lchar(0,d++,char(0,s++)); i++;
-   }
+   while (i++ < n)
+      lchar(0,d++,char(0,s++));
 }
 
 f_wrtsec(buf,sec) { /* TODO */
@@ -248,7 +228,7 @@ f_uintout(buf,i,u) {
 }
 
 f_intout(buf,i,n) {
-   if (n & 0177777) {
+   if (n & 0100000) {
       lchar(buf,i++,'-');
       n = -n;
    }
@@ -347,13 +327,10 @@ f_ideid(buf,drive) {
 
 f_rdnvr(offs,buf,n) {
    extrn rtc;
-   auto i;
 
    if (!(f_getdev() & DEV_RTC))
       return (1);
-   i = 0;
-   while (i < n)
-      lchar(buf,i++,char(rtc,offs++));
+   f_memcpy(buf << 1,rtc + offs, n);
    return (0);
 }
 
@@ -363,9 +340,7 @@ f_wrnvr(offs,buf,n) {
 
    if (!(f_getdev() & DEV_RTC))
       return (1);
-   i = 0;
-   while (i < n)
-      lchar(rtc,offs++,char(buf,i++));
+   f_memcpy(rtc + offs, buf << 1, n);
    return (0);
 }
 
@@ -378,15 +353,15 @@ f_wrnvr(offs,buf,n) {
 #define RTC_Y   9
 
 packd(tod,raw) { /* pack date */
-   tod[0] =   (char(raw,RTC_Y) << 9)
-            + (char(raw,RTC_M) << 5)
-            +  char(raw,RTC_D);
+   tod[0] = (char(raw,RTC_Y) << 9)
+          + (char(raw,RTC_M) << 5)
+          +  char(raw,RTC_D);
 }
 
 packt(tod,raw) { /* pack time */
-   tod[1] =   (char(raw,RTC_HH) << 11)
-            + (char(raw,RTC_MM) <<  5)
-            + (char(raw,RTC_SS) >>  1);
+   tod[1] = (char(raw,RTC_HH) << 11)
+          + (char(raw,RTC_MM) <<  5)
+          + (char(raw,RTC_SS) >>  1);
 }
 
 unpkd(raw,tod) { /* unpack date */
@@ -451,7 +426,7 @@ f_tmtoas(buf,i,tod) {
    lchar(buf,i++,':');
    i = sprintn(buf,i,char(raw,RTC_MM));
    lchar(buf,i++,':');
-   return (sprintn(buf,i,char(raw,RTC_MM)));
+   return (sprintn(buf,i,char(raw,RTC_SS)));
 }
 
 f_astodt(buf,i,tod) { /* m/d/y */
@@ -480,7 +455,7 @@ f_astotm(buf,i,tod) { /* hh:mm:ss */
    return (i);
 }
 
-rtc 037200; /* $7Dxx */
+rtc 076400; /* $7Dxx */
 
 bd.rate 300; /* terminal baud rate */
 fdc 0; /* FDC status */

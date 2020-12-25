@@ -54,6 +54,7 @@
  * 201220AP RTC/NVR uses nvr.ram file
  * 201221AP reg display uses XP:
  * 201222AP begin FDS integration
+ * 201225AP $L works
  *
  */
 
@@ -1286,10 +1287,8 @@ void ut20xy(FILE *out,Word adr,Word len,int cont)
       O(out,"%02X", memrd(adr + i));
    }
    O(out,"\n");
-   if (out != stdout) {
+   if (out != stdout)
       O(out,"%c",DC3); // write DC3
-      fclose(out);
-   }
 }
 
 int ut20mon(FILE *inp)
@@ -1414,8 +1413,11 @@ int ut20mon(FILE *inp)
             utc = utget(inp);
             brkadr = utadr(inp);
          } 
-         else if (utc == 'F')
+         else if (utc == 'F') {
+            uteat(inp);
             cmdShell();
+            uteat(inp);
+         }
          else if (utc == 'U' || utc == 'P') {
             cmd = utc;
             utc = utget(inp);
@@ -1457,7 +1459,7 @@ int ut20mon(FILE *inp)
          else if (utc == 'X' || utc == 'Y') {
             // X: comma cont. 20bytes/line
             // Y: semicol cont. 16bytes/line
-            cont = utc == 'X'? 20 : 16;
+            cont = utc == 'X'? CMD_X : CMD_Y;
 
             utc = utget(inp);
             fn  = utnam(inp);
