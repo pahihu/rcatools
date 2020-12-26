@@ -54,7 +54,7 @@
  * 201220AP RTC/NVR uses nvr.ram file
  * 201221AP reg display uses XP:
  * 201222AP begin FDS integration
- * 201225AP $L works
+ * 201225AP $L works, $U in $X/$Y fmt
  *
  */
 
@@ -1120,8 +1120,6 @@ void xecute(Word p)
    fflush(stdout);
 }
 
-#define DC3 0x13
-
 int issep(int c)
 {
    return c == ' ' || c == ',' || c == ';' || c == '\n';
@@ -1267,7 +1265,7 @@ LError:
    return -1;
 }
 
-void ut20xy(FILE *out,Word adr,Word len,int cont)
+void ut20xy(FILE *out,Word adr,Word len,int cont,Word u)
 {
    int i;
 
@@ -1287,8 +1285,11 @@ void ut20xy(FILE *out,Word adr,Word len,int cont)
       O(out,"%02X", memrd(adr + i));
    }
    O(out,"\n");
-   if (out != stdout)
+   if (out != stdout) {
+      if (0xFFFF != u)
+         O(out,"$U%04X\n",u);
       O(out,"%c",DC3); // write DC3
+   }
 }
 
 int ut20mon(FILE *inp)
@@ -1345,7 +1346,11 @@ int ut20mon(FILE *inp)
             utc = utget(inp);
             for (i = 0; i < 16; i++) {
                if (8 == i) H("\n");
-               H("%04X ", r[i]);
+               else if (i) {
+                  if ((i & 3) == 0) H(",");
+                  H(" ");
+               }
+               H("%04X", r[i]);
             }
             H("\n");
          }
@@ -1466,7 +1471,7 @@ int ut20mon(FILE *inp)
             adr = utadr(inp);
             len = utadr(inp);
             out = strcmp(fn,"TTY")? fopen(fn,"w+") : stdout;
-            ut20xy(out,adr,len,cont);
+            ut20xy(out,adr,len,cont,0xFFFF);
             if (out != stdout)
                fclose(out);
          }
