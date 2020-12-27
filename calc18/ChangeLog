@@ -1,6 +1,9 @@
 History
 =======
 
+201227AP prolog includes eread()/ewrite() to use UT20 disk I/O routines
+         see diskio.prg example
+
 201223AP -Os uses asm char(), lchar(), otherwise compiles code directly
          elfbios.prg uses Elf/OS date/time encoding
 

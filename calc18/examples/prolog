@@ -19,6 +19,12 @@ REG2=#0D
 REG1=#0E
 FP=#0F
 SSEG=#7FFF
+INIT1=#83F3
+INIT2=#83F6
+HOMDSK=#82BA   ..HOME DISKS
+LOADER=#8400   ..LOADER $L
+EWRITE=#8500   ..WRITE SECTOR
+EREAD=#8502    ..READ SECTOR
 ..
  ORG#0000
 
@@ -38,7 +44,7 @@ SSEG=#7FFF
 ..  STANDARD CALL ROUTINE
 ..
 RCALL: SEP PC
-CALL:
+CALL:  SEX SP
  GHI ARGPTR ;STXD        ..PUSH ARGPTR
  GLO ARGPTR ;STXD
  GHI PC ;PHI ARGPTR      ..ARGPTR=PC
@@ -299,6 +305,48 @@ Llchar:
  LDA MA ;PLO AC                  ..AC.0=C.0
  STR AUX                         ..*AUX=AC.0
  LDN MA ;PHI AC                  ..AC.1=C.1
+ SEP SRET
+ ..
+ ..  (st,c)=eread(dcb)
+ ..  (st,0)=ewrite(dcb,c)
+ ..
+Leread:
+ LDI #00 ;LSZ
+Lewrite:
+ LDI #01 ;PLO AC
+ GHI FP ;STXD                   ..SAVE FP (RF)
+ GLO FP ;STXD
+ GLO SP ;ADI #05 ;PLO MA        ..MA->ARG1
+ GHI SP ;ADCI #00 ;PHI MA
+ LDA MA ;SHL  ;PLO RC           ..RC=*MA
+ LDA MA ;SHLC ;PHI RC
+ GLO AC ;LBZ MREAD              ..READ?
+ LDN MA ;PHI RF                 ..RF=C
+ SEP SCALL,A(EWRITE)            ..CALL EWRITE
+ LDI #00 ;PLO RF                ..RF.0=0
+ LBR MDONE
+MREAD:
+ SEP SCALL,A(EREAD)             ..CALL EREAD
+MDONE:
+ LDI #00 ;SHLC ;PHI AC          ..AC=(STATUS,RF.0)
+ GLO RF ;PLO AC
+ IRX ;LDXA ;PLO FP              ..RESTORE FP
+ LDX ;PHI FP
+ SEP SRET
+ ..
+ ..  dskgo()
+ ..
+Ldskgo:
+ LDI A.0(M0) ;PLO R0
+ LDI A.1(M0) ;PHI R0
+ SEX R0                         ..SWITCH TO R0
+ SEP R0
+M0:
+ LDI A.0(XDSKGO) ;PLO PC        ..PC=SRET
+ LDI A.1(XDSKGO) ;PHI PC
+ LBR HOMDSK                     ..JUMP TO HOMDSK
+XDSKGO:
+ SEX SP
  SEP SRET
  ..
  ..  PROGRAM

@@ -432,8 +432,8 @@ void fddctrl(Byte data)
    int s;
    int sent;
 
-//   if (!skipcmd(data))
-//      H("FDD %02X",data);
+// if (!skipcmd(data))
+//    H("FDD %02X status=%02X",data,DSK.status);
 
    sent = 0;
    DSK.cmd = data;
@@ -517,7 +517,7 @@ LSEEK:
    case 0x21: // load unit-sec#, (0 - 3), (1 - 26)
       DSK.unit = (0xC0 & DSK.data) >> 6;
       DSK.sector = (0x1F & DSK.data);
-// H(" U/S=%02X U=%X S=%02X", DSK.data, DSK.unit, DSK.sector);
+// H(" U/S=%02X", DSK.data);
       if (!fdd[DSK.unit])
          DSK.status |= DE_FAIL;
       else if (!DSK.sector || DSK.sector > DSK_STRK)
@@ -551,8 +551,8 @@ LSEEK:
    if (!sent)
       DSK.input = DSK.status;
 
-//    if (!skipcmd(data))
-//        H("\r\n");
+// if (!skipcmd(data))
+//    H("\r\n");
 }
 
 /*
@@ -826,8 +826,9 @@ void xecute(Word p)
 {  
    Word W;
    int cond, done;
+   int savtrace;
 
-   r[P] = p; done = 0;
+   r[P] = p; done = 0; savtrace = trace;
    while (!done) {
       if (has_ctrlc()) {
          H("\r\n\r\nCtrl-C pressed!\r\n");
@@ -842,8 +843,10 @@ void xecute(Word p)
          cond = ucase(getchar());
          if ('C' == cond)
             trace = 0;
-         else if ('Q' == cond)
+         else if ('Q' == cond) {
+            trace = savtrace;
             break;
+         }
       }
       W = fetch(r[P]); r[P]++; cycle();
       I = Hi(W); N = Lo(W);
