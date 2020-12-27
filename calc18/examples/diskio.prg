@@ -5,7 +5,20 @@ main() {
    dskgo();
 
    puts("mkdcb...*n");
-   mkdcb(dcb,0,1,1);
+   mkdcb(dcb,0,2,1);
+
+   puts("writes...*n");
+   i = 0;
+   while (i < 128) {
+      lchar(buf,i,i); i++;
+   }
+   writes(dcb,buf);
+
+   puts("clear buf...*n");
+   i = 0; while (i < 64) buf[i++] = 0;
+
+   puts("mkdcb...*n");
+   mkdcb(dcb,0,2,1);
 
    puts("reads...*n");
    reads(dcb,buf);
