@@ -21,6 +21,11 @@
 
 #define PACKED  __attribute__((__packed__))
 
+#define DCB(u,t,s)   ((t) + ((s) << 8) + (u? 0x4000 : 0))
+#define UNIT(x)      (((x) & 0x4000)? 1 : 0)
+#define SECTOR(x)    (((x) >> 8) & 0x1F)
+#define TRACK(x)     ((x) & 0x7F)
+
 #define MAXNAME   10
 
 typedef struct PACKED _DIRENT { // 16bytes
@@ -78,9 +83,9 @@ static char *FDErrmsg[] = {
 #define MAXBUF    128
 
 int FDErr;
-Byte FDUnit;;
+Byte FDU;
+Word FDCB; // last valid DCB
 Byte FDBuf[MAXBUF];
-long FDPos[4];
 typedef struct _IOCB {
    Word pos, size;
    Byte eof, rw;
@@ -129,48 +134,32 @@ static Byte fdHash(Byte *nm)
    return h;
 }
 
-Byte fdSelect(Byte uni)
+static void doSeek(Word dcb, char *msg)
 {
-   if (uni > MAXUNI)
-      uni = MAXUNI;
-   FDUnit = uni;
-   return fdd[FDUnit]? 0 : (FDErr = FDE_DISK);
-}
+   long offs;
 
-static void doSeek(char *msg)
-{
-   if (fseek(fdd[FDUnit], FDPos[FDUnit], SEEK_SET) < 0) {
+   offs = MAXBUF * (MAXSEC * TRACK(dcb) + (SECTOR(dcb) - 1));
+   if (fseek(fdd[UNIT(dcb)], offs, SEEK_SET) < 0) {
       printf("%s(): seek failed\n",msg);
       abort();
    }
+   FDCB = dcb;
 }
 
-void fdSeek(Byte t,Byte s)
+void *fdRead(Word dcb, Byte *buf)
 {
-   if (t > MAXTRACK)
-      t = MAXTRACK;
-   if (s < 1)
-      s = 1;
-   else if (s > MAXSEC)
-      s = MAXSEC;
-   FDPos[FDUnit] = MAXBUF * (MAXSEC * t + (s - 1));
-   doSeek("fdSeek");
-}
-
-void *fdRead(Byte *buf)
-{
-   doSeek("fdRead");
+   doSeek(dcb, "fdRead");
    if (!buf) buf = FDBuf;
-   fread(buf, sizeof(Byte), MAXBUF, fdd[FDUnit]);
+   fread(buf, sizeof(Byte), MAXBUF, fdd[UNIT(dcb)]);
    return buf;
 }
 
-void fdWrite(Byte *buf)
+void fdWrite(Word dcb, Byte *buf)
 {
-   doSeek("fdWrite");
+   doSeek(dcb, "fdWrite");
    if (!buf) buf = FDBuf;
-   fwrite(buf, sizeof(Byte), MAXBUF, fdd[FDUnit]);
-   fflush(fdd[FDUnit]);
+   fwrite(buf, sizeof(Byte), MAXBUF, fdd[UNIT(dcb)]);
+   fflush(fdd[UNIT(dcb)]);
 }
 
 void fdFName2Str(char *str, Byte *nm)
@@ -260,13 +249,12 @@ Byte fdTAlloc(Byte nt)
    Byte *map;
    int i, j;
 
-   fdSeek(0, MAP);
-   map = fdRead(0);
+   map = fdRead(DCB(FDU,0,MAP),0);
    for (i = 0; i < MAXTRACK + 1 - nt; i++) {
       if (*map == 0) {
          if (1 == nt) {
             map[0] = 1;
-            fdWrite(0);
+            fdWrite(DCB(FDU,0,MAP),0);
             return i;
          }
          for (j = 0; j < nt; j++)
@@ -275,7 +263,7 @@ Byte fdTAlloc(Byte nt)
          if (j == nt) {
             for (j = 0; j < nt; j++)
                map[j] = 1;
-            fdWrite(0);
+            fdWrite(DCB(FDU,0,MAP),0);
             return i;
          }
       }
@@ -291,11 +279,20 @@ void fdTDealloc(Byte t, Byte nt)
    Byte *map;
 
    // update map
-   fdSeek(0, MAP); map = fdRead(0);
+   map = fdRead(DCB(FDU,0,MAP),0);
    map += t;
    for (i = 0; i < nt; i++)
       *map++ = 0;
-   fdWrite(0);
+   fdWrite(DCB(FDU,0,MAP),0);
+}
+
+Byte fdSelect(Byte uni)
+{
+   if (uni > MAXUNI)
+      uni = MAXUNI;
+
+   FDU = uni;
+   return fdd[FDU]? 0 : (FDErr = FDE_DISK);
 }
 
 int fdProcDir(Byte uni, char *pat, int del)
@@ -310,8 +307,7 @@ int fdProcDir(Byte uni, char *pat, int del)
    if (fdSelect(uni))
       return FDErr;
    for (s = DIRBEG; s < DIREND; s++) {
-      fdSeek(0, s);
-      dir = fdRead(0);
+      dir = fdRead(DCB(FDU,0,s),0);
       for (i = 0; i < MAXDIRENT; i++) {
          DIRENT *de = &dir->entries[i];
          if (0x7F & de->track) {
@@ -326,7 +322,7 @@ int fdProcDir(Byte uni, char *pat, int del)
                   nt = de->ntracks;
 
                   // delete, write back map sector
-                  de->track = DE_DELETED; fdWrite(0);
+                  de->track = DE_DELETED; fdWrite(DCB(FDU,0,s),0);
 
                   // update map
                   fdTDealloc(t, nt);
@@ -380,9 +376,8 @@ Byte fdFind(Byte *nm)
    if (dbg) printf("fdFind(): h=%d s=%d\n",h,s);
    ds = 0;
    for (i = 0; i < DIREND - DIRBEG; i++) {
-      fdSeek(0, s);
       if (dbg) printf("checking %d\n",s);
-      dir = fdRead(0);
+      dir = fdRead(DCB(FDU,0,s),0);
       for (j = 0; j < MAXDIRENT; j++) {
          DE = &dir->entries[j];
           t = DE->track;
@@ -404,7 +399,7 @@ Byte fdFind(Byte *nm)
    }
    // no empty entry, only normal + deleted entries
    if (ds) {                                    // deleted entry?
-      fdSeek(0,ds); dir = fdRead(0);            //    read back
+      dir = fdRead(DCB(FDU,0,ds),0);            //    read back
       DE = &dir->entries[dj];                   //    reset DE
       return dj + 1;
    }
@@ -441,7 +436,7 @@ Byte fdCreate(Byte *nm, Word size)
    DE->track   = t;
    DE->ntracks = nt;
    DE->size    = size;
-   fdWrite(0);
+   fdWrite(FDCB,0);
 
    return t;
 
@@ -472,7 +467,7 @@ int fdRename(Byte uni, char *nm, char *newnm)
 
    // update direntry
    fdStr2FName(DE->name, newnm);
-   fdWrite(0);
+   fdWrite(FDCB,0);
 
    return 0;
 }
@@ -555,8 +550,7 @@ Byte fdGet(Byte fd)
    if (MAXBUF == cb->bufpos) {
       if (fdSelect(cb->u))
          return EOT;
-      fdSeek(cb->t, cb->s);
-      fdRead(cb->buf);
+      fdRead(DCB(cb->u,cb->t,cb->s),cb->buf);
       cb->bufpos = 0;
       fdNextSector(cb);
    }
@@ -576,8 +570,7 @@ Byte fdPut(Byte fd, Byte c)
    if (MAXBUF == cb->bufpos) {
       if (fdSelect(cb->u))
          return FDErr;
-      fdSeek(cb->t, cb->s);
-      fdWrite(cb->buf);
+      fdWrite(DCB(FDU,cb->t,cb->s),cb->buf);
       cb->bufpos = 0;
       fdNextSector(cb);
    }
@@ -597,8 +590,7 @@ Byte fdClose(Byte fd)
       if (cb->bufpos) {
          if (fdSelect(cb->u))
             return FDErr;
-         fdSeek(cb->t, cb->s);
-         fdWrite(cb->buf);
+         fdWrite(DCB(FDU,cb->t,cb->s),cb->buf);
       }
    }
    cb->size = 0;
@@ -615,34 +607,37 @@ Byte fdEof(Byte fd)
    return cb->pos == cb->size? 1 : 0;
 }
 
+static int nargs;
+static char *args[8];
+
 
 // DIR [PAT][:UNI]
-int cmdDir(int argc,char*argv[])
+int cmdDir(void)
 {
    Byte uni;
    char *pat;
 
    uni = 0; pat = NULL;
-   if (argc > 1) {
-      if (fdParseFName(&uni, argv[1]))
+   if (nargs > 1) {
+      if (fdParseFName(&uni, args[1]))
          return FDErr = FDE_SYNTAX;
-      pat = argv[1];
+      pat = args[1];
    }
 
    return fdProcDir(uni, pat, 0);
 }
 
 // COPY FILE1[:UNI] FILE2[:UNI]
-int cmdCopy(int argc, char*argv[])
+int cmdCopy(void)
 {
    Byte c;
 
-   if (3 != argc)
+   if (3 != nargs)
       return FDErr = FDE_SYNTAX;
 
-   if (fdOpenR(0,argv[1]))
+   if (fdOpenR(0,args[1]))
       return FDErr;
-   if (fdOpenW(1,argv[2],FDesc[0].size)) {
+   if (fdOpenW(1,args[2],FDesc[0].size)) {
       fdClose(0);
       return FDErr;
    }
@@ -658,37 +653,37 @@ int cmdCopy(int argc, char*argv[])
 }
 
 // DEL PAT[:UNI]
-int cmdDel(int argc, char*argv[])
+int cmdDel(void)
 {
    Byte uni;
 
    uni = 0;
-   if (2 != argc)
+   if (2 != nargs)
       return FDErr = FDE_SYNTAX;
 
-   if (fdParseFName(&uni, argv[1]))
+   if (fdParseFName(&uni, args[1]))
       return FDErr = FDE_SYNTAX;
 
-   return fdDel(uni, argv[1]);
+   return fdDel(uni, args[1]);
 }
 
 // MERGE FILE1 FILE2 FILE3 ... FILEN
-int cmdMerge(int argc, char *argv[])
+int cmdMerge(void)
 {
    int i;
    Word prevss, ss;
    Byte c;
 
-   if (argc < 3)
+   if (nargs < 3)
       return FDErr = FDE_SYNTAX;
 
    /* calc size */
    ss = prevss = 0;
-   for (i = 2; i < argc; i++) {
-      if (*argv[i] == 0)
+   for (i = 2; i < nargs; i++) {
+      if (*args[i] == 0)
          ss++;
       else {
-         if (fdOpenR(0,argv[i]))
+         if (fdOpenR(0,args[i]))
             return FDErr;
          ss += FDesc[0].size;
          fdClose(0);
@@ -698,14 +693,14 @@ int cmdMerge(int argc, char *argv[])
       prevss = ss;
    }
 
-   if (fdOpenW(1,argv[1],ss))
+   if (fdOpenW(1,args[1],ss))
       return FDErr;
 
-   for (i = 2; i < argc; i++) {
-      if (*argv[i] == 0)
+   for (i = 2; i < nargs; i++) {
+      if (*args[i] == 0)
          fdPut(1,DC3);
       else {
-         if (fdOpenR(0,argv[i]))
+         if (fdOpenR(0,args[i]))
             return FDErr;
          c = fdGet(0);
          while (!fdEof(0))  {
@@ -721,25 +716,25 @@ int cmdMerge(int argc, char *argv[])
 }
 
 // RENAME FILE1[:UNI] FILE2[:UNI]
-int cmdRename(int argc, char*argv[])
+int cmdRename(void)
 {
    Byte suni, duni;
 
    suni = duni = 0;
-   if (3 != argc)
+   if (3 != nargs)
       return FDErr = FDE_SYNTAX;
 
-   if (fdParseFName(&suni, argv[1]))
+   if (fdParseFName(&suni, args[1]))
       return FDErr = FDE_SYNTAX;
 
-   if (fdParseFName(&duni, argv[2]))
+   if (fdParseFName(&duni, args[2]))
       return FDErr = FDE_SYNTAX;
 
-   return fdRename(suni > duni? suni : duni, argv[1], argv[2]);
+   return fdRename(suni > duni? suni : duni, args[1], args[2]);
 }
 
 // FREE [UNIT]
-int cmdFree(int argc, char*argv[])
+int cmdFree(void)
 {
    Byte uni;
    int s, i;
@@ -747,18 +742,17 @@ int cmdFree(int argc, char*argv[])
    DIR *dir;
 
    uni = 0;
-   if (1 != argc)
-      uni = fdDecimal(argv[1]);
+   if (1 != nargs)
+      uni = fdDecimal(args[1]);
 
    if (fdSelect(uni))
       return FDErr;
 
    // scan dir entries
    nf = 0;
-   for (s = 2; s < 18; s++) {
-      fdSeek(0, s);
-      dir = fdRead(0);
-      for (i = 0; i < 8; i++) {
+   for (s = DIRBEG; s < DIREND; s++) {
+      dir = fdRead(DCB(FDU,0,s),0);
+      for (i = 0; i < MAXDIRENT; i++) {
          DIRENT *de = &dir->entries[i];
          if (DE_EMPTY == (0x7F & de->track))
             nf++;
@@ -767,8 +761,7 @@ int cmdFree(int argc, char*argv[])
 
    // read map, count free tracks
    nt = 0;
-   fdSeek(0, 1);
-   map = fdRead(0);
+   map = fdRead(DCB(FDU,0,1),0);
    for (i = 0; i < 77; i++)
       if (0 == *map++)
          nt++;
@@ -779,7 +772,7 @@ int cmdFree(int argc, char*argv[])
 }
 
 // EXAM [UNI] TRACK SEC
-int cmdExam(int argc, char*argv[])
+int cmdExam(void)
 {
    Byte uni, t, s;
    int i, j, c;
@@ -787,19 +780,18 @@ int cmdExam(int argc, char*argv[])
    Word *w;
 
    uni = 0;
-   if (3 < argc)
+   if (3 < nargs)
       return FDErr = FDE_SYNTAX;
 
-   t = fdDecimal(argv[1]); s = fdDecimal(argv[2]);
-   if (argc > 3) {
-      uni = t; t = s; s = fdDecimal(argv[3]);
+   t = fdDecimal(args[1]); s = fdDecimal(args[2]);
+   if (nargs > 3) {
+      uni = t; t = s; s = fdDecimal(args[3]);
    }
 
    if (fdSelect(uni))
       return FDErr;
 
-   fdSeek(t, s);
-   buf = fdRead(0);
+   buf = fdRead(DCB(FDU,t,s),0);
    for (i = 0; i < 8; i++) {
       w = (Word*) buf;
       for (j = 0; j < 8; j++)
@@ -821,7 +813,7 @@ int cmdExam(int argc, char*argv[])
 // MEM FILE <BEGIN> <END>
 // MEM FILE <END>
 // MEM FILE <BEGIN> <END> <START>
-int cmdMem(int argc, char*argv[])
+int cmdMem(void)
 {
    Byte uni;
    Word beg, end, start;
@@ -830,19 +822,19 @@ int cmdMem(int argc, char*argv[])
    Byte fnm[MAXNAME];
 
    uni = 0;
-   if (argc < 3 || argc > 5)
+   if (nargs < 3 || nargs > 5)
       return FDErr = FDE_SYNTAX;
 
-   if (fdParseFName(&uni, argv[1]))
+   if (fdParseFName(&uni, args[1]))
       return FDErr = FDE_SYNTAX;
 
    start = beg = 0;
-   if (3 == argc)
-      end = fdHex(argv[2]);
+   if (3 == nargs)
+      end = fdHex(args[2]);
    else {
-      start = beg = fdHex(argv[2]); end = fdHex(argv[3]);
-      if (5 == argc)
-         start = fdHex(argv[4]);
+      start = beg = fdHex(args[2]); end = fdHex(args[3]);
+      if (5 == nargs)
+         start = fdHex(args[4]);
    }
 
    s = end - beg + 1;
@@ -851,21 +843,21 @@ int cmdMem(int argc, char*argv[])
    if (fdSelect(uni))
       return FDErr;
 
-   fdStr2FName(fnm,argv[1]);
+   fdStr2FName(fnm,args[1]);
    t = fdCreate(fnm, s);
    if (!t)
       return FDErr;
 
    // save to disk
-   fdSeek(t, 1);
-   ut20xy(fdd[FDUnit],beg,end,CMD_X,start);
-   fflush(fdd[FDUnit]);
+   doSeek(DCB(FDU,t,1),"cmdMem");
+   ut20xy(fdd[FDU],beg,end,CMD_X,start);
+   fflush(fdd[FDU]);
 
    return 0;
 }
 
 // SYSGEN [UNI]
-int cmdSysgen(int argc, char*argv[])
+int cmdSysgen(void)
 {
    Byte uni;
    int i, s;
@@ -873,27 +865,24 @@ int cmdSysgen(int argc, char*argv[])
    char dummy[10];
    DIR *dir;
 
-
    uni = 0;
-   if (argc > 1)
-      uni = fdDecimal(argv[1]);
+   if (nargs > 1)
+      uni = fdDecimal(args[1]);
 
    if (fdSelect(uni))
       return FDErr;
 
    // initialize track map, t0 allocated
-   fdSeek(0, MAP);
-   map = fdRead(0);
+   map = fdRead(DCB(FDU,0,MAP),0);
    for (i = 0; i < MAXBUF; i++)
       map[i] = 0;
    map[0] = 1;
-   fdWrite(0);
+   fdWrite(DCB(FDU,0,MAP),0);
 
    // write directory file
    dummy[0] = '\0';
    for (s = DIRBEG; s < DIREND; s++) {
-      fdSeek(0, s);
-      dir = fdRead(0);
+      dir = fdRead(DCB(FDU,0,s),0);
       for (i = 0; i < MAXDIRENT; i++) {
          DIRENT *de = &dir->entries[i];
          fdStr2FName(de->name, dummy);
@@ -901,19 +890,19 @@ int cmdSysgen(int argc, char*argv[])
          de->ntracks = 0;
          de->size    = 0;
       }
-      fdWrite(0);
+      fdWrite(DCB(FDU,0,s),0);
    }
 
    return 0;
 }
 
-int cmdType(int argc,char*argv[])
+int cmdType(void)
 {
    Byte c;
 
-   if (2 != argc)
+   if (2 != nargs)
       return FDErr = FDE_SYNTAX;
-   if (fdOpenR(0,argv[1]))
+   if (fdOpenR(0,args[1]))
       return FDErr;
 
    c = fdGet(0);
@@ -940,7 +929,7 @@ int cmdShell(void)
    char c, *q, buf[128];
    struct {
       char *nm;
-      int (*cmd)(int,char**);
+      int (*cmd)(void);
    } cmdtab[] = {
       {"COPY",   cmdCopy},
       {"DEL",    cmdDel},
@@ -954,8 +943,7 @@ int cmdShell(void)
       {"TYPE",   cmdType},
       {0, 0}
    };
-   char *args[8];
-   int nargs, i;
+   int i;
 
    while (1) {
       FDErr = 0;
@@ -981,7 +969,7 @@ int cmdShell(void)
          }
          for (i = 0; cmdtab[i].nm; i++) {
             if (!strcmp(cmdtab[i].nm,args[0])) {
-               (*cmdtab[i].cmd)(nargs,args);
+               (*cmdtab[i].cmd)();
                if (FDErr)
                   printf("%d: %s\n",FDErr, FDErrmsg[FDErr]);
                break;
