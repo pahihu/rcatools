@@ -1,5 +1,14 @@
 /* stdlib functions */
 
+/*
+ * History
+ * =======
+ * 201227AP disk sector read/write
+ * 201228AP vectored I/O: ttyputc/ttygetc, ioget[]/ioput[] vectors
+ *          rd.unit/wr.unit
+ *
+ */
+
 putci(c) {
    if (!c || c == '*e')
       return;
@@ -8,7 +17,7 @@ putci(c) {
    putc(c);
 }
 
-putchar(c) { /* put char to UART */
+ttyputc(c) { /* put char to UART */
    extrn putc;
    register h;
 
@@ -18,39 +27,40 @@ putchar(c) { /* put char to UART */
    return (c);
 }
 
-getchar() { /* get char from UART */
+ttygetc() { /* get char from UART */
    extrn getc;
    auto c;
 
    c = getc();
    if (c == 13)
       c = '*n';
+   ttyputc(c); /* echo */
    return (c);
 }
 
-#if 0
-char(s,i) { /* i-th char of string s */
-   register n;
+ttygo() {
+   extrn ttyinit, ioget, ioput, ttygetc, ttyputc;
 
-   n = s[i>>1];
-   /* s[] contains "ABCD", accessed a 'BA' 'DC' */
-   if (i&01)
-      n=n>>8;
-   return (n&0377);
+   ioget[0] = &ttygetc;
+   ioput[1] = &ttyputc;
+   ttyinit = 1;
 }
 
-lchar(s,i,c) { /* store char c in the i-th pos of string s */
-   register n, x;
+putchar(c) {
+   extrn ttyinit, ioput, wr.unit;
 
-   n = s[x = i>>1];
-   if (i&1)
-      n = (n & 0377) + (c << 8);
-   else
-      n = (n & 0177400) + c;
-   s[x] = n;
-   return (c);
+   if (!ttyinit)
+      ttygo();
+   return ((ioput[wr.unit])(c,wr.unit));
 }
-#endif
+
+getchar() {
+   extrn ttyinit, ioget, rd.unit;
+
+   if (!ttyinit)
+      ttygo();
+   return ((ioget[rd.unit])(rd.unit));
+}
 
 puts(s) {
    register c,i;
@@ -64,11 +74,8 @@ gets(s) { /* get string */
    register i, c;
 
    i = 0;
-   while ('*n' != (c = getchar())) {
+   while ('*n' != (c = getchar()))
       lchar(s,i++,c);
-      putchar(c);
-   }
-   putchar(c);
    lchar(s,i,'*e');
 }
 
@@ -77,7 +84,6 @@ printn(n,b) { /* print number in base b */
 
    if (a=n/b)
       printn(a,b);
-   /* putchar(n % b + '0'); */
    putchar(char("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ",n%b));
 }
 
@@ -98,10 +104,10 @@ digit(c) {
 
 atoi(s,b) { /* convert string to number in base b */
    auto c;
-   register n, d, i;
+   register n, d;
 
-   n = i = 0;
-   while (isnum(c = char(s,i++))) {
+   n = 0;
+   while (isnum(c = char(0,s++))) {
       d = digit(c);
       if (b - 1 < d)
          return (0177777);
@@ -196,5 +202,61 @@ loop:
    goto loop;
 }
 #endif
+
+#ifdef NEED_diskio
+dskgo() {
+   extrn ioget, ioput;
+   auto i;
+
+   i = 2;
+   while (i < 8) {
+      ioget[i] = 0; /* &fgetc */
+      ioput[i] = 0; /* &fputc */
+      i++;
+   }
+   homdsk();
+}
+
+mkdcb(unit,track,sector) {
+   extrn DCB;
+
+   DCB[1] = 0;
+   DCB[0] = track + (--sector << 8);
+   if (unit)
+      DCB[0] =+ 040000;
+   return (DCB);
+}
+
+dskrd(dcb,buf) {
+   auto i, stc;
+
+   i = 0;
+   while (i < 128) {
+      stc = eread(&dcb[1]);
+      if (!(stc & 0400))
+         puts("eread() failed*n");
+      lchar(buf,i++,stc);
+   }
+}
+
+dskwr(dcb,buf) {
+   auto i, c, st;
+
+   i = 0;
+   while (i < 128) {
+      c = char(buf,i++);
+      st = ewrite(&dcb[1],c);
+      if (!st)
+         puts("ewrite() failed*n");
+   }
+}
+
+DCB[2] 0, 0;
+#endif
+rd.unit 0;
+wr.unit 1;
+ttyinit 0;
+ioget[8];
+ioput[8];
 
 /* vim: set ts=3 sw=3 et: */

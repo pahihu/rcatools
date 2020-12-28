@@ -3,7 +3,7 @@ main() {
 
    puts("enter a hex number: $"); gets(s = &buf[0]); putchar('*n');
    puts(s); putchar('*n');
-   n = atoi(s, 16);
+   n = atoi(2*s, 16);
    printn(n, 10); putchar('*n');
 }
 

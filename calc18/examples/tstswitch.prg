@@ -4,7 +4,7 @@ main() {
    while (1) {
       puts(" enter a number: ");
       gets(s = &buf[0]);
-      n = atoi(s, 10);
+      n = atoi(2*s, 10);
       puts("got "); printn(n, 10); putchar('*n');
       if (!n) goto end;
       switch n {

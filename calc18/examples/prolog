@@ -334,18 +334,18 @@ MDONE:
  LDX ;PHI FP
  SEP SRET
  ..
- ..  dskgo()
+ ..  homdsk()
  ..
-Ldskgo:
+Lhomdsk:
  LDI A.0(M0) ;PLO R0
  LDI A.1(M0) ;PHI R0
  SEX R0                         ..SWITCH TO R0
  SEP R0
 M0:
- LDI A.0(XDSKGO) ;PLO PC        ..PC=SRET
- LDI A.1(XDSKGO) ;PHI PC
+ LDI A.0(XHOMDSK) ;PLO PC       ..PC=SRET
+ LDI A.1(XHOMDSK) ;PHI PC
  LBR HOMDSK                     ..JUMP TO HOMDSK
-XDSKGO:
+XHOMDSK:
  SEX SP
  SEP SRET
  ..

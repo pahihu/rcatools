@@ -1,27 +1,28 @@
 main() {
-   auto buf 64, dcb 2, i;
+   extrn DCB;
+   auto buf 64, i;
 
    puts("dskgo...*n");
    dskgo();
 
    puts("mkdcb...*n");
-   mkdcb(dcb,0,2,1);
+   mkdcb(0,2,1);
 
-   puts("writes...*n");
+   puts("dskwr...*n");
    i = 0;
    while (i < 128) {
       lchar(buf,i,i); i++;
    }
-   writes(dcb,buf);
+   dskwr(DCB,buf);
 
    puts("clear buf...*n");
    i = 0; while (i < 64) buf[i++] = 0;
 
    puts("mkdcb...*n");
-   mkdcb(dcb,0,2,1);
+   mkdcb(0,2,1);
 
-   puts("reads...*n");
-   reads(dcb,buf);
+   puts("dskrd...*n");
+   dskrd(DCB,buf);
 
    i = 0;
    while (i < 128) {
@@ -38,37 +39,6 @@ hex(n) {
 hex2(n) {
    hex(n >> 4);
    hex(n);
-}
-
-mkdcb(dcb,u,t,s) {
-   dcb[1] = 0;
-   dcb[0] = t + (--s << 8);
-   if (u)
-      dcb[0] =+ 040000;
-}
-
-reads(dcb,buf) {
-   auto i, stc;
-
-   i = 0;
-   while (i < 128) {
-      stc = eread(&dcb[1]);
-      if (!(stc & 0400))
-         puts("eread() failed*n");
-      lchar(buf,i++,stc);
-   }
-}
-
-writes(dcb,buf) {
-   auto i, c, st;
-
-   i = 0;
-   while (i < 128) {
-      c = char(buf,i++);
-      st = ewrite(&dcb[1],c);
-      if (!st)
-         puts("ewrite() failed*n");
-   }
 }
 
 #include "stdlib.prg"
