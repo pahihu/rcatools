@@ -3,13 +3,14 @@
 /*
  * History
  * =======
- * 201227AP disk sector read/write
+ * 201229AP gethex/puthex
  * 201228AP vectored I/O: ttyputc/ttygetc, ioget[]/ioput[] vectors
  *          rd.unit/wr.unit
+ * 201227AP disk sector read/write
  *
  */
 
-putci(c) {
+xputc(c) { /* translate char */
    if (!c || c == '*e')
       return;
    if (c == '*n')
@@ -21,9 +22,9 @@ ttyputc(c) { /* put char to UART */
    extrn putc;
    register h;
 
-   putci(c & 0377);
+   xputc(c & 0377);
    if (h = c >> 8)
-      putci(h);
+      xputc(h);
    return (c);
 }
 
@@ -80,12 +81,54 @@ gets(s) { /* get string */
 }
 
 printn(n,b) { /* print number in base b */
+   extrn DIGITS;
    register a;
 
    if (a=n/b)
       printn(a,b);
-   putchar(char("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ",n%b));
+   putchar(char(DIGITS,n%b));
 }
+
+#ifdef NEED_hex
+puthex(n) {
+   extrn DIGITS;
+
+   putchar(char(DIGITS,n));
+}
+
+puthex2(n) {
+   puthex(n >> 4);
+   puthex(n & 017);
+}
+
+puthex4(n) {
+   puthex2(n >> 8);
+   puthex2(n & 0377);
+}
+
+gethex() {
+   auto c;
+
+   c = getchar();
+   if (c >= 'A')
+      return (c - 'A' + 10);
+   return (c - '0');
+}
+
+gethex2() {
+   auto n;
+
+   n = gethex();
+   return ((n << 4) + gethex());
+}
+
+gethex4() {
+   auto n;
+
+   n = gethex2();
+   return ((n << 8) + gethex2());
+}
+#endif
 
 #ifdef NEED_atoi
 isdigit(c) {
@@ -253,6 +296,8 @@ dskwr(dcb,buf) {
 
 DCB[2] 0, 0;
 #endif
+
+DIGITS "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 rd.unit 0;
 wr.unit 1;
 ttyinit 0;

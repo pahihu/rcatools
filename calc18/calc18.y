@@ -274,13 +274,13 @@ void usage(void) {
 int main(int argc, char*argv[]) {
    int i;
 
-   opttime = 1;
+   opt = OTIME;
    defsym("...");
    for (i = 1; i < argc; i++) {
       if ('-' == *argv[i])
          switch (argv[i][1]) {
          case 'd': dbg = 1; break;
-         case 'O': if ('s' == argv[i][2]) opttime = 0;
+         case 'O': if ('s' == argv[i][2]) opt = OSPACE;
                    break;
          case 'h': usage();
          case 'r': regpar = 1; break;

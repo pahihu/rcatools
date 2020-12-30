@@ -1,8 +1,17 @@
 #include "fds.h"
 
-openr(fd,bName) {
-   extrn FDErr, DCB, DE, FDesc;
-   auto cb, uni;
+/*
+ * History
+ * =======
+ * 201229AP loadbin,loadhex,exec
+ * 201228AP openr,openw,close,fgetc,fputc,flush
+ *
+ */
+
+open(fd,bName,size,rw) {
+   extrn FDErr, DCB, DE, FDesc, IOBufs;
+   auto cb, uni, p;
+   auto track;
 
    cb = FDesc + (fd << 4); /* sizeof_IOCB */
    if (cb[0])
@@ -12,59 +21,51 @@ openr(fd,bName) {
    fdStr2FName(cb,bName);
 
    fdSelect(uni);
-   if (!fdFind(BYTES(cb)))
-      return (FDErr = FDE_NOTFOUND);
+   if (rw) {
+      if (!(track = fdCreate(BYTES(cb),size)))
+         return (FDErr);
+   }
+   else {
+      if (!fdFind(BYTES(cb)))
+         return (FDErr = FDE_NOTFOUND);
+      size  = DE[DIRENT_size];
+      track = DE[DIRENT_tracks] & 0377;
+   }
 
-   cb[IOCB_pos]    = 0;
-   cb[IOCB_size]   = DE[DIRENT_size];
-   mkdcb(uni,DE[DIRENT_tracks] & 0377,1);
-   cb[IOCB_dcb]    = DCB[0];
-   cb[IOCB_dcb+1]  = DCB[1];
-   cb[IOCB_eof]    = 0;
-   cb[IOCB_rw]     = 0;
-   cb[IOCB_bufpos] = MAXBUF;
+   p = cb + IOCB_pos;
+   *(p++) = 0;    /* pos  */
+   *(p++) = size; /* size */
+   *(p++) = 0;    /* eof  */
+   *(p++) = rw;   /* rw   */
+   *(p++) = rw? 0 : MAXBUF; /* bufpos */
+   mkdcb(uni,track,1);
+   *(p++) = DCB[0]; /* dcb */
+   *(p++) = DCB[1];
+   *(p)   = IOBufs + (fd << 6); /* buf, MAXBUF_W */
 
    return (0);
+}
+
+openr(fd,bName) {
+   return (open(fd,bName,0,0));
 }
 
 openw(fd,bName,size) {
-   extrn FDErr, DCB, FDesc;
-   auto cb, uni, dcb;
-   auto t;
-
-   cb = FDesc + (fd << 4); /* sizeof_IOCB */
-   if (cb[0])
-      return (FDErr = FDE_IOCB);
-   if (fdParseFName(&uni,bName))
-      return (FDErr = FDE_SYNTAX);
-   fdStr2FName(BYTES(cb),bName);
-
-   fdSelect(uni);
-   if (!(t = fdCreate(BYTES(cb),size)))
-      return (FDErr);
-
-   cb[IOCB_pos]    = 0;
-   cb[IOCB_size]   = size;
-   mkdcb(uni,t,1);
-   cb[IOCB_dcb  ]  = DCB[0];
-   cb[IOCB_dcb+1]  = DCB[1];
-   cb[IOCB_eof]    = 0;
-   cb[IOCB_rw]     = 1;
-   cb[IOCB_bufpos] = 0;
-
-   return (0);
+   return (open(fd,bName,size,1));
 }
 
 fgetc(fd) {
-   extrn FDErr, FDesc, IOBufs;
+   extrn FDErr, FDesc;
    auto cb, buf;
 
    cb  = FDesc + (fd << 4); /* sizeof_IOCB */
-   buf = IOBufs + (fd << 6); /* MAXBUF_W */
-   if (!cb[0])
-      return (FDErr = FDE_IOCB);
-   if (cb[IOCB_pos] == cb[IOCB_size])
+   if (!cb[0]) {
+      FDErr = FDE_IOCB;
       return (EOT);
+   }
+   else if (cb[IOCB_pos] == cb[IOCB_size])
+      return (EOT);
+   buf = cb[IOCB_buf];
    if (MAXBUF == cb[IOCB_bufpos]) {
       fdRead(cb + IOCB_dcb,buf);
       cb[IOCB_bufpos] = 0;
@@ -74,26 +75,27 @@ fgetc(fd) {
 }
 
 fputc(c,fd) {
-   extrn FDErr, FDesc, IOBufs;;
-   auto cb, buf;
+   extrn FDErr, FDesc;
+   auto cb, e, buf;
 
    cb  = FDesc + (fd << 4); /* sizeof_IOCB */
-   buf = IOBufs + (fd << 6); /* MAXBUF_W */
-   if (!cb[0])
-      return (FDErr = FDE_IOCB);
-   if (cb[IOCB_pos] == cb[IOCB_size])
-      return (FDErr = FDE_DISKFULL);
+   if (!cb[0]) {
+      FDErr = FDE_IOCB; return (EOT);
+   }
+   else if (cb[IOCB_pos] == cb[IOCB_size]) {
+      FDErr = FDE_DISKFULL; return (EOT);
+   }
+   buf = cb[IOCB_buf];
    if (MAXBUF == cb[IOCB_bufpos]) {
       fdWrite(cb + IOCB_dcb,buf);
       cb[IOCB_bufpos] = 0;
    }
    cb[IOCB_pos]++;
-   buf[cb[IOCB_bufpos]++] = c;
-   return (0);
+   return (buf[cb[IOCB_bufpos]++] = c);
 }
 
 close(fd) {
-   extrn FDErr, FDesc, IOBufs;;
+   extrn FDErr, FDesc;
    auto cb, buf;
 
    cb = FDesc + (fd << 4); /* sizeof_IOCB */
@@ -101,12 +103,10 @@ close(fd) {
       return (FDErr = FDE_IOCB);
    if (cb[IOCB_rw]) {
       if (cb[IOCB_bufpos]) {
-         buf = IOBufs + (fd << 6); /* MAXBUF_W */
-         fdWrite(cb + IOCB_dcb,buf);
+         fdWrite(cb + IOCB_dcb,cb[IOCB_buf]);
       }
    }
-   cb[0] = 0;
-   return (0);
+   return (cb[0] = 0);
 }
 
 flush() {
@@ -122,7 +122,78 @@ eof(fd) {
    cb = FDesc + (fd << 4); /* sizeof_IOCB */
    if (!cb[0])
       return (FDErr = FDE_IOCB);
-   return (cb[IOCB_pos] == cb[IOCB_size]? 1 : 0);
+   return (cb[IOCB_pos] == cb[IOCB_size]);
+}
+
+getadr() {
+   auto adr;
+
+   adr = getchar();
+   return ((adr << 8) + getchar());
+}
+
+/* multiple segments, {adr:2,len:2,data:len}+ */
+loadbin(bName) {
+   extrn FDErr, rd.unit;
+   auto old.rd, c;
+   auto adr, n;
+
+   if (openr(2,bName))
+      return (FDErr);
+   old.rd = rd.unit; rd.unit = 2;
+
+   while (!eof(rd.unit)) {
+      adr = getadr();
+      if (!(n = getadr())) /* len=0, start adr */
+         goto End;
+      while (n--)
+         lchar(0,adr++,getchar());
+   }
+End:
+   close(rd.unit); rd.unit = old.rd;
+   return (adr);
+}
+
+loadhex(bName) {
+   extrn FDErr, rd.unit;
+   auto old.rd, c, adr;
+
+   if (openr(2,bName))
+      return (FDErr);
+
+   old.rd = rd.unit; rd.unit = 2;
+   while (!eof(rd.unit)) {
+LAgain:
+      c = getchar();
+      if (c == '!') {
+         c = getchar();
+         if (c == 'M' || c == 'U') {
+            adr = gethex4(); goto LAgain;
+         }
+         else
+            return (1);
+      }
+      else if (c == ',' || c == '*n')
+         goto LAgain;
+      lchar(0,adr++,gethex2());
+   }
+   close(rd.unit); rd.unit = old.rd;
+   return (adr);
+}
+
+exec(bName) {
+   extrn FDErr, DE;
+   auto fnm MAXNAME_W;
+   auto entry;
+
+   fdStr2FName(fnm,bName);
+   if (!fdFind(BYTES(fnm)))
+      return (FDErr = FDE_NOTFOUND);
+   entry = DE[DIRENT_type]? loadbin(bName) : loadhex(bName);
+   if (entry & 1) /* odd entry means fmt error */
+      return (FDErr = FDE_LOAD);
+   entry =>> 1;
+   return ((entry)());
 }
 
 FDesc[128]; /* 8 * sizeof_IOCB */

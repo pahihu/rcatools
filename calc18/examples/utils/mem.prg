@@ -11,7 +11,7 @@ main() {
    auto uni;
    auto beg, end, start;
    auto s, i;
-   auto fnm MAXNAME_W, buf MAXBUF_W;
+   auto fnm MAXNAME_W, old.wr;
 
    uni = 0;
    if (NArgs < 3 || NArgs > 5)
@@ -32,21 +32,20 @@ main() {
    s = end - beg + 1;
    s = 6 + (2 * s) + ((s + 19) / 20) * 2 + 1 + 6 + 1;
 
-   if (fdOpenW(2,Args[1],s,buf))
+   if (openw(2,Args[1],s))
       return (FDErr);
+   old.wr = wr.unit; wr.unit = 2;
 
    /* save to disk */
-   old.unit = wr.unit;
-   wr.unit = 2;
-   puts("!M"); hex4(beg); putchar('*n');
+   puts("!M"); puthex4(beg); putchar('*n');
    i = 0;
    while (beg < end) {
       c = char(0,beg++);
-      hex2(c);
+      puthex2(c);
       if (0 == (++i % 20))
          putchar(',*n');
    }
-   puts("$U"); hex4(start); putchar('*n');
+   puts("$U"); puthex4(start); putchar('*n');
    fdClose(2);
    wr.unit = old.unit;
 

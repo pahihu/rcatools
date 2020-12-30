@@ -1,17 +1,5 @@
 /* Memory dump and disassembler */
 
-hex(n) {
-   putchar(char("0123456789ABCDEF",n));
-}
-
-hex2(n) {
-   hex(n >> 4); hex(n & 017);
-}
-
-hex4(n) {
-   hex2(n >> 8); hex2(n & 0377);
-}
-
 printable(c) {
    return ((31 < c && c < 128)? c : '.');
 }
@@ -30,10 +18,10 @@ dump(a,n) {
 
    i=0;
    while (i<n) {
-      hex4(a); putchar(' ');
+      puthex4(a); putchar(' ');
       j=0;
       while (j<8) {
-         putchar(' '); hex2(char(0,a + j++));
+         putchar(' '); puthex2(char(0,a + j++));
       }
       putchar('  '); /* 2B */
       j=0;
@@ -55,7 +43,7 @@ dasm(p) {
    register i, mnemo, args;
 
    c0de = char(0,p); N = Lo(c0de);
-/* hex4(p); putchar(' '); hex2(c0de); hex(Hi(c0de)); putchar(' '); hex(N); putchar('*n'); */
+/* puthex4(p); putchar(' '); puthex2(c0de); puthex(Hi(c0de)); putchar(' '); puthex(N); putchar('*n'); */
    args = a;
    mnemo = m + 2*Hi(c0de);
 /* puts(mnemo); putchar('*n'); */
@@ -70,10 +58,10 @@ dasm(p) {
    arg = char(args,('*e' == char(args,1))? 0 : N) - '0';
    
    nargs = (arg & 3) + 1;
-   hex4(p); putchar(' ');
+   puthex4(p); putchar(' ');
    i = 0;
    while (i < nargs)
-      hex2(char(0,p+i++));
+      puthex2(char(0,p+i++));
    while (i++ < 4)
       putchar('  '); /* 2B */
    putchar(mnemo[0]);
@@ -84,15 +72,15 @@ dasm(p) {
    case 0:
       goto end;
    case 1:
-      hex2(char(0,p+1));
+      puthex2(char(0,p+1));
       goto end;
    case 2:
-      hex4((char(0,p+1) << 8) + char(0,p+2));
+      puthex4((char(0,p+1) << 8) + char(0,p+2));
       goto end;
    case 4:
    case 8:
       if (arg == 4) N =& 7;
-      hex(N);
+      puthex(N);
       goto end;
    }
 end:
@@ -164,6 +152,7 @@ main() {
    }
 }
 
+#define NEED_hex
 #include "stdlib.prg"
 
 /* vim: set ts=3 sw=3 et: */

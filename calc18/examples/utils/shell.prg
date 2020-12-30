@@ -1,65 +1,46 @@
-static int isempt(int c) {
-   return c < 33;
+#include "fds.h"
+
+isempt(c) {
+   return (c < 33);
 }
 
-static int issep(int c) {
-   return c == 0 || c == ' ' || c == ',' || c == ';' || c == '/';
+issep(c) {
+   return (!c || c == ' ' || c == ',' || c == ';' || c == '/');
 }
 
-// SHELL
-int cmdShell(void)
-{
-   char c, *q, buf[128];
-   struct {
-      char *nm;
-      int (*cmd)(void);
-   } cmdtab[] = {
-      {"COPY",   cmdCopy},
-      {"DEL",    cmdDel},
-      {"DIR",    cmdDir},
-      {"EXAM",   cmdExam},
-      {"FREE",   cmdFree},
-      {"MEM",    cmdMem},
-      {"MERGE",  cmdMerge},
-      {"RENAME", cmdRename},
-      {"SYSGEN", cmdSysgen},
-      {"TYPE",   cmdType},
-      {0, 0}
-   };
-   int i;
+ucase(c) {
+   if ('a' <= c && c <= 'z')
+      c = c - 'a' + 'A';
+   return (c);
+}
+
+/* SHELL */
+cmdShell() {
+   extrn FDErr, FDErrmsg, NArgs, Args;
+   auto c, q, buf 64;
+   auto i, fnm MAXNAME_W;
 
    while (1) {
       FDErr = 0;
-      printf("> ");
-      if (!(q = fgets(buf,127,stdin)))
-         return 0;
+      puts("> ");
+      if (!(q = gets(buf)))
+         return (0);
+      q = BYTES(q);
       i = strlen(q);
-      if (i && '\n' == q[i-1])
-         q[i-1] = '\0';
-      nargs = 0;
-      while ((nargs < 8) && *q) {
-         while (isempt(c = *q)) q++;
-         args[nargs++] = q;
-         while (!issep(c = ucase(*q)))
-            *q++ = c;
-         *q++ = '\0';
+      if (i && '*n' == char(0,q+i-1)
+         lchar(0,q+i-1,'*e');
+      NArgs = 0;
+      while ((NArgs < 8) && char(0,q) != '*e') {
+         while (isempt(c = char(0,q))) q++;
+         Args[NArgs++] = q;
+         while (!issep(c = ucase(char(0,q))))
+            lchar(0,q++,c);
+         lchar(0,q++,'*e');
       }
-      if (nargs) {
-         if (dbg) {
-            for (i = 0; i < nargs; i++)
-               printf("arg%d=[%s] ",i,args[i]);
-            printf("\n");
-         }
-         for (i = 0; cmdtab[i].nm; i++) {
-            if (!strcmp(cmdtab[i].nm,args[0])) {
-               (*cmdtab[i].cmd)();
-               if (FDErr)
-                  printf("%d: %s\n",FDErr, FDErrmsg[FDErr]);
-               break;
-            }
-         }
-         if (!cmdtab[i].nm)
-            printf("CMD NOT FOUND\n");
+      if (NArgs) {
+         exec(Args[0]);
+         if (FDErr)
+            printf(%d: %s*n",FDErr,FDErrmsg[FDErr]);
       }
    }
    return 0;

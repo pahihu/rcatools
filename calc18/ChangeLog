@@ -1,6 +1,10 @@
 History
 =======
 
+201230AP changed RTSWITCH
+         added prolog2 which uses tokens (much smaller code size),
+         targeting -Os
+
 201228AP stdlib: dskgo/mkdcb/dskrd/dskwr routines (NEED_diskio)
          NB. disk I/O requires the UT20 ROM and 2x disk images,
          because HOMDSK checks both units.

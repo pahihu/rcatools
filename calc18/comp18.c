@@ -46,7 +46,7 @@
 
 int Err = 0;
 char *fn;
-int opttime = 1;
+OptFlag opt = OTIME;
 int nregvars; // no.of regvars
 int regpar = 0; // no params in registers
 int verbose = 0; // verbose
@@ -722,7 +722,7 @@ Z glvaluvar(NODE *p) {
       WLDSYM(MA,tmp);
       break;
    case C_AUTO:
-      if (!opttime && !HI(offs))
+      if (opt == OSPACE && !HI(offs))
          H(" LDI A.0(AUT8); PLO SUB ;SEP SUB,#%02X\n",LO(offs));
       else
          WSMI(MA,FP,offs);
@@ -732,7 +732,7 @@ Z glvaluvar(NODE *p) {
       exit(1);
       break;
    case C_PARAM:
-      if (!opttime && !HI(offs))
+      if (opt == OSPACE && !HI(offs))
          H(" LDI A.0(PAR8); PLO SUB ;SEP SUB,#%02X\n",LO(offs));
       else
          WADI(MA,FP,offs);
@@ -754,7 +754,7 @@ Z gindex(NODE *p) {
    }
    else {
       gbinary(p);
-      if (!opttime)
+      if (opt == OSPACE)
          H(" LDI A.0(IDX) ;PLO SUB ;SEP SUB\n");
       else {
          WADD(MA,AC);
@@ -1043,11 +1043,11 @@ Z gxor(NODE *p) { glog(p, "XOR", "XRI"); }
 Z gor(NODE *p)  { glog(p, "OR", "ORI");  }
 
 Z WSTRMA(void) {
-   if (opttime) {
+   if (opt == OTIME) {
       WPOP(MA);
       WSTR(MA,AC);
    }
-   else
+   else if (opt == OSPACE)
       H(" LDI A.0(ASGN) ;PLO SUB ;SEP SUB\n");
 }
 
@@ -1263,7 +1263,7 @@ static int gintrinsic(char *sym,NODE *p) {
    NODE *q, *arg1, *arg2, *arg3;
    int x3;
 
-   if (!opttime)
+   if (opt == OSPACE)
       return 0;
 
    if (!strcmp(sym,"char")) {
@@ -1328,7 +1328,7 @@ int ex(NODE *p) {
          if (regpar)
             needfp = nparams > 2 || (autooffs + 1);
          if (needfp) {
-            if (!opttime && !HI(autooffs+1))
+            if (opt == OSPACE && !HI(autooffs+1))
                H(" LDI A.0(SUBENT) ;PLO SUB ;SEP SUB,#%02X\n",LO(autooffs+1));
             else {
                WPUSH(FP);
@@ -1399,11 +1399,19 @@ int ex(NODE *p) {
       case SWITCH:
          swpush();
          load(p->a[0]);
+#if 1
+         H(" LDI A.1(L%d) ;STXD\n",switches[currsw].ltab);
+         H(" LDI A.0(L%d) ;STXD\n",switches[currsw].ltab);
+         gcall("SWITCH");
+         H(" DB L%d ..MAXCASE\n",switches[currsw].lmaxcase);
+         H(" DW L%d ..ENDCASE\n",switches[currsw].lend);
+#else
          H(" GLO AC ;SMI L%d\n",switches[currsw].lmaxcase);
          H(" LBDF L%d\n",switches[currsw].lend);
          H(" LDI A.1(L%d) ;STXD\n",switches[currsw].ltab);
          H(" LDI A.0(L%d) ;STR SP\n",switches[currsw].ltab);
          gcall("SWITCH");
+#endif
          ex(p->a[1]);
          H("L%d:\n",switches[currsw].lend);
          swpop();
@@ -1438,14 +1446,14 @@ int ex(NODE *p) {
          ex(q->a[1]); // stmt
          H("E%s:\n",sym); // fn epilogue
          if (needfp) {
-            if (!opttime)
+            if (opt == OSPACE)
                H(" LDI A.0(SUBRET) ;PLO SUB ;SEP SUB\n");
             else {
                WMOV(SP, FP);
                WPOP(FP);
             }
          }
-         if (opttime)
+         if (opt == OTIME)
             H(" SEP SRET\n");
          swdef();
          dropsyms();

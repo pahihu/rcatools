@@ -308,7 +308,7 @@ fdFind(bName) {
    if (ds) {                                    /* deleted entry? */
       dir = fdRead(mkdcb(FDU,0,ds),0);          /*    read back   */
       DE = dir + dj * sizeof_DIRENT;            /*    reset DE    */
-      return (dj + 1);
+      return (0);
    }
    /* DIR full */
    DE = 0;                                      /* clear DE */
@@ -326,8 +326,7 @@ fdCreate(bName,size) {
       FDErr = FDE_DISKFULL; return (0);
    }
 
-   i = fdFind(bName);
-   if (i) {
+   if ((i = fdFind(bName))) {
       FDErr = FDE_EXISTS;
       goto LError;
    }
@@ -343,6 +342,7 @@ fdCreate(bName,size) {
       lchar(DE,i++,char(0,bName++));
    DE[DIRENT_tracks] = (nt << 8) + t;
    DE[DIRENT_size]   = size;
+   DE[DIRENT_type]   = 0; /* ASCII file */
    fdWrite(FDCB,0);
 
    return (t);
@@ -365,8 +365,7 @@ fdRename(uni,bName,bNewname) {
 
    fdStr2FName(fnm, bName);
    fdSelect(uni);
-   i = fdFind(BYTES(fnm));
-   if (!i)
+   if (!(i = fdFind(BYTES(fnm))))
       return (FDErr = FDE_NOTFOUND);
 
    /* update direntry */
@@ -378,7 +377,8 @@ fdRename(uni,bName,bNewname) {
 
 FDErr 0;          /* error code */
 FDErrmsg[0] "OK", "DISK FULL", "DIR. FULL", "FILE EXIST",
-            "F.N. NOT FOUND", "SYNTAX ERROR", "DISK ERROR", "IOCB ERROR";
+            "F.N. NOT FOUND", "SYNTAX ERROR", "DISK ERROR", "IOCB ERROR",
+            "LOADER ERROR";
 FDU;              /* current unit */
 FDCB 2;           /* last DCB */
 FDBuf[MAXBUF_W];  /* I/O buffer */

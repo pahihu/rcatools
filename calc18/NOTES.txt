@@ -218,3 +218,25 @@ flush() same as close(wr.unit)
 ioerrors(n)
    0 - terminate on error, 1 anything goes
 
+
+ZIP routines
+============
+
+- uses the same regs as -Ot
+- tokenized routines: runs in PC, virtual pointer is IP
+- uses std.calls
+- can call native routines or Z routines can be called from natives
+
+   DB A.0(TCALL),A(SUBR),LO(2*NARGS),HI(2*NARGS)   ..CALL NATIVE/Z ROUTINE
+
+ZSUBR:
+   SEP ZENT,LO(#FRAME),HI(#FRAME)
+   ...
+   DB A.0(TRET)
+
+SUBR:
+   ...
+   SEP SRET
+
+
+.. vim: set ts=3 sw=3 et:

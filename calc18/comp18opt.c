@@ -32,7 +32,7 @@
 
 int Err = 0;
 char *fn;
-int opttime = 1;
+OptFlag opt = OTIME;
 int lowreg; // lowest regvar
 int nregvars; // no.of regvars
 int regpar = 0; // no params in registers
@@ -807,7 +807,7 @@ Z glvaluvar(NODE *p, int regena, int pushma) {
          H(" GLO AUX ;STXD\n");
       }
       else {
-         if (!opttime && !HI(offs))
+         if (opt == OSPACE && !HI(offs))
             H(" LDI A.0(AUT8); PLO SUB ;SEP SUB,#%02X\n",LO(offs));
          else
             WSMI("MA","FP",offs);
@@ -824,7 +824,7 @@ Z glvaluvar(NODE *p, int regena, int pushma) {
          H(" GLO AUX ;STXD\n");
       }
       else {
-         if (!opttime && !HI(offs))
+         if (opt == OSPACE && !HI(offs))
             H(" LDI A.0(PAR8); PLO SUB ;SEP SUB,#%02X\n",LO(offs));
          else
             WADI("MA","FP",offs);
@@ -1964,7 +1964,7 @@ int ex(NODE *p) {
          if (regpar)
             needfp = nparams > 2 || (autooffs + 1);
          if (needfp) {
-            if (!opttime && !HI(autooffs+1))
+            if (opt == OSPACE && !HI(autooffs+1))
                H(" LDI A.0(SUBENT) ;PLO SUB ;SEP SUB,#%02X\n",LO(autooffs+1));
             else {
                WPUSH("FP");
@@ -2096,14 +2096,14 @@ Lautodef:
                WPOP(regnm(i-1));
          }
          if (needfp) {
-            if (!opttime)
+            if (opt == OSPACE)
                H(" LDI A.0(SUBRET) ;PLO SUB ;SEP SUB\n");
             else {
                WMOV("SP", "FP");
                WPOP("FP");
             }
          }
-         if (opttime)
+         if (opt == OTIME)
             H(" SEP SRET\n");
          swdef();
          dropsyms();
