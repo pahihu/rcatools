@@ -239,4 +239,7 @@ SUBR:
    SEP SRET
 
 
+- PRI PRD POI POD tokens for ++x, --x, x++, x--
+
+
 .. vim: set ts=3 sw=3 et:

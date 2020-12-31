@@ -86,7 +86,7 @@ TADD: LBR VADD
 TSUB: LBR VSUB
 TMUL: LBR VMUL
 TDIV: LBR VDIV
-TMOD: LBR VMOD
+TMQ:  LBR VMQ
 TAND: LBR VAND
 TOR:  LBR VOR
 TXOR: LBR VXOR
@@ -95,15 +95,21 @@ TNEG: LBR VNEG
 TSHL: LBR VSHL
 TSHR: LBR VSHR
 TLDI: LBR VLDI
+TLDI8:LBR VLDI8
 TIDX: LBR VIDX
+TIDX8:LBR VIDX8
 TLOD: LBR VLOD
+TLOD8:LBR VLOD8
 TSTO: LBR VSTO
-TLBR: LBR VLBR
-TLBZ: LBR VLBZ
+TSTO8:LBR VSTO8
+TBR:  LBR VBR
+TBZ:  LBR VBZ
+TBNZ: LBR VBNZ
 TEQ:  LBR VEQ
-TNOT: LBR VEQ
+TNOT: LBR BEQ
 TNE:  LBR VNE
-TLT:  LBR VLE
+TNE0: LBR BNE
+TLT:  LBR VLT
 TGE:  LBR VGE
 TGT:  LBR VGT
 TLE:  LBR VLE
@@ -115,9 +121,48 @@ TPAR: LBR VPAR
 TLOC8:LBR VLOC8
 TLOC: LBR VLOC
 TIVP: LBR VIVP
-..
-..  UNSIGNED MULT AC BY AUX
-..
+TPRI: LBR VPRI    ..PRE INC
+TPRD: LBR VPRD    ..PRE DEC
+TINC: LBR VINC    ..AC++
+TDEC: LBR VDEC    ..AC--
+TMUL2:LBR VMUL2
+TDIV2:LBR VDIV2
+TSWI: LBR VSWI
+ ..
+ ..  CALL ROUTINE IN AC
+ ..
+RTNCALL:
+ GHI ARGPTR ;STXD        ..PUSH ARGPTR
+ GLO ARGPTR ;STXD
+ GHI PC ;PHI ARGPTR      ..ARGPTR=PC
+ GLO PC ;PLO ARGPTR
+ GLO AC ;SHL ;PLO PC     ..PC=2*AC
+ GHI AC ;SHLC ;PHI PC
+ LBR RRET                ..BRANCH TO ENTRY
+ ..
+ ..  SWITCH
+ ..  AC = VAL TO JUMP ON, SWTAB ADDR ON STACK
+ ..
+ ..  LDI A.0(SWITCH) ;PLO SUB ;SEP SUB
+ ..  DB #MAXCASE
+ ..  DW ADDR(LEND)
+ ..
+RTSWITCH:
+ LDA PC ;STR SP ;GLO AC ;SM      ..CHK MAXCASE
+ LBDF RTLEND
+ GLO AC ;SHL ;IRX ;ADD ;PLO MA   ..CALC OFFS, ADD TO SWTAB
+ LDI #00 ;IRX ;ADC ;PHI MA
+ LDA MA ;PHI PC         ..GET ADDR
+ LDN MA ;PLO PC
+ LBR RRET               ..JUMP TO CASE
+RTLEND:
+ LDA PC ;PHI AUX        ..JUMP TO LEND
+ LDN PC ;PLO PC
+ GHI AUX ;PHI PC
+ LBR RRET
+ ..
+ ..  UNSIGNED MULT AC BY AUX
+ ..
 RTUMULT:
  IRX ;IRX                .. SP->AUX.1
  LDI #00 ;PHI MQ ;PLO MQ .. MQ=0
@@ -172,7 +217,7 @@ SDM:
  DEC SP                         .. SP->Y.0
  GLO AC      ;SM ;PLO TMP       ..IF X>=Y
  GHI AC ;IRX ;SMB               .. SP->Y.1
- LBNF COMPQ0
+ BNF COMPQ0
  PHI AC ;GLO TMP ;PLO AC        ..X=X-Y
 DBLD:                           ..WHILE
  DEC SP                         .. SP->Y.0
@@ -183,7 +228,7 @@ DBLD:                           ..WHILE
  DEC SP                         .. SP->Y.0
  LDX ;SHL  ;STR SP              ..Y=Y+Y
  IRX ;LDX ;SHLC ;STR SP         .. SP->Y.1
- LBR DBLD
+ BR DBLD
 COMPQ0:
  .. Q IS AC
  LDI #00 ;PLO AC ;PHI AC        ..Q = 0
@@ -196,58 +241,30 @@ COMPQ:
  INC AC                         ..Q = Q + 1
 CHK0:
  DEC SP                         .. SP->Y.0
- GLO AUX ;XOR ;IRX ;LBNZ YNEY0  ..IF Y == Y0 BREAK, SP->Y.1
+ GLO AUX ;XOR ;IRX ;BNZ YNEY0   ..IF Y == Y0 BREAK, SP->Y.1
  GHI AUX ;XOR ;LBZ RRET
 YNEY0:
  GLO AC ;SHL ;PLO AC            ..Q = Q + Q
  GHI AC ;SHLC ;PHI AC
  LDX ;SHR ;STR SP               ..Y = HALF(Y)
  DEC SP ;LDX ;SHRC ;STR SP      .. SP->Y.0
- LBR COMPQ
- ..
- ..  CALL ROUTINE IN AC
- ..
-RTNCALL:
- GHI ARGPTR ;STXD        ..PUSH ARGPTR
- GLO ARGPTR ;STXD
- GHI PC ;PHI ARGPTR      ..ARGPTR=PC
- GLO PC ;PLO ARGPTR
- GLO AC ;SHL ;PLO PC     ..PC=2*AC
- GHI AC ;SHLC ;PHI PC
- LBR RRET                ..BRANCH TO ENTRY
- ..
- ..  SWITCH
- ..  AC = VAL TO JUMP ON, SWTAB ADDR ON STACK
- ..
- ..  LDI A.0(SWITCH) ;PLO SUB ;SEP SUB
- ..  DB #MAXCASE
- ..  DW ADDR(LEND)
- ..
-RTSWITCH:
- LDA PC ;STR SP ;GLO AC ;SM      ..CHK MAXCASE
- LBDF LEND
- GLO AC ;SHL ;IRX ;ADD ;PLO MA   ..CALC OFFS, ADD TO SWTAB
- LDI #00 ;IRX ;ADC ;PHI MA
- LDA MA ;PHI PC         ..GET ADDR
- LDN MA ;PLO PC
- LBR RRET               ..JUMP TO CASE
-LEND:
- LDA PC ;PHI AUX        ..JUMP TO LEND
- LDN PC ;PLO PC
- GHI AUX ;PHI PC
- LBR RRET
+ BR COMPQ
  ..
  ..  Z RUNTIME RTNS
  ..
-VCALL:                     ..CALL,SUBR,LO(2*NARGS),HI(2*NARGS)
+VNCALL:                    ..NCALL,LO(2*NARGS),HI(2*NARGS), ADR IN AC
+ GLO AC ;SHL ;PLO AC       ..AC=AC << 2
+ GHI AC ;SHLC ;PHI AC
+ LBR DOCALL
+VCALL:                     ..CALL,SUBR,LO(2*NARGS)
  ..RUNS IN PC!
  LDA IP ;PHI AC            ..AC=SUBR
  LDA IP ;PLO AC
-VNCALL:                    ..NCALL,LO(2*NARGS),HI(2*NARGS), ADR IN AC
- LDI A.1(CHSUB) ;PHI SUB   ..CHANGE TO SUB
- LDI A.0(CHSUB) ;PLO SUB
+DOCALL:                    
+ LDI A.1(CHSUB1) ;PHI SUB  ..CHANGE TO SUB
+ LDI A.0(CHSUB1) ;PLO SUB
  SEP SUB
-CHSUB:
+CHSUB1:
  GHI ARGPTR ;STXD          ..PUSH ARGPTR
  GLO ARGPTR ;STXD
  LDI A.1(RTS) ;PHI ARGPTR  ..ARGPTR=ADDR(RTS)
@@ -257,7 +274,9 @@ CHSUB:
  LBR RRET                  ..JUMP TO SUBR IN PC, IP POINTS TO LO(2*NARGS)...
 RTS:
  LDA IP ;STR SP ;GLO SP ;ADD ;PLO AUX  ..SP += 2*#NARGS
- LDA IP ;STR SP ;GHI SP ;ADC ;PHI SP
+ LBNF NOCY
+ GHI SP ;ADCI #00 ;PHI SP
+NOCY:
  GLO AUX ;PLO SP
  LBR NEXT
  ..
@@ -295,14 +314,7 @@ VDIV:                      ..AC=*SP++ / AC
  LDI A.0(UDIV) ;PLO SUB ;SEP SUB
  LBR NEXT
  ..
-VMOD:                      ..AC=*SP++ % AC
- IRX ;LDXA ;PLO AUX        ..AUX=*SP++
- LDX ;PHI AUX
- GHI AC ;STXD              ..*SP++=AC
- GLO AC ;STXD
- GLO AUX ;PLO AC           ..AC=AUX
- GHI AUX ;PHI AC
- LDI A.0(UDIV) ;PLO SUB ;SEP SUB
+VMQ:                       ..AC=MQ
  GLO MQ ;PLO AC
  GHI MQ ;PHI AC
  LBR NEXT
@@ -332,16 +344,25 @@ VNEG:                      ..AC=-AC
  GHI AC ;SDBI #00 ;PHI AC
  LBR NEXT
  ..
+VMUL2:
+ LDI #01 ;PLO AUX
+ LBR MUL2
+ ..
 VSHL:                      ..AC= *SP++ << AC
  GLO AC ;PLO AUX
  IRX ;LDXA ;PLO AC
  LDX ;PHI AC
 NXTSHL:
  GLO AUX ;LBZ NEXT         ..0==AUX? GOTO NEXT
+MUL2:
  GLO AC ;SHL ;PLO AC
  GHI AC ;SHLC ;PHI AC
  DEC AUX
  LBR NXTSHL
+ ..
+VDIV2:
+ LDI #01 ;PLO AUX
+ LBR DIV2
  ..
 VSHR:                      ..AC= *SP++ >> AC
  GLO AC ;PLO AUX
@@ -349,55 +370,86 @@ VSHR:                      ..AC= *SP++ >> AC
  LDX ;PHI AC
 NXTSHR:
  GLO AUX ;LBZ NEXT
+DIV2:
  GHI AC ;SHR ;PHI AC
  GLO AC ;SHRC ;PLO AC
  DEC AUX
  LBR NXTSHR
  ..
+VLDI8:                     ..AC=#00XX
+ LDI #00 ;PHI AC
+ LBR LDI8
+ ..
 VLDI:                      ..AC=#XXYY
  LDA IP ;PHI AC
+LDI8:
  LDA IP ;PLO AC
  LBR NEXT
  ..
-VIDX:                      ..AC=2*(*SP + AC)
+ ..
+VIDX:                      ..AC=2*((*SP++) + AC)
  GLO AC ;IRX ;ADD ;PLO AUX
  GHI AC ;IRX ;ADC ;PHI AUX
  GLO AUX ;SHL ;PLO AC
  GHI AUX ;SHLC ;PHI AC
  LBR NEXT
  ..
-VLOD:                      ..AC=M[AC]
- LDA AC ;PLO AUX
- LDN AC ;PHI AC
- GLO AUX ;PLO AC
+VIDX8:                     ..AC=2*(*SP++)+AC
+ IRX ;LDXA ;SHL ;PLO AUX
+ LDX ;SHLC ;PHI AUX
+ GLO AUX ;STR SP ;GLO AC ;ADD ;PLO AC
+ GHI AUX ;STR SP ;GHI AC ;ADC ;PHI AC
+ LBR NEXT
+ ..
+VLOD:                      ..MA=AC,AC=M[MA]
+ GLO AC ;PLO MA
+ GHI AC ;PHI MA
+ LDA MA ;PLO AC
+ LDN MA ;PHI AC
+ LBR NEXT
+ ..
+VLOD8:
+ GLO AC ;PLO MA            ..MA=AC
+ GHI AC ;PHI MA
+ LDA MA ;PLO AC            ..AC.0=M[MA]
+ LDI #00 ;PHI AC
  LBR NEXT
  ..
 VSTO:                      ..M[*SP]=AC
- IRX ;LDXA ;PLO AUX
- LDX ;PHI AUX
- GLO AC ;STR AUX ;INC AUX
- GHI AC ;STR AUX
+ IRX ;LDXA ;PLO MA
+ LDX ;PHI MA
+ GLO AC ;STR MA ;INC MA
+ GHI AC ;STR MA
  LBR NEXT
  ..
-VLBR:                      ..LBR #XXYY
- LDA IP ;PLO AUX
- LDN IP ;PHI IP
- GLO AUX ;PLO IP
+VSTO8:                     ..M[*SP++]=AC.0
+ IRX ;LDXA ;PLO MA
+ LDX ;PHI MA
+ GLO AC ;STR MA
  LBR NEXT
  ..
-VLBZ:                      ..LBZ #XXYY
- GLO AC ;LBNZ NOBZ
- GHI AC ;LBNZ NOBZ
- LBR VLBR
-NOBZ:
+VBR:                       ..BR #XXYY
+ LDA IP ;PHI AUX
+ LDN IP ;PLO IP
+ GHI AUX ;PHI IP
+ LBR NEXT
+ ..
+VBZ:                       ..BZ #XXYY
+ GLO AC ;LBNZ NOBR
+ GHI AC ;LBNZ NOBR
+ LBR VBR
+NOBR:
  LDA IP ;LDA IP
  LBR NEXT
+VBNZ:                      ..BNZ #XXYY
+ GLO AC ;LBNZ VBR
+ GHI AC ;LBNZ VBR
+ LBR NOBR
  ..
 VEQ:                       ..AC= *SP++ == AC? 1 : 0
  GLO AC ;IRX ;SD ;PLO AC
  GHI AC ;IRX ;SDB ;PHI AC
-BEQ:
-VNOT:                      ..AC= AC==0 ? 1 : 0
+BEQ:                       ..AC= AC==0 ? 1 : 0
  GLO AC ;LBNZ F
  GHI AC ;LBZ T
  LBR F
@@ -406,7 +458,7 @@ VNE:                       ..AC= *SP++ != AC? 1 : 0
  GLO AC ;IRX ;SD ;PLO AC
  GHI AC ;IRX ;SDB ;PHI AC
  ..
-BNE:
+BNE:                       ..AC= AC!=0 ? 1 : 0
  GLO AC ;LBNZ T
  GHI AC ;LBNZ T
  LBR F
@@ -450,6 +502,10 @@ VRET:
  GHI FP ;PHI SP
  IRX ;LDXA ;PLO FP         ..POP FP
  LDX ;PHI FP
+ LDI A.1(CHSUB2) ;PHI SUB   ..CHANGE TO SUB
+ LDI A.0(CHSUB2) ;PLO SUB
+ SEP SUB
+CHSUB2:
  LBR RET                   ..STD.RETURN
  ..
 XZENT: SEP PC
@@ -491,6 +547,25 @@ VLOC:                      ..LOC,LO(#OFFS),HI(#OFFS)
  LDA IP ;STR SP ;GHI FP ;SMB ;PHI AC
  LBR NEXT
  ..
+VPRI:                      ..PRE INC, AC=VAL, MA=ADR+1
+ INC AC
+STMA:
+ GHI AC ;STR MA ;DEC MA
+ GLO AC ;STR MA
+ LBR NEXT
+ ..
+VPRD:                      ..PRE DEC
+ DEC AC                    ..AC--
+ LBR STMA
+ ..
+VINC:                      ..AC++
+ INC AC
+ LBR NEXT
+ ..
+VDEC:                      ..AC--
+ DEC AC
+ LBR NEXT
+ ..
 VIVP:                      ..IVP,LO(#OFFS),HI(#OFFS)
  LDA IP ;STR SP ;GLO FP ;SM ;PLO MA ..MA=FP-#OFFS
  LDA IP ;STR SP ;GLO FP ;SMB ;PHI MA
@@ -498,6 +573,27 @@ VIVP:                      ..IVP,LO(#OFFS),HI(#OFFS)
  GLO MA ;SHRC
  DEC MA ;DEC MA ;STR MA    ..*MA=AUX
  INC MA ;GHI AUX ;STR MA
+ LBR NEXT
+ ..
+ ..  SWITCH
+ ..  AC = VAL TO JUMP ON, SWTAB ADDR ON STACK
+ ..
+ ..  LDI A.0(SWITCH) ;PLO SUB ;SEP SUB
+ ..  DB #MAXCASE
+ ..  DW ADDR(LEND)
+ ..
+VSWI:
+ LDA IP ;STR SP ;GLO AC ;SM      ..CHK MAXCASE
+ LBDF VLEND
+ GLO AC ;SHL ;IRX ;ADD ;PLO MA   ..CALC OFFS, ADD TO SWTAB
+ LDI #00 ;IRX ;ADC ;PHI MA
+ LDA MA ;PHI IP         ..GET ADDR
+ LDN MA ;PLO IP
+ LBR NEXT               ..JUMP TO CASE
+VLEND:
+ LDA IP ;PHI AUX        ..JUMP TO LEND
+ LDN IP ;PLO IP
+ GHI AUX ;PHI IP
  LBR NEXT
  .. 
  ..  putc(c)
@@ -525,34 +621,6 @@ Lexit:
  IDL     ..STOP
 DIE:
  LBR DIE,#DEAD
- ..
- ..  char(s,x)
- ..
-Lchar:
- GLO SP ;ADI #03 ;PLO MA         ..MA=ADDR(S)
- GHI SP ;ADCI #00 ;PHI MA
- LDA MA ;SHL  ;PLO AC            ..AC=2*S
- LDA MA ;SHLC ;PHI AC
- LDA MA ;STR SP ;GLO AC ;ADD ;PLO AUX  ..AUX.0=AC.0+X.0
- LDN MA ;STR SP ;GHI AC ;ADC ;PHI MA   ..MA.1=AC.1+AUX.1
- GLO AUX ;PLO MA                 ..MA.0=AUX.0
- LDN MA ;PLO AC                  ..AC=*MA
- LDI #00 ;PHI AC
- SEP SRET
- ..
- ..  lchar(s,x,c)
- ..
-Llchar:
- GLO SP ;ADI #03 ;PLO MA         ..MA=ADDR(S)
- GHI SP ;ADCI #00 ;PHI MA
- LDA MA ;SHL  ;PLO AC            ..AC=2*S
- LDA MA ;SHLC ;PHI AC
- LDA MA ;STR SP ;GLO AC ;ADD ;PLO AUX  ..AUX=AC+X
- LDA MA ;STR SP ;GHI AC ;ADC ;PHI AUX
- LDA MA ;PLO AC                  ..AC.0=C.0
- STR AUX                         ..*AUX=AC.0
- LDN MA ;PHI AC                  ..AC.1=C.1
- SEP SRET
  ..
  ..  (st,c)=eread(dcb)
  ..  (st,0)=ewrite(dcb,c)

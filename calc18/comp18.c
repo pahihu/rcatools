@@ -488,35 +488,45 @@ Z WLDD(void) {
 }
 
 Z gldvar(NODE *p) {
+   if (opt == OSPACE) {
+      H(" DB A.0(TLOD)\n");
+      return;
+   }
    WLDN(AC,MA);
 }
 
 Z gbinary(NODE *p) {
-   if (p) {
-      load(p->a[0]);
+   load(p->a[0]);
+   if (opt == OSPACE)
+      H(" DB A.0(TPUSH)\n");
+   else
       WPUSH(AC);
-      load(p->a[1]);
-   }
+   load(p->a[1]);
 }
 
 Z gsub(NODE *p) {
    int imm1, x1;
 
-   if (p) {
-      imm1 = isimm(p->a[1]);
-      x1   = p->a[1]->x;
-
-      if (imm1 && 1 == x1) {
-         load(p->a[0]);
-         WDEC(AC);
-         return;
-      }
-      else if (imm1) {
-         load(p->a[0]);
-         WSMI(AC,AC,x1);
-         return;
-      }
+   if (opt == OSPACE) {
+      gbinary(p);
+      H(" DB A.0(TSUB)\n");
+      return;
    }
+
+   imm1 = isimm(p->a[1]);
+   x1   = p->a[1]->x;
+
+   if (imm1 && 1 == x1) {
+      load(p->a[0]);
+      WDEC(AC);
+      return;
+   }
+   else if (imm1) {
+      load(p->a[0]);
+      WSMI(AC,AC,x1);
+      return;
+   }
+
    gbinary(p);
    WSD(AC,AC);
 }
@@ -593,12 +603,59 @@ Z grelop(int op,int r,int lbl1,int lbl2) {
  *
  */
 
-Z glt(NODE *p) { gcmp(p,0); p->t = COND; p->x = '<'; }
-Z gge(NODE *p) { gcmp(p,0); p->t = COND; p->x = GE;  }
-Z ggt(NODE *p) { gcmp(p,1); p->t = COND; p->x = '>'; }
-Z gle(NODE *p) { gcmp(p,1); p->t = COND; p->x = LE;  }
-Z gne(NODE *p) { gcmp(p,1); p->t = COND; p->x = NE;  }
-Z geq(NODE *p) { gcmp(p,1); p->t = COND; p->x = EQ;  }
+Z glt(NODE *p) {
+   if (opt == OSPACE) {
+      gbinary(p);
+      H(" DB A.0(TLT)\n");
+      return;
+   }
+   gcmp(p,0); p->t = COND; p->x = '<';
+}
+
+Z gge(NODE *p) {
+   if (opt == OSPACE) {
+      gbinary(p);
+      H(" DB A.0(TGE)\n");
+      return;
+   }
+   gcmp(p,0); p->t = COND; p->x = GE;
+}
+
+Z ggt(NODE *p) {
+   if (opt == OSPACE) {
+      gbinary(p);
+      H(" DB A.0(TGT)\n");
+      return;
+   }
+   gcmp(p,1); p->t = COND; p->x = '>';
+}
+
+Z gle(NODE *p) {
+   if (opt == OSPACE) {
+      gbinary(p);
+      H(" DB A.0(TLE)\n");
+      return;
+   }
+   gcmp(p,1); p->t = COND; p->x = LE;
+}
+
+Z gne(NODE *p) {
+   if (opt == OSPACE) {
+      gbinary(p);
+      H(" DB A.0(TNE)\n");
+      return;
+   }
+   gcmp(p,1); p->t = COND; p->x = NE;
+}
+
+Z geq(NODE *p) {
+   if (opt == OSPACE) {
+      gbinary(p);
+      H(" DB A.0(TEQ)\n");
+      return;
+   }
+   gcmp(p,1); p->t = COND; p->x = EQ;
+}
 
 Z gne0(int r) {
    H(" GLO %s ;LSNZ\n",reg(r));
@@ -615,6 +672,11 @@ Z geq0(int r) {
 
 Z load(NODE *p) {
    int savF, savT;
+
+   if (opt == OSPACE) {
+      ex(p);
+      return;
+   }
 
    savF = Fbranch; savT = Tbranch;
 
@@ -639,20 +701,24 @@ Z gadd(NODE *p) {
    int imm1, x1;
 
    gxopi(p);
-   if (p) {
-      imm1 = isimm(p->a[1]);
-      x1   = p->a[1]->x;
+   if (opt == OSPACE) {
+      gbinary(p);
+      H(" DB A.0(TADD)\n");
+      return;
+   }
 
-      if (imm1 && 1 == x1) {
-         load(p->a[0]);
-         WINC(AC);
-         return;
-      }
-      else if (imm1) {
-         load(p->a[0]);
-         WADI(AC,AC,x1);
-         return;
-      }
+   imm1 = isimm(p->a[1]);
+   x1   = p->a[1]->x;
+
+   if (imm1 && 1 == x1) {
+      load(p->a[0]);
+      WINC(AC);
+      return;
+   }
+   else if (imm1) {
+      load(p->a[0]);
+      WADI(AC,AC,x1);
+      return;
    }
    gbinary(p);
    WADD(AC,AC);
@@ -662,15 +728,21 @@ Z glog(NODE *p, char *xop, char *imop) {
    int imm1, x1;
 
    gxopi(p);
-   if (p) {
-      imm1 = isimm(p->a[1]);
-      x1   = p->a[1]->x;
-      if (imm1) {
-         load(p->a[0]);
-         WLOGI(AC,AC,x1,imop);
-         return;
-      }
+
+   if (opt == OSPACE) {
+      gbinary(p);
+      H(" DB A.0(T%s)\n",xop);
+      return;
    }
+
+   imm1 = isimm(p->a[1]);
+   x1   = p->a[1]->x;
+   if (imm1) {
+      load(p->a[0]);
+      WLOGI(AC,AC,x1,imop);
+      return;
+   }
+
    gbinary(p);
    WLOG(AC,AC,xop);
 }
@@ -678,6 +750,22 @@ Z glog(NODE *p, char *xop, char *imop) {
 Z gwhile(NODE *cond, NODE *body, NODE *end) {
    int lbl1;
    int savF, savT;
+
+   if (opt == OSPACE) {
+      int B, E;
+
+      H("L%d:\n",B=lbl++);
+      ex(cond);
+      H(" DB A.0(TBZ)\n");
+      H(" DW L%d\n",E=lbl++);
+      ex(body);
+      if (end)
+         ex(end);
+      H(" DB A.0(TBR)\n");
+      H(" DW L%d\n",B);
+      H("L%d:\n",E);
+      return;
+   }
 
    savF = Fbranch; savT = Tbranch;
 
@@ -719,11 +807,20 @@ Z glvaluvar(NODE *p) {
       break;
    case C_EXTRN:
       sprintf(tmp,"L%s",sym);
-      WLDSYM(MA,tmp);
+      if (opt == OSPACE) {
+         H(" DB A.0(TLDI)\n");
+         H(" DW %s\n",tmp);
+      }
+      else
+         WLDSYM(MA,tmp);
       break;
    case C_AUTO:
-      if (opt == OSPACE && !HI(offs))
-         H(" LDI A.0(AUT8); PLO SUB ;SEP SUB,#%02X\n",LO(offs));
+      if (opt == OSPACE) {
+         if (HI(offs))
+            H(" DB A.0(TLOC),#%02X,#%02X\n",LO(offs),HI(offs));
+         else
+            H(" DB A.0(TLOC8),#%02X\n",LO(offs));
+      }
       else
          WSMI(MA,FP,offs);
       break;
@@ -732,8 +829,12 @@ Z glvaluvar(NODE *p) {
       exit(1);
       break;
    case C_PARAM:
-      if (opt == OSPACE && !HI(offs))
-         H(" LDI A.0(PAR8); PLO SUB ;SEP SUB,#%02X\n",LO(offs));
+      if (opt == OSPACE) {
+         if (HI(offs))
+            H(" DB A.0(TPAR),#%02X,#%02X\n",LO(offs),HI(offs));
+         else
+            H(" DB A.0(TPAR8),#%02X\n",LO(offs));
+      }
       else
          WADI(MA,FP,offs);
       break;
@@ -744,6 +845,11 @@ Z glvaluvar(NODE *p) {
 }
 
 Z gindex(NODE *p) {
+   if (opt == OSPACE) {
+      gbinary(p);
+      H(" DB A.0(TIDX)\n");
+      return;
+   }
    if (isaref(p)) {
       glvaluvar(p->a[0]); // AUX = base
       WLDN(AUX,MA);
@@ -754,12 +860,8 @@ Z gindex(NODE *p) {
    }
    else {
       gbinary(p);
-      if (opt == OSPACE)
-         H(" LDI A.0(IDX) ;PLO SUB ;SEP SUB\n");
-      else {
-         WADD(MA,AC);
-         WSHL(MA,MA);
-      }
+      WADD(MA,AC);
+      WSHL(MA,MA);
    }
 }
 
@@ -773,6 +875,10 @@ Z glvalu(NODE *p) { // addr in MA
    else if (OPR == p->t) {
       if (UNARY + '*' == p->x) {
          load(p->a[0]);
+         if (opt == OSPACE) {
+            H(" DB A.0(TMUL2)\n");
+            return;
+         }
          H(" ..SHL MA,AC\n");
          WSHL(MA,AC);
          return;
@@ -790,14 +896,18 @@ Z gshl(NODE *p) {
    int lbl1, lbl2;
    int imm1, x1;
 
-   if (p) {
-      imm1 = isimm(p->a[1]);
-      x1   = p->a[1]->x;
-      if (imm1 && 1 == x1) {
-         load(p->a[0]);
-         WSHL(AC,AC);
-         return;
-      }
+   if (opt == OSPACE) {
+      gbinary(p);
+      H(" DB A.0(TSHL)\n");
+      return;
+   }
+
+   imm1 = isimm(p->a[1]);
+   x1   = p->a[1]->x;
+   if (imm1 && 1 == x1) {
+      load(p->a[0]);
+      WSHL(AC,AC);
+      return;
    }
    gbinary(p);
    WMOV0(AUX,AC);
@@ -816,14 +926,17 @@ Z gshr(NODE *p) {
    int lbl1, lbl2;
    int imm1, x1;
 
-   if (p) {
-      imm1 = isimm(p->a[1]);
-      x1   = p->a[1]->x;
-      if (imm1 && 1 == x1) {
-         load(p->a[0]);
-         WSHR(AC,AC);
-         return;
-      }
+   if (opt == OSPACE) {
+      gbinary(p);
+      H(" DB A.0(TSHR)\n");
+      return;
+   }
+   imm1 = isimm(p->a[1]);
+   x1   = p->a[1]->x;
+   if (imm1 && 1 == x1) {
+      load(p->a[0]);
+      WSHR(AC,AC);
+      return;
    }
    gbinary(p);
    WMOV0(AUX,AC);
@@ -843,6 +956,11 @@ Z gstvar(NODE *p) {
 }
 
 Z gpreinc(NODE *p) {
+   if (opt == OSPACE) { // XXX
+      load(p);
+      H(" DB A.0(TPRI)\n");
+      return;
+   }
    load(p);
    WINC(AC);
    WDEC(MA);
@@ -850,6 +968,11 @@ Z gpreinc(NODE *p) {
 }
 
 Z gpredec(NODE *p) {
+   if (opt == OSPACE) { // XXX
+      load(p);
+      H(" DB A.0(TPRD)\n");
+      return;
+   }
    load(p);
    WDEC(AC);
    WDEC(MA);
@@ -858,40 +981,49 @@ Z gpredec(NODE *p) {
 
 Z gpostinc(NODE *p) {
    gpreinc(p);
+   if (opt == OSPACE) {
+      H(" DB A.0(TDEC)\n");
+      return;
+   }
    WDEC(AC);
 }
 
 Z gpostdec(NODE *p) {
    gpredec(p);
+   if (opt == OSPACE) {
+      H(" DB A.0(TINC)\n");
+      return;
+   }
    WINC(AC);
 }
 
-Z gcall(char *subr) {
+Z grtcall(char *subr) {
    H(" ..CALL %s\n",subr);
-   // NB. all runtime routines should be on the same page!
-   // H(" LDI A.1(%s) ;PHI SUB\n",subr);
-   H(" LDI A.0(%s) ;PLO SUB\n",subr);
-   H(" SEP SUB\n");
+   // NB. all runtime rtn entry points should be on the same page!
+   H(" LDI A.0(%s) ;PLO SUB ;SEP SUB\n",subr);
 }
 
 Z gdiv(NODE *p) {
    int imm1, x1;
 
-   if (p) {
-      imm1 = isimm(p->a[1]);
-      x1   = p->a[1]->x;
-      if (imm1 && 2 == x1) {
-         load(p->a[0]);
-         WSHR(AC,AC);
-         return;
-      }
+   if (opt == OSPACE) {
+      gbinary(p);
+      H(" DB A.0(TDIV)\n");
+      return;
+   }
+   imm1 = isimm(p->a[1]);
+   x1   = p->a[1]->x;
+   if (imm1 && 2 == x1) {
+      load(p->a[0]);
+      WSHR(AC,AC);
+      return;
    }
    gbinary(p);
    // dividend on stack, divisor in AC
    WPOP(AUX);
    WPUSH(AC);
    WMOV(AC,AUX);
-   gcall("UDIV");
+   grtcall("UDIV");
 }
 
 static int idlist(int t,NODE *p, int offs) {
@@ -943,10 +1075,15 @@ static int idlist(int t,NODE *p, int offs) {
          sym = getsym(n);
          H(" ..INIT %s=&%s[0]\n",sym,sym);
          offs -= 2;
-         WSMI(MA,FP,offs);
-         WSHR(AUX,MA);
-         WDEC(MA); WDEC(MA);
-         WSTR(MA,AUX);
+         if (opt == OSPACE) {
+            H(" DB A.0(TIVP),#%02X,#%02X\n",LO(offs),HI(offs));
+         }
+         else {
+            WSMI(MA,FP,offs);
+            WSHR(AUX,MA);
+            WDEC(MA); WDEC(MA);
+            WSTR(MA,AUX);
+         }
       }
       break;
    case VARDEF:
@@ -984,6 +1121,7 @@ static int revidlist(int t,NODE *p, int offs) {
 static int exprlist(NODE *p, int offs, int nargs) {
    NODE *q;
    char tmp[32];
+   int x1;
 
    if (!p)
       return offs;
@@ -991,17 +1129,35 @@ static int exprlist(NODE *p, int offs, int nargs) {
    assert(OPR == p->t && XLST == p->x);
    H(" ..PUSH ARG%d\n",nargs - offs++);
    if (isimm(p->a[1])) {
-      WPUSHI(p->a[1]->x);
+      if (opt == OSPACE) {
+         x1 = p->a[1]->x;
+         if (HI(x1))
+            H(" DB A.0(TLDI),#%02X,#%02X\n",HI(x1),LO(x1));
+         else
+            H(" DB A.0(TLDI8),#%02X\n",LO(x1));
+         H(" DB A.0(TPUSH)\n");
+      }
+      else
+         WPUSHI(p->a[1]->x);
    }
    else if (isstr(p->a[1])) {
       q = p->a[1];
       H(" ..PUSH STR %s [%d]\n",printable(q->s),q->x=lbl++);
       sprintf(tmp,"L%d SHR 1",q->x);
-      WPUSHSYM(tmp);
+      if (opt == OSPACE) {
+         H(" DB A.0(TLDI)\n");
+         H(" DW %s\n",tmp);
+         H(" DB A.0(TPUSH)\n");
+      }
+      else
+         WPUSHSYM(tmp);
    }
    else {
       load(p->a[1]);
-      WPUSH(AC);
+      if (opt == OSPACE)
+         H(" DB A.0(TPUSH)\n");
+      else
+         WPUSH(AC);
    }
    return exprlist(p->a[0],offs,nargs);
 }
@@ -1019,23 +1175,34 @@ Z galign(void) {
    H(" ORG*+(* AND 1)\n");
 }
 
-Z gmod(NODE *p) { gdiv(p); WMOV(AC,MQ); }
+Z gmod(NODE *p) {
+   gdiv(p);
+   if (opt == OSPACE)
+      H(" DB A.0(TMQ)\n");
+   else
+      WMOV(AC,MQ);
+}
+
 Z gmul(NODE *p) {
    int imm1, x1;
 
-   gxopi(p);
-   if (p) {
-      imm1 = isimm(p->a[1]);
-      x1   = p->a[1]->x;
+   if (opt == OSPACE) {
+      gbinary(p);
+      H(" DB A.0(TMUL)\n");
+      return;
+   }
 
-      if (imm1 && 2 == x1) {
-         load(p->a[0]);
-         WSHL(AC,AC);
-         return;
-      }
+   gxopi(p);
+   imm1 = isimm(p->a[1]);
+   x1   = p->a[1]->x;
+
+   if (imm1 && 2 == x1) {
+      load(p->a[0]);
+      WSHL(AC,AC);
+      return;
    }
    gbinary(p);
-   gcall("UMULT");
+   grtcall("UMULT");
 }
 
 Z gand(NODE *p) { glog(p, "AND", "ANI"); }
@@ -1043,19 +1210,25 @@ Z gxor(NODE *p) { glog(p, "XOR", "XRI"); }
 Z gor(NODE *p)  { glog(p, "OR", "ORI");  }
 
 Z WSTRMA(void) {
-   if (opt == OTIME) {
-      WPOP(MA);
-      WSTR(MA,AC);
-   }
-   else if (opt == OSPACE)
-      H(" LDI A.0(ASGN) ;PLO SUB ;SEP SUB\n");
+   assert(opt == OTIME);
+
+   WPOP(MA);
+   WSTR(MA,AC);
 }
 
 Z gasgnop(NODE *p) {
-   glvalu(p->a[0]);
-   WPUSH(MA);
-   gldvar(p->a[0]);
-   p->a[0]->t = SKIP;
+   if (opt == OSPACE) {
+      glvalu(p->a[0]); // adr in AC
+      H(" DB A.0(TPUSH)\n");
+      H(" DB A.0(TLOD)\n");
+      p->a[0]->t = SKIP;
+   }
+   else {
+      glvalu(p->a[0]);
+      WPUSH(MA);
+      gldvar(p->a[0]);
+      p->a[0]->t = SKIP;
+   }
 
    switch (p->x) {
    case AOR:  gor(p); break;
@@ -1078,11 +1251,21 @@ Z gasgnop(NODE *p) {
       exit(1);
    }
 
-   // AC - result, stack lvalu addr
-   WSTRMA();
+   if (opt == OSPACE)
+      H(" DB A.0(TSTO)\n");
+   else
+      // AC - result, stack lvalu addr
+      WSTRMA();
 }
 
 Z gasgn(NODE *p) {
+   if (opt == OSPACE) {
+      glvalu(p->a[0]);
+      H(" DB A.0(TPUSH)\n");
+      load(p->a[1]);
+      H(" DB A.0(TSTO)\n");
+      return;
+   }
    if (isvar(p->a[0]) || isaref(p->a[0])) {
       H(" ..SIMPLE ASGN\n");
       load(p->a[1]);
@@ -1099,6 +1282,10 @@ Z gasgn(NODE *p) {
 
 Z glnot(NODE *p) {
    ex(p->a[0]);
+   if (opt == OSPACE) {
+      H(" DB A.0(TNOT)\n");
+      return;
+   }
    if (COND == p->a[0]->t)
       p->x = negrel(p->a[0]->x);
    else
@@ -1108,7 +1295,18 @@ Z glnot(NODE *p) {
 
 Z gland(NODE *p) {
    int savF, savT;
-   int local;
+   int local, F;
+
+   if (opt == OSPACE) {
+      F = lbl++;
+      ex(p->a[0]);
+      H(" DB A.0(TBZ)\n");
+      H(" DW L%d\n",F);
+      ex(p->a[1]);
+      H(" DB A.0(TNE0)\n");
+      H("L%d:\n",F);
+      return;
+   }
 
    savT = Tbranch; savF = Fbranch; local = 0;
    if (0 == savF + savT) {
@@ -1141,7 +1339,18 @@ Z gland(NODE *p) {
 
 Z glor(NODE *p) {
    int savF, savT;
-   int local;
+   int local,T;
+
+   if (opt == OSPACE) {
+      T = lbl++;
+      ex(p->a[0]);
+      H(" DB A.0(TBNZ)\n");
+      H(" DW L%d\n",T);
+      ex(p->a[1]);
+      H("L%d:\n",T);
+      H(" DB A.0(TNE0)\n");
+      return;
+   }
 
    savT = Tbranch; savF = Fbranch; local = 0;
    if (0 == savF + savT) {
@@ -1177,6 +1386,23 @@ Z gcondexpr(NODE *p) {
    int savF, savT;
    int lbl1;
 
+   if (opt == OSPACE) {
+      int F,E;
+      
+      F = lbl++; E = lbl++;
+      ex(p->a[0]);
+      q = p->a[1];
+      H(" DB A.0(TBZ)\n");
+      H(" DW L%d\n",F);
+      ex(q->a[0]);
+      H(" DB A.0(TBR)\n");
+      H(" DW L%d\n",E);
+      H("L%d:\n",F);
+      ex(q->a[1]);
+      H("L%d:\n",E);
+      return;
+   }
+
    savF = Fbranch; savT = Tbranch;
    Fbranch = lbl++; Tbranch = lbl++;
 
@@ -1200,6 +1426,26 @@ Z gifelse(NODE *p) {
    int lbl1;
    int savF, savT;
    NODE *q;
+
+   if (opt == OSPACE) {
+      int F, E;
+
+      ex(p->a[0]);
+      q = p->a[1];
+      H(" DB A.0(TBZ)\n");
+      H(" DW L%d\n",E=lbl++);
+      ex(q->a[0]);
+      if (q->a[1]) {
+         H(" DB A.0(TBR)\n");
+         H(" DW L%d\n",F=lbl++);
+         H("L%d:\n",E);
+         ex(q->a[1]);
+         H("L%d:\n",F);
+      }
+      else
+         H("L%d:\n",E);
+      return;
+   }
 
    savF = Fbranch; savT = Tbranch;
    Tbranch = lbl++; Fbranch = lbl++;
@@ -1263,13 +1509,17 @@ static int gintrinsic(char *sym,NODE *p) {
    NODE *q, *arg1, *arg2, *arg3;
    int x3;
 
-   if (opt == OSPACE)
-      return 0;
-
    if (!strcmp(sym,"char")) {
       q = p->a[1];
       arg1 = q->a[0]->a[1];
       arg2 = q->a[1];
+      if (opt == OSPACE) {
+         ex(arg1);
+         H(" DB A.0(TPUSH)\n");
+         ex(arg2);
+         H(" DB A.0(TIDX8),A.0(TLOD8)\n");
+         return 1;
+      }
       gcaref(arg1, arg2);
       WLDN0(AC,MA);
       return 1;
@@ -1279,6 +1529,15 @@ static int gintrinsic(char *sym,NODE *p) {
       arg1 = q->a[0]->a[0]->a[1];
       arg2 = q->a[0]->a[1];
       arg3 = q->a[1];
+      if (opt == OSPACE) {
+         ex(arg1);
+         H(" DB A.0(TPUSH)\n");
+         ex(arg2);
+         H(" DB A.0(TIDX8),A.0(TPUSH)\n");
+         ex(arg3);
+         H(" DB A.0(TSTO8)\n");
+         return 1;
+      }
       gcaref(arg1, arg2);
       if (isimm(arg3)) {
          x3 = arg3->x;
@@ -1314,12 +1573,26 @@ int ex(NODE *p) {
    case SKIP:
    case COND: break;
    case CON:
-      WLDI(AC,p->x);
+      if (opt == OSPACE) {
+         if (HI(p->x)) {
+            H(" DB A.0(TLDI)\n");
+            H(" DW #%04X\n",p->x);
+         }
+         else
+            H(" DB A.0(TLDI8),#%02X\n",LO(p->x));
+      }
+      else
+         WLDI(AC,p->x);
       break;
    case STR:
       H(" ..STR %s [%d]\n",printable(p->s),p->x=lbl++);
       sprintf(tmp,"L%d SHR 1",p->x);
-      WLDSYM(AC,tmp);
+      if (opt == OSPACE) {
+         H(" DB A.0(TLDI)\n");
+         H(" DW %s\n",tmp);
+      }
+      else
+         WLDSYM(AC,tmp);
       break;
    case ID: glvalu(p); gldvar(p); break;
    case OPR:
@@ -1328,8 +1601,8 @@ int ex(NODE *p) {
          if (regpar)
             needfp = nparams > 2 || (autooffs + 1);
          if (needfp) {
-            if (opt == OSPACE && !HI(autooffs+1))
-               H(" LDI A.0(SUBENT) ;PLO SUB ;SEP SUB,#%02X\n",LO(autooffs+1));
+            if (opt == OSPACE)
+               H(" SEP ZENT,#%02X,#%02X\n",LO(autooffs+1),HI(autooffs+1));
             else {
                WPUSH(FP);
                WMOV(FP,SP);
@@ -1398,20 +1671,21 @@ int ex(NODE *p) {
          break;
       case SWITCH:
          swpush();
-         load(p->a[0]);
-#if 1
-         H(" LDI A.1(L%d) ;STXD\n",switches[currsw].ltab);
-         H(" LDI A.0(L%d) ;STXD\n",switches[currsw].ltab);
-         gcall("SWITCH");
+         if (opt == OSPACE) {
+            H(" DB A.0(TLDI)\n");
+            H(" DW L%d\n", switches[currsw].ltab);
+            H(" DB A.0(TPUSH)\n");
+            load(p->a[0]);
+            H(" DB A.0(TSWI)\n");
+         }
+         else {
+            load(p->a[0]);
+            H(" LDI A.1(L%d) ;STXD\n",switches[currsw].ltab);
+            H(" LDI A.0(L%d) ;STXD\n",switches[currsw].ltab);
+            grtcall("SWITCH");
+         }
          H(" DB L%d ..MAXCASE\n",switches[currsw].lmaxcase);
          H(" DW L%d ..ENDCASE\n",switches[currsw].lend);
-#else
-         H(" GLO AC ;SMI L%d\n",switches[currsw].lmaxcase);
-         H(" LBDF L%d\n",switches[currsw].lend);
-         H(" LDI A.1(L%d) ;STXD\n",switches[currsw].ltab);
-         H(" LDI A.0(L%d) ;STR SP\n",switches[currsw].ltab);
-         gcall("SWITCH");
-#endif
          ex(p->a[1]);
          H("L%d:\n",switches[currsw].lend);
          swpop();
@@ -1447,7 +1721,7 @@ int ex(NODE *p) {
          H("E%s:\n",sym); // fn epilogue
          if (needfp) {
             if (opt == OSPACE)
-               H(" LDI A.0(SUBRET) ;PLO SUB ;SEP SUB\n");
+               H(" DB A.0(TRET)\n");
             else {
                WMOV(SP, FP);
                WPOP(FP);
@@ -1471,8 +1745,15 @@ int ex(NODE *p) {
                   defcls(p->a[0]->x,C_EXTRN,0);
                argcnt = ex(p->a[1]); // push args
                H(" ..CALL %s\n",sym);
-               H(" SEP SCALL,A(L%s)\n",sym);
+               if (opt == OSPACE) {
+                  H(" DB A.0(TCALL)\n");
+                  H(" DW L%s\n",sym);
+               }
+               else
+                  H(" SEP SCALL,A(L%s)\n",sym);
             }
+            else
+               argcnt = -1;
          }
          else { // NB. paren expr!
             q = p->a[0];
@@ -1480,10 +1761,18 @@ int ex(NODE *p) {
             argcnt = ex(p->a[1]); // push args
             load(q->a[0]);
             H(" ..CALL expr\n");
-            H(" LDI A.0(NCALL) ;PLO SUB ;SEP SUB\n");
+            if (opt == OSPACE)
+               H(" DB A.0(TNCALL)\n");
+            else
+               H(" LDI A.0(NCALL) ;PLO SUB ;SEP SUB\n");
          }
-         if (argcnt)
-            WADI(SP,SP,2*argcnt); // 2byte args
+         if (argcnt > -1) { // NB. not intrinsic call
+            argcnt *= 2; // 2byte args
+            if (opt == OSPACE)
+               H(" DB #%02X\n",LO(argcnt));
+            else if (argcnt)
+               WADI(SP,SP,argcnt);
+         }
          break;
       case FOR:
          stmt = p->a[0]; q = p->a[1];
@@ -1497,11 +1786,19 @@ int ex(NODE *p) {
       case RETURN:
          if (p->a[0])
             load(p->a[0]);
-         H(" LBR E%s\n", fn); // fn epilogue
+         if (opt == OSPACE) {
+            H(" DB A.0(TBR)\n");
+            H(" DW E%s\n",fn);
+         }
+         else
+            H(" LBR E%s\n", fn); // fn epilogue
          break;
       case ',': // fn params
          ex(p->a[0]);
-         WPUSH(AC);
+         if (opt == OSPACE)
+            H(" DB A.0(TPUSH)\n");
+         else
+            WPUSH(AC);
          load(p->a[1]);
          break;
       case ';':
@@ -1524,7 +1821,12 @@ int ex(NODE *p) {
          H(" ..GOTO\n");
          if (!getoffs(p->a[0]->x))
             setoffs(p->a[0]->x,lbl++);
-         H(" LBR L%d\n",getoffs(p->a[0]->x));
+         if (opt == OSPACE) {
+            H(" DB A.0(TBR)\n");
+            H(" DW L%d\n",getoffs(p->a[0]->x));
+         }
+         else
+            H(" LBR L%d\n",getoffs(p->a[0]->x));
          break;
       case '=': H(" ..ASSIGN\n"); gasgn(p); break;
       case AOR: case AAND:
@@ -1541,21 +1843,37 @@ int ex(NODE *p) {
       case UNARY + '-':
          load(p->a[0]);
          H(" ..NEG AC\n");
-         WSDI(AC,AC,0);
+         if (opt == OSPACE)
+            H(" DB A.0(TNEG)\n");
+         else
+            WSDI(AC,AC,0);
          break;
-      case '~': load(p->a[0]); WCOM(AC,AC); break;
+      case '~':
+         load(p->a[0]);
+         if (opt == OSPACE)
+            H(" DB A.0(TCOM)\n");
+         else
+            WCOM(AC,AC);
+         break;
       case '!': glnot(p); break;
       case LAND: gland(p); break;
       case LOR: glor(p); break;
       case UNARY + '&':
          glvalu(p->a[0]);
-         WSHR(AC,MA);
+         if (opt == OSPACE)
+            H(" DB A.0(TDIV2)\n");
+         else
+            WSHR(AC,MA);
          break;
       case UNARY + '*':
          load(p->a[0]);
          H(" ..DEREF\n");
-         WSHL(AUX,AC);
-         WLDN(AC,AUX);
+         if (opt == OSPACE)
+            H(" DB A.0(TMUL2),A.0(TLOD)\n");
+         else {
+            WSHL(AUX,AC);
+            WLDN(AC,AUX);
+         }
          break;
       default:
          switch (p->x) {

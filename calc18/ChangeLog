@@ -1,6 +1,8 @@
 History
 =======
 
+201231AP tokenized -Os, still debugging run-time
+
 201230AP changed RTSWITCH
          added prolog2 which uses tokens (much smaller code size),
          targeting -Os
