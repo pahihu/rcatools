@@ -12,7 +12,7 @@ main() {
    printf("Today is %s %s %d, %d at %d:%d:%d*n",days[dow-1],months[m-1],d,y+2000,hh,mm,ss);
 }
 
-RTC 037200; /* $7Dxx */
+RTC 037600; /* $7Fxx */
 months[0] "Jan", "Feb", "Mar", "Apr", "May", "Jun",
           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec";
 days[0] "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat";

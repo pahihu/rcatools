@@ -3,7 +3,7 @@
 /* TYPE FILE */
 main() {
    extrn NArgs, Args, FDErr, rd.unit;
-   auto c;
+   auto c, old.rd;
 
    if (2 != NArgs)
       return (FDErr = FDE_SYNTAX);

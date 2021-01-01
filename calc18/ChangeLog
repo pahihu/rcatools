@@ -1,6 +1,14 @@
 History
 =======
 
+210101AP fixed tokenized vector init
+         stack begins at $7EFF, RTC/NVRAM from $7F00
+         fixed RTSWITCH/TSWI: pop swtab from stack
+         export SIM18OPTS="-c -n7F -fdisk1 -fdisk2 -m UT20.HEX"
+         prg2bin can be run from other dir, set B18DIR to location of
+         prolog.b18/epilog.b18
+         fixed FDS utils syntax (not tested yet)
+
 201231AP tokenized -Os, still debugging run-time
 
 201230AP changed RTSWITCH

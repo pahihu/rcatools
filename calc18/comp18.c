@@ -1479,6 +1479,18 @@ Z gcaref(NODE *arg1, NODE *arg2) { // [l]char(arg1,arg2,...)
    imm2 = isimm(arg2);
    x1   = arg1->x;
    x2   = arg2->x;
+   if (opt == OSPACE) {
+      if (imm1 && !x1)
+         ex(arg2);
+      else {
+         ex(arg1);
+         H(" DB A.0(TPUSH)\n");
+         ex(arg2);
+         H(" DB A.0(TIDX8)\n");
+      }
+      return;
+   }
+
    if (imm1) {
       if (imm2) { // imm1[imm2]
          WLDI(MA,2*x1+x2);
@@ -1513,14 +1525,11 @@ static int gintrinsic(char *sym,NODE *p) {
       q = p->a[1];
       arg1 = q->a[0]->a[1];
       arg2 = q->a[1];
+      gcaref(arg1, arg2);
       if (opt == OSPACE) {
-         ex(arg1);
-         H(" DB A.0(TPUSH)\n");
-         ex(arg2);
-         H(" DB A.0(TIDX8),A.0(TLOD8)\n");
+         H(" DB A.0(TLOD8)\n");
          return 1;
       }
-      gcaref(arg1, arg2);
       WLDN0(AC,MA);
       return 1;
    }
@@ -1529,16 +1538,13 @@ static int gintrinsic(char *sym,NODE *p) {
       arg1 = q->a[0]->a[0]->a[1];
       arg2 = q->a[0]->a[1];
       arg3 = q->a[1];
+      gcaref(arg1, arg2);
       if (opt == OSPACE) {
-         ex(arg1);
          H(" DB A.0(TPUSH)\n");
-         ex(arg2);
-         H(" DB A.0(TIDX8),A.0(TPUSH)\n");
          ex(arg3);
          H(" DB A.0(TSTO8)\n");
          return 1;
       }
-      gcaref(arg1, arg2);
       if (isimm(arg3)) {
          x3 = arg3->x;
          WLDI(AC,x3);

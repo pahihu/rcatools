@@ -12,7 +12,7 @@ main() {
       bPat = Args[1];
    }
 
-   return (fdProcDir(uni, pat, 0));
+   return (fdProcDir(uni, bPat, 0));
 }
 
 /* vim: set ts=3 sw=3 et: */

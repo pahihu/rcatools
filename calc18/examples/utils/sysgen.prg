@@ -1,13 +1,17 @@
 #include "fds.h"
 
+#define MAP     1
+#define DIRBEG  2
+#define DIREND 18
+
 /* SYSGEN [UNI] */
 main() {
-   extrn NArgs, Args, FDErr;
+   extrn NArgs, Args, FDErr, FDU, FDCB;
    auto uni;
    auto i, s;
    auto map;
    auto dummy MAXNAME_W;
-   auto dir;
+   auto dir, de;
 
    uni = 0;
    if (NArgs > 1)

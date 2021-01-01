@@ -7,10 +7,10 @@
  */
 
 main() {
-   extrn NArgs, Args, FDErr;
+   extrn NArgs, Args, FDErr, wr.unit;
    auto uni;
    auto beg, end, start;
-   auto s, i;
+   auto s, i, c;
    auto fnm MAXNAME_W, old.wr;
 
    uni = 0;
@@ -47,7 +47,7 @@ main() {
    }
    puts("$U"); puthex4(start); putchar('*n');
    fdClose(2);
-   wr.unit = old.unit;
+   wr.unit = old.wr;
 
    return (0);
 }

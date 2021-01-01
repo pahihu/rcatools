@@ -55,6 +55,7 @@
  * 201221AP reg display uses XP:
  * 201222AP begin FDS integration
  * 201225AP $L works, $U in $X/$Y fmt
+ * 210101AP init mem w/ $DEAD, break on r[7] = $DEAD
  *
  */
 
@@ -835,7 +836,8 @@ void xecute(Word p)
          done = 1;
          break;
       }
-      if (brkadr && brkadr == r[P])
+      // break on adr or AC = #DEAD
+      if (brkadr && (brkadr == r[P] || (brkadr == 0xDEAD && r[7] == brkadr)))
          trace = 1;
       if (trace) {
          H("\n"); dasm(r[P]);
@@ -1688,6 +1690,9 @@ void fini(void)
 
 void storage(void)
 {
+   Word *W;
+   int i;
+
    if (M)
       return;
 
@@ -1696,6 +1701,11 @@ void storage(void)
       fprintf(stderr,"out of storage\n");
       exit(1);
    }
+   W = (Word*)M;
+   for (i = 0; i < MAX_MEM/2; i++)  // init mem
+      W[i] = 0xDEAD;
+   for (i = 0; i < 16; i++) // init reg storage
+      M[0x8C00 + i] = 0;
 }
 
 void usage(void)

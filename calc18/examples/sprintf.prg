@@ -17,11 +17,9 @@ sprintf(buf,fmt, x1,x2,x3,x4,x5,x6,x7,x8,x9) {
    adx = &x1;  /* argument pointer */
 loop:
    while ((c=char(fmt,i++)) != '%') {
-      if ('*e' == c) {
-         lchar(buf,k,'*e');
+      if (lchar(buf,k++,c) == '*e') {
          return;
       }
-      lchar(buf,k++,c);
    }
    x = *adx++;
    switch (c = char(fmt,i++)) - 'a' {

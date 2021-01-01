@@ -38,12 +38,23 @@ prinh(n) {
    f_msg(s); f_type('*n');
 }
 
+printod(tod) {
+   auto s 16, i;
+
+   i = f_hexout4(s,0,tod[0]);
+   lchar(s,i++,' ');
+   i = f_hexout4(s,i,tod[1]);
+   lchar(s,i,'*e');
+   f_msg(s); f_type('*n');
+}
+
 main() {
    extrn mq;
    auto tod 2, bdt 2, sd 16, st 16, s 16, i;
    auto n;
 
    f_gettod(tod);
+   printod(tod);
    prind(sd,tod);
    print(st,tod);
 
@@ -54,6 +65,7 @@ main() {
    prind(s,bdt);
    i = f_astotm(st,0,bdt);
    print(s,bdt);
+   printod(bdt);
 
    n = f_mul16(4321,4321);
    prinh(mq); prinh(n);

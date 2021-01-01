@@ -2,7 +2,7 @@
 
 /* EXAM [UNI] TRACK SEC */
 main() {
-   extrn NArgs, Args, FDErr;
+   extrn NArgs, Args, FDErr, FDU;
    auto uni, t, s;
    auto i, j, c;
    auto buf;
@@ -39,7 +39,7 @@ main() {
       i++;
    }
 
-   return 0;
+   return (0);
 }
 
 /* vim: set ts=3 sw=3 et: */

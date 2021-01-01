@@ -6,20 +6,26 @@ then
    echo "usage: prg2bin file"
    exit 1
 fi
-cpp $1.prg | grep -v '^#' >pre.$$
-../beb18 $B18OPTS <pre.$$ >out.$$
+
+if [ "X$B18DIR" = "X" ];
+then
+   B18DIR=`pwd`
+fi
+
+cpp -I$B18DIR $1.prg | grep -v '^#' >_$1.pre
+beb18 $B18OPTS <_$1.pre >out.$$
 if [ $? -ne 0 ];
 then
-   rm -f out.$$ pre.$$
+   rm -f out.$$ #_$1.pre
    exit $?
 fi
 if [ -r "include.sr" ];
 then
-   cat prolog include.sr out.$$ epilog >_$1.sr
+   cat $B18DIR/prolog.b18 include.sr out.$$ $B18DIR/epilog.b18 >_$1.sr
 else
-   cat prolog out.$$ epilog >_$1.sr
+   cat $B18DIR/prolog.b18 out.$$ $B18DIR/epilog.b18 >_$1.sr
 fi
 a18 _$1.sr -r -L $1.lst -b $1.bin
 
 ls -l $1.bin
-rm -f out.$$ pre.$$
+rm -f out.$$ #_$1.pre

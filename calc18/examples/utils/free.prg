@@ -1,15 +1,18 @@
 #include "fds.h"
 
+#define DIRBEG  2
+#define DIREND 18
+
 /* FREE [UNIT] */
 main() {
-   extrn NArgs, Args, FDErr;
+   extrn NArgs, Args, FDErr, FDU;
    auto uni;
    auto s, i;
    auto nt, nf, map;
-   auto dir;
+   auto dir, de;
 
    uni = 0;
-   if (1 != Nargs)
+   if (1 != NArgs)
       uni = atoi(Args[1],10);
 
    fdSelect(uni);
@@ -21,7 +24,7 @@ main() {
       dir = fdRead(mkdcb(FDU,0,s),0);
       i = 0; de = dir;
       while (i++ < MAXDIRENT) {
-         if (DE_EMPTY == (0177 & de[DIRENT_track]))
+         if (DE_EMPTY == (0177 & de[DIRENT_tracks]))
             nf++;
          de =+ sizeof_DIRENT;
       }

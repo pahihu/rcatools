@@ -1,5 +1,5 @@
-CC = cc -Wall -g
-CFLAGS = #-O2
+CC = cc -Wall #-g
+CFLAGS = -O2
 SRCS = 1802.c fds.c curterm.c
 OBJS = $(SRCS:.c=.o)
 

@@ -27,7 +27,7 @@ cmdShell() {
          return (0);
       q = BYTES(q);
       i = strlen(q);
-      if (i && '*n' == char(0,q+i-1)
+      if (i && '*n' == char(0,q+i-1))
          lchar(0,q+i-1,'*e');
       NArgs = 0;
       while ((NArgs < 8) && char(0,q) != '*e') {
@@ -40,13 +40,10 @@ cmdShell() {
       if (NArgs) {
          exec(Args[0]);
          if (FDErr)
-            printf(%d: %s*n",FDErr,FDErrmsg[FDErr]);
+            printf("%d: %s*n",FDErr,FDErrmsg[FDErr]);
       }
    }
-   return 0;
+   return (0);
 }
-
-NArgs 0;
-Args[8];
 
 /* vim: set ts=3 sw=3 et: */

@@ -455,7 +455,7 @@ f_astotm(buf,i,tod) { /* hh:mm:ss */
    return (i);
 }
 
-rtc 076400; /* $7Dxx */
+rtc 077400; /* $7Fxx */
 
 bd.rate 300; /* terminal baud rate */
 fdc 0; /* FDC status */

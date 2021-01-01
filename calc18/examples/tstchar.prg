@@ -21,7 +21,7 @@ upper(s) {
 }
 
 main() {
-   extrn a, b, s, rd.unit;
+   extrn a, b, s, rd.u;
    auto s1 8, s2 8, bigs 16;
    auto a1 8, a2 8, a3 8;
    auto n;
@@ -45,7 +45,7 @@ printf("after cpy: s1 == s2 ? %d*n",s1 == s2);
    printf("s1: %s*n",s1);
    printf("s2: %s*n",s2);
 
-   printf("rd.unit = %d*n",rd.unit);
+   printf("rd.u = %d*n",rd.u);
    printf("lower case %s*n",a = lower("AbraCAdaBrA"));
    printf("upper case %s*n",upper(a));
 
@@ -61,7 +61,7 @@ printf("after cpy: s1 == s2 ? %d*n",s1 == s2);
 a 'hi' ;
 b '!*n' ;
 s[2] "hello, ", "world!*n";
-rd.unit 0;
+rd.u 0;
 
 #define NEED_strcopy
 #define NEED_concat

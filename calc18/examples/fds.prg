@@ -384,5 +384,8 @@ FDCB 2;           /* last DCB */
 FDBuf[MAXBUF_W];  /* I/O buffer */
 DE 0;             /* DIRENT */
 
+NArgs 0;          /* cmd.line args */
+Args[8];
+
 
 /* vim: set ts=3 sw=3 et: */
