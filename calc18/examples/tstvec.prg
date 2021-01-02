@@ -21,7 +21,4 @@ main() {
 v[2] ;
 n 2000 ;
 
-#define NEED_printf
-#include "stdlib.prg"
-
 /* vim: set ts=3 sw=3 et: */

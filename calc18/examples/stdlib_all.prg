@@ -1,6 +1,5 @@
 #define NEED_atoi
-#define NEED_strcopy
-#define NEED_concat
+#define NEED_str
 #define NEED_getarg
 #define NEED_printf
 #define NEED_diskio

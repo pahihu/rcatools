@@ -38,7 +38,4 @@ main() {
    show("&(**x) = ",&*x);
 }
 
-#define NEED_printf
-#include "stdlib.prg"
-
 /* vim: set ts=3 sw=3 et: */

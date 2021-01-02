@@ -21,7 +21,7 @@ then
 fi
 if [ -r "include.sr" ];
 then
-   cat $B18DIR/prolog.b18 include.sr out.$$ $B18DIR/epilog.b18 >_$1.sr
+   cat $B18DIR/prolog.b18 out.$$ include.sr $B18DIR/epilog.b18 >_$1.sr
 else
    cat $B18DIR/prolog.b18 out.$$ $B18DIR/epilog.b18 >_$1.sr
 fi

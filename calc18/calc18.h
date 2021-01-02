@@ -40,6 +40,7 @@ extern int Err;
 extern int dbg, varstat, regpar, verbose;
 typedef enum {OSPACE, OTIME} OptFlag;
 extern OptFlag opt;
+extern int lbl;
 
 NODE *nod(int typ, int n, char *s, NODE *arg0, NODE *arg1);
 void freenod(NODE*);

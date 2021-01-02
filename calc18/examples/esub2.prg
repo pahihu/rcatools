@@ -1,8 +1,4 @@
-putchar(c) {
-   if (c == '*n')
-      putc(13);
-   putc(c);
-}
+#define putchar ttyputc
 
 main() {
    extrn v, n;

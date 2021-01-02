@@ -106,25 +106,6 @@ fdMatch(bName,bPat) /* char ptrs */
            && fdMatch(bName+1,bPat+1));     /*    AND tail match */
 }
 
-strlen(bStr) {
-   auto i;
-
-   i = 0;
-   while (char(0,bStr++) != '*e') i++;
-   return (i);
-}
-
-strchr(bStr,b) {
-   auto c;
-
-   while ((c = char(0,bStr)) != '*e') {
-      if (b == c)
-         return (bStr);
-      bStr++;
-   }
-   return (0);
-}
-
 fdParseFName(pUni,bName)
 {
    auto n, p;
@@ -137,7 +118,7 @@ fdParseFName(pUni,bName)
          /* NB. allow :xxx */
          if ('*e' == char(0,p++)) /* xxxx: */
             return (1);
-         *(pUni) = fdDecimal(p);
+         *(pUni) = atoi(p,10);
       }
    }
    return (0);
@@ -211,16 +192,6 @@ fdSelect(uni) {
    return (0);
 }
 
-strncmp(s1,s2,n) {
-   auto i, c1, c2;
-
-   i = 0;
-   while (i < n && (c1 = char(0,s1)) == (c2 = char(0,s2))) {
-      s1++; s2++;
-   }
-   return (c1 - c2);
-}
-
 fdProcDir(uni,bPat,del) {
    extrn FDCB, FDU;
    auto dir, de, det, buf 8, i, s, ff, hastar, t, nt;
@@ -257,11 +228,11 @@ fdProcDir(uni,bPat,del) {
                   putchar('*n');
                }
             }
-         } // not empty, not deleted
+         } /* not empty, not deleted */
          i++; de =+ sizeof_DIRENT;
-      } // dirents
+      } /* dirents */
       s++;
-   } // DIR
+   } /* DIR */
    return (0);
 }
 
@@ -293,7 +264,7 @@ fdFind(bName) {
             ds = s; dj = j;
          }
          if (0 == strncmp(bName, BYTES(DE), MAXNAME)) {  /* check name */
-            if (0200 & t) // deleted            /*    deleted entry?       */
+            if (0200 & t)                       /*    deleted entry?       */
                return (0);                      /*       return not found  */
             return (j + 1);                     /*    normal entry, found  */
          }

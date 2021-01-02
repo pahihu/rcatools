@@ -14,6 +14,4 @@ main() {
    puts("2**f - e = "); printn(2*f-e,10); putchar('*n');
 }
 
-#include "stdlib.prg"
-
 /* vim: set ts=3 sw=3 et: */

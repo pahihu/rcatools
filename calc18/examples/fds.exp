@@ -1,0 +1,13 @@
+ ..
+ .. FDS
+ ..
+ EXPORT LfdRead, LfdWrite, LfdFName2Str, LfdStr2FName, LfdParseFName
+ EXPORT LfdSelect, LfdProcDir, LfdFind, LfdCreate, LfdDel, LfdRename
+ EXPORT LFDErr, LFDErrmsg, LFDU, LFDCB, LDE
+ EXPORT LNArgs, LArgs
+ ..
+ .. FILEIO
+ ..
+ EXPORT Lopenr, Lopenw, Lclose, Lflush, Leof, Lexec
+ EXPORT LFDesc
+ ..

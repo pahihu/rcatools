@@ -56,6 +56,8 @@
  * 201222AP begin FDS integration
  * 201225AP $L works, $U in $X/$Y fmt
  * 210101AP init mem w/ $DEAD, break on r[7] = $DEAD
+ *          ?R prints mem contents from $8C00
+ * 210102AP fixed TLIO deselect
  *
  */
 
@@ -806,11 +808,10 @@ void out(Byte port, Byte data)
                  lprout(data);
               }
               break;
-      case 7: if (1 == SEL) {
+      case 7: if (0x04 & data) // deselect TLIO
+                 TLIO = 0;
+              if (1 == SEL)
                  timout(data);
-                 if (0x04 & data) // deselect TLIO
-                    TLIO = 0;
-              }
               break;
       }
    else if (RC)
@@ -1355,7 +1356,7 @@ int ut20mon(FILE *inp)
                   if ((i & 3) == 0) H(",");
                   H(" ");
                }
-               H("%04X", r[i]);
+               H("%04X", HILO(memrd(0x8C00+2*i),memrd(0x8C00+2*i+1)));
             }
             H("\n");
          }
@@ -1438,7 +1439,7 @@ int ut20mon(FILE *inp)
                SEL = 0x00;
             for (i = 0; i < 16; i++)
                r[i] = HILO(memrd(0x8C00+2*i),memrd(0x8C00+2*i+1));
-            xecute(adr);
+            X = P = 0; xecute(adr);
             for (i = 0; i < 16; i++) {
                memwr(0x8C00+2*i+0, HI(r[i]));
                memwr(0x8C00+2*i+1, LO(r[i]));
@@ -1704,7 +1705,7 @@ void storage(void)
    W = (Word*)M;
    for (i = 0; i < MAX_MEM/2; i++)  // init mem
       W[i] = 0xDEAD;
-   for (i = 0; i < 16; i++) // init reg storage
+   for (i = 0; i < 32; i++) // init reg storage
       M[0x8C00 + i] = 0;
 }
 

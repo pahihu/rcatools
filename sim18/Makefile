@@ -46,7 +46,7 @@ ut20p_2.bin: ut20p_2.sr
 	a18 ut20p_2.sr -r -f 0C4H -L ut20p_2.lst -o ut20p_2.hex
 
 ut20.rom: ut20p_1.bin ut20p_2.bin
-	touch ut20.rom
+	cat ut20p_1.bin ut20p_2.bin >ut20.rom
 
 clean:
 	$(RM) sim18 $(OBJS)

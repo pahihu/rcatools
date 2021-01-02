@@ -160,7 +160,7 @@ atoi(s,b) { /* convert string to number in base b */
 }
 #endif
 
-#ifdef NEED_strcopy
+#ifdef NEED_str
 strcopy(d,s) {
    register i;
 
@@ -169,9 +169,7 @@ strcopy(d,s) {
       i++;
    return(d);
 }
-#endif
 
-#ifdef NEED_concat
 concat(a,x1,x2,x3,x4,x5,x6,x7,x8,x9,x10) { /* terminate w/ zero */
    auto i, adx;
    register c, j, x;
@@ -184,6 +182,35 @@ concat(a,x1,x2,x3,x4,x5,x6,x7,x8,x9,x10) { /* terminate w/ zero */
    }
    lchar(a,j,'*e');
    return (a);
+}
+
+strlen(bStr) {
+   auto i;
+
+   i = 0;
+   while (char(0,bStr++) != '*e') i++;
+   return (i);
+}
+
+strchr(bStr,b) {
+   auto c;
+
+   while ((c = char(0,bStr)) != '*e') {
+      if (b == c)
+         return (bStr);
+      bStr++;
+   }
+   return (0);
+}
+
+strncmp(s1,s2,n) {
+   auto i, c1, c2;
+
+   i = 0;
+   while (i < n && (c1 = char(0,s1)) == (c2 = char(0,s2))) {
+      s1++; s2++;
+   }
+   return (c1 - c2);
 }
 #endif
 

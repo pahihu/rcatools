@@ -1,0 +1,16 @@
+#
+# compile prg to ASM source
+#
+if [ $# -ne 1 ];
+then
+   echo "usage: prg2sr file"
+   exit 1
+fi
+
+if [ "X$B18DIR" = "X" ];
+then
+   B18DIR=`pwd`
+fi
+
+cpp -I$B18DIR $1.prg | grep -v '^#' >_$1.pre
+exec beb18 $B18OPTS <_$1.pre >_$1.out

@@ -24,7 +24,7 @@ main() {
       w = buf;
       j = 0;
       while (j++ < 8) {
-         hex4(*w++); putchar(' ');
+         puthex4(*w++); putchar(' ');
       }
       putchar(' ');
       j = 0;

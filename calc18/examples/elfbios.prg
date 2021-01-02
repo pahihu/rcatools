@@ -165,7 +165,7 @@ f_isterm(c) {
    return (!f_isalnum(c));
 }
 
-digit(c) {
+edigit(c) {
    if (c <= '9')
       return (c - '0');
    c =& ~32;
@@ -177,7 +177,7 @@ f_hexin(s,i,pn) { /* return next not converted index */
 
    n = 0;
    while (f_ishex(c = char(s,i++)))
-      n = (n << 4) + digit(c);
+      n = (n << 4) + edigit(c);
    *(pn) = n;
    return (i);
 }
@@ -213,7 +213,7 @@ f_atoi(s,i,pn) {
 
    n = 0;
    while (f_isnum(c = char(s,i++)))
-      n = 10 * n + digit(c);
+      n = 10 * n + edigit(c);
    *(pn) = n;
    return (i);
 }

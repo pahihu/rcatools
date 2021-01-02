@@ -165,6 +165,4 @@ main() {
    test12(); test13(); test14(); test15();
 }
 
-#include "stdlib.prg"
-
 /* vim: set ts=3 sw=3 et: */

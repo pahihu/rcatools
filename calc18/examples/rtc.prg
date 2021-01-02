@@ -17,7 +17,4 @@ months[0] "Jan", "Feb", "Mar", "Apr", "May", "Jun",
           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec";
 days[0] "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat";
 
-#define NEED_printf
-#include "stdlib.prg"
-
 /* vim: set ts=3 sw=3 et: */

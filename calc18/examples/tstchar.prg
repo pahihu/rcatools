@@ -63,10 +63,4 @@ b '!*n' ;
 s[2] "hello, ", "world!*n";
 rd.u 0;
 
-#define NEED_strcopy
-#define NEED_concat
-#define NEED_getarg
-#define NEED_printf
-#include "stdlib.prg"
-
 /* vim: set ts=3 sw=3 et: */

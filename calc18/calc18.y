@@ -18,6 +18,7 @@ void yyerror(char*);
  * 201203AP resolved yacc conflicts
  *          labels, goto lbl, logical AND/OR/NOT
  * 201204AP function call, return
+ * 210102AP -Lnum to start label defs
  *
  */
 
@@ -266,8 +267,10 @@ void usage(void) {
    fprintf(stderr,"options:\n");
    fprintf(stderr,"  -d       compiler dbg info\n");
    fprintf(stderr,"  -h       help\n");
+   fprintf(stderr,"  -Lnum    start labels at num\n");
    fprintf(stderr,"  -O[s|t]  'optimize' for space or time\n");
    fprintf(stderr,"  -v       variable access stats\n");
+   fprintf(stderr,"  -V       verbose\n");
    exit(1);
 }
 
@@ -285,9 +288,11 @@ int main(int argc, char*argv[]) {
          case 'h': usage();
          case 'r': regpar = 1; break;
          case 'v': varstat = 1; break;
+         case 'L': lbl = atoi(argv[i]+2); break;
          case 'V': verbose = 1; break;
          }
    }
+   H(" ..LBL=%d\n",lbl);
    yyparse();
    exit(Err);
 }

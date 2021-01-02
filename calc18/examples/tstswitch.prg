@@ -26,7 +26,4 @@ end: puts("bye!*n");
    return;
 }
 
-#define NEED_atoi
-#include "stdlib.prg"
-
 /* vim: set ts=3 sw=3 et: */

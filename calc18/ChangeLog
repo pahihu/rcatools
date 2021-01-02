@@ -1,6 +1,20 @@
 History
 =======
 
+210102AP memory map
+                $8000 ut20.bin
+                $9000 b18lib.bin   contains b18rt.sr and stdlib_all.prg
+                $B000 fds.bin      contains fds.prg and fileio.prg
+         executables start at $0100
+         b18lib.def contains B18 run-time and stdlib defs
+         fds.def    contains FDS defs
+
+         prg2sr <file> converts <file.prg> to _<file>.out which contains
+           the ASM source, and _<file>.pre is the preprocessed B source
+         beb18 -L<num> starts label numbering at <num>
+         mkbins assembles b18lib.bin and fds.bin
+         export SIM18OPTS="-c -n7F -fdisk1 -fdisk2"
+         
 210101AP fixed tokenized vector init
          stack begins at $7EFF, RTC/NVRAM from $7F00
          fixed RTSWITCH/TSWI: pop swtab from stack

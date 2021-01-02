@@ -46,8 +46,7 @@ main() {
          putchar(',*n');
    }
    puts("$U"); puthex4(start); putchar('*n');
-   fdClose(2);
-   wr.unit = old.wr;
+   close(wr.unit); wr.unit = old.wr;
 
    return (0);
 }

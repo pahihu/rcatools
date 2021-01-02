@@ -15,7 +15,7 @@ ucase(c) {
 }
 
 /* SHELL */
-cmdShell() {
+main() {
    extrn FDErr, FDErrmsg, NArgs, Args;
    auto c, q, buf 64;
    auto i, fnm MAXNAME_W;

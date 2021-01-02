@@ -1,0 +1,12 @@
+a18 b18rt.sr -r -l b18rt.lst -b b18rt.bin -x b18rt.def
+
+./prg2sr stdlib_all
+cat b18rt.sr _stdlib_all.out stdlib_all.exp > b18lib.sr
+a18 b18lib.sr -r -l b18lib.lst -b b18lib.bin -x b18lib.def
+
+./prg2sr fds
+export B18OPTS="-L1000"
+./prg2sr fileio
+unset B18OPTS
+cat prolog.fds _fds.out _fileio.out fds.exp > fds.sr
+a18 fds.sr -r -l fds.lst -b fds.bin -x fds.def

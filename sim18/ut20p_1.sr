@@ -774,5 +774,6 @@ TL2A:    SHR                     ..DIV BY 2?
  INIT2:LBR DSKGO2
  GOUT20:LBR ENTER
 CKHEX:  LBR CHKXE
+ NOP                              ..PAD TO 1024BYTES
 ..
  END #8000

@@ -1,7 +1,5 @@
 /* calc18 Fibonacci example */
 
-#include "stdlib.prg"
-
 fib(n) {
    if (n < 2)
       return (n);

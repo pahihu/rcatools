@@ -78,7 +78,7 @@ int needfp = 1; // need FP
 int funhd = 0; // fn header
 
 
-static int lbl = 1; // label generator
+int lbl = 1; // label generator
 static int Fbranch = 0,Tbranch = 0;
 
 #define LO(x)   ((x) & 0xFF)

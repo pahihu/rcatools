@@ -152,7 +152,4 @@ main() {
    }
 }
 
-#define NEED_hex
-#include "stdlib.prg"
-
 /* vim: set ts=3 sw=3 et: */
