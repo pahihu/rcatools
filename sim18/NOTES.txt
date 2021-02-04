@@ -1,6 +1,21 @@
 CDP1802 NOTES
 =============
 
+- M.Riley 512K memory expansion
+  16K switched into $8000 - $BFFF
+  external latch (5bits [or 8bit]) controlled by writing to any address from
+  $C000 upwards.
+
+  16K requires 14bits + 5bits latch => 19bits, 512K
+                      + 8bits latch => 22bits, 4MB
+
+- Lee Hart's Altaid8080 design
+
+  It uses a 74HC251 multiplexer and a 74HC259 addressable latch. The 64K
+  memory space is broken into 8K pages, and each page can be selected as
+  RAM, ROM, or none. Bits in the addressable latch control bank-switching
+  and select the upper address bits of up to 1 Mbyte of memory.
+
 - AMSAT AO-40 IHU-1 (also on OSCAR 10, 13)
    AO-13 w/ 32K of memory, but never used more than 16K
    CDP-1802 w/ 16KB of memory, running at 100K instr/s
